@@ -1,0 +1,128 @@
+{
+  "theme_archetype": {
+    "name": "Archetype 5: Jewel & Luxury (Adapted for Dark Mode SaaS)",
+    "mode": "dark",
+    "rationale": "Indian wedding photography is high-end, visual, and dramatic. The target audience (creatives, editors, videographers) works natively in dark environments (Lightroom, Premiere). A cinematic dark mode with high-contrast golden accents communicates premium quality, trust, and the 'golden hour' aesthetic, while maintaining technical clarity for SaaS operations."
+  },
+  "colors": {
+    "background": {
+      "base": "#0A0A0A",
+      "surface": "#131315",
+      "elevated": "#1C1C1F"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A",
+      "inverse": "#000000"
+    },
+    "brand": {
+      "primary": "#F59E0B",
+      "primary_hover": "#D97706",
+      "accent": "#EAB308",
+      "muted_accent": "rgba(245, 158, 11, 0.15)"
+    },
+    "utility": {
+      "border": "rgba(255, 255, 255, 0.1)",
+      "border_focus": "rgba(245, 158, 11, 0.5)",
+      "success": "#10B981",
+      "warning": "#F43F5E",
+      "glass": "rgba(10, 10, 10, 0.6)"
+    },
+    "rules": {
+      "gradients": "No generic full-screen gradients. Use subtle radial glows (blur-3xl) behind key elements (like the gig negotiation card) using the brand.muted_accent color.",
+      "contrast": "Text below 18px must meet 4.5:1 WCAG AA. Interactive elements must explicitly define hover text colors (e.g., hover:text-white).",
+      "tinted_grey": "Greys are tinted slightly warm (Zinc scale in Tailwind) to complement the amber/gold accents."
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Cormorant Garamond",
+      "display": "Outfit",
+      "body": "Manrope",
+      "mono": "JetBrains Mono"
+    },
+    "hierarchy": {
+      "h1": "font-heading text-5xl sm:text-6xl tracking-tighter font-light",
+      "h2": "font-heading text-3xl sm:text-4xl tracking-tight",
+      "h3": "font-display text-xl sm:text-2xl font-semibold",
+      "h4": "font-display text-lg sm:text-xl font-medium",
+      "body": "font-body text-base leading-relaxed",
+      "small": "font-body text-sm",
+      "label": "font-display text-xs uppercase tracking-[0.2em] text-secondary"
+    },
+    "rules": {
+      "marketing": "Use Cormorant Garamond for massive, editorial hero headlines to evoke wedding luxury.",
+      "dashboard": "Use Outfit for all dashboard module titles and numbers to ensure crisp, technical readability.",
+      "weights": "Avoid generic 'bold'. Mix 'light' headings with 'semibold' UI accents for high tension.",
+      "banned": "Inter, Roboto, Open Sans, Space Grotesk are strictly prohibited for headings."
+    }
+  },
+  "spacing_and_layout": {
+    "system": "Tailwind generously spaced scale. p-6, p-8 for standard cards, p-12 to p-24 for section gaps.",
+    "grids": {
+      "marketing": "MODE A (Tetris Grid) - Asymmetrical 12-col grid. Use col-span-8 for hero images, col-span-4 for typography. Never fill perfectly; leave negative space.",
+      "dashboard": "MODE B (Control Room) - Strict 4-col grid. gap-4 or gap-6. Every pixel utilized. h-full for children."
+    },
+    "rules": {
+      "optical_alignment": "Pad left-aligned text blocks optically when next to icons.",
+      "borders": "Containers with borders MUST have p-6 or p-8 internal padding.",
+      "mobile": "Mobile-first grids. Max image height 80vh on mobile to prevent blocking scroll."
+    }
+  },
+  "surface_styles": {
+    "glassmorphism": "Used for Sticky Navs, Modals, and Action Bars. backdrop-blur-2xl bg-black/60 with a sharp 1px border-white/10. Drop shadow: shadow-[0_8px_32px_rgba(0,0,0,0.4)].",
+    "cards": "Used for Dashboard Widgets. Flat surface (bg-[#131315]), sharp or max rounded-md corners, 1px border-white/10. Hover state: border-[#F59E0B]/50 and slight -translate-y-1.",
+    "tracing_beam": "Used for the Pricing Card (₹69/mo) and Gig Invite Cards. Masked animated border glow.",
+    "grid_borders": "Used for the Calendar/Availability view. border-collapse, border-r border-b border-white/5."
+  },
+  "motion_and_interaction": {
+    "libraries": ["framer-motion", "lenis"],
+    "rules": {
+      "scroll": "MANDATORY: lenis for smooth momentum scrolling on marketing pages.",
+      "hover": "All interactive elements must have hover states. transition-all duration-200 ease-out.",
+      "entrance": "Staggered fade-up (y: 20, opacity: 0) for lists (like the Gig Team Assembly).",
+      "accessibility": "Respect prefers-reduced-motion. Add aria-hidden to decorative animations."
+    }
+  },
+  "components_strategy": {
+    "marketing_pages": "Pure HTML/Tailwind. Asymmetrical raw divs. No Shadcn structural cards.",
+    "dashboard_apps": "Shadcn UI heavily customized. Strip default Vercel aesthetic.",
+    "specific_components": {
+      "forms": "Shadcn Form, Input, Select. Dark background, white/10 borders.",
+      "calendar": "Shadcn Calendar for multi-day booking. Highlight 90-min buffer slots in muted warning color.",
+      "toast": "Sonner for notifications (Gig accepted, Counter-offer sent).",
+      "icons": "lucide-react for all standard UI icons."
+    },
+    "testing": "All interactive elements MUST include `data-testid` (e.g., data-testid='gig-accept-button')."
+  },
+  "media_and_images": {
+    "rules": "Maximum overlay opacity is bg-black/50. If image is too bright, use gradient overlay. Never use placeholder URLs.",
+    "images": {
+      "hero_marketing": {
+        "url": "https://images.unsplash.com/photo-1554844453-7ea2a562a6c8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHwxfHxwaG90b2dyYXBoZXIlMjBzaWxob3VldHRlJTIwc3Vuc2V0fGVufDB8fHx8MTc3NDU5MjgxNnww&ixlib=rb-4.1.0&q=85",
+        "description": "Photographer silhouette at sunset. Use for main landing page hero background.",
+        "treatment": "bg-black/40 overlay, parallax scroll."
+      },
+      "dashboard_empty_state": {
+        "url": "https://images.unsplash.com/photo-1656230776444-90623016e4d1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwxfHxjYW1lcmElMjBsZW5zZXMlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3NzQ1OTI4MTd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Macro camera lens. Use for Gear Vault empty state or background.",
+        "treatment": "Grayscale, opacity 20%."
+      },
+      "portfolio_example": {
+        "url": "https://images.pexels.com/photos/36252789/pexels-photo-36252789.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Stunning Indian bride and groom. Use in the 'Event Workspace' moodboard or Profile showcase.",
+        "treatment": "Crisp borders, no overlay, let the colors pop against the dark UI."
+      }
+    }
+  },
+  "pages_and_functionalities": {
+    "landing_page": "Hero with parallax image, dynamic 'Ticker' of premium gear brands. Bento grid for features.",
+    "auth_onboarding": "Multi-step wizard. Dark modal over blurred background. Progress bar in gold (#F59E0B).",
+    "dashboard": "Control room grid. High contrast metrics (Wallet, Invites).",
+    "gig_management": "Split-pane view. Left: Gig details and Session timeline. Right: Team assembly and negotiation loop (Quote/Counter/Accept buttons).",
+    "calendar": "Grid borders. Distinct visual states for 'Booked', 'Standby', and '90-min Buffer'.",
+    "financials": "Ledger table using Shadcn Table. Strict monospaced fonts for currency values (₹).",
+    "admin_dashboard": "Hyper-dense. Monochromatic with red/green status badges for ID Verification."
+  }
+}
