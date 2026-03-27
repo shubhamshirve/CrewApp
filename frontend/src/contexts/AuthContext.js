@@ -3,8 +3,9 @@ import axios from "axios";
 
 const AuthContext = createContext(null);
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-export const API = `${BACKEND_URL}/api`;
+// When REACT_APP_BACKEND_URL is empty (Docker/nginx-proxy mode), use relative /api
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
+export const API = BACKEND_URL ? `${BACKEND_URL}/api` : "/api";
 
 const api = axios.create({ baseURL: API });
 

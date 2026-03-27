@@ -1,0 +1,26 @@
+.git/
+.gitignore
+node_modules/
+*/node_modules/
+
+# Logs
+*.log
+logs/
+
+# Test reports
+test_reports/
+tests/
+
+# IDE
+.vscode/
+.idea/
+
+# Dev environment files
+*.env.local
+.env.*.local
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/

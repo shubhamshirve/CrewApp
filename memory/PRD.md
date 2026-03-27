@@ -103,7 +103,14 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ `AdminDashboard.jsx` — Verification queue, user management, penalties
 - ✅ `Layout.jsx` — Collapsible sidebar, mobile menu
 
-## Prioritized Backlog
+## Docker Setup (Added)
+- ✅ `backend/Dockerfile` — Python 3.11-slim, installs requirements, runs uvicorn
+- ✅ `frontend/Dockerfile` — Multi-stage: Node 20 build → nginx:alpine serve
+- ✅ `frontend/nginx.conf` — Proxies `/api` to `backend:8001`, serves React SPA
+- ✅ `docker-compose.yml` — 3 services: mongodb, backend, frontend with health checks
+- ✅ `backend/.dockerignore` / `frontend/.dockerignore` / `.dockerignore`
+- ✅ `backend/.env.example` / `frontend/.env.example` — Templates without secrets
+- ✅ `README.docker.md` — Complete setup guide with commands, architecture diagram, troubleshooting
 
 ### P0 (Critical - Next Sprint)
 - [ ] Google Calendar two-way sync (currently mocked)
