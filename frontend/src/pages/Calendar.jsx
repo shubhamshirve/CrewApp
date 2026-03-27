@@ -1,0 +1,156 @@
+import React, { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import Layout from "@/components/Layout";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Zap, ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
+import { toast } from "sonner";
+
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+export default function CalendarPage() {
+  const { user, api } = useAuth();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [gigs, setGigs] = useState([]);
+  const [invites, setInvites] = useState([]);
+  const [isStandby, setIsStandby] = useState(user?.is_standby || false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [gigRes, invRes] = await Promise.all([
+          api.get("/gigs"),
+          api.get("/gigs/invites/received"),
+        ]);
+        setGigs(gigRes.data);
+        setInvites(invRes.data.filter(i => i.status === "accepted"));
+      } catch {}
+    };
+    load();
+  }, []);
+
+  const toggleStandby = async () => {
+    try {
+      await api.put("/users/settings", { is_standby: !isStandby });
+      setIsStandby(!isStandby);
+      toast.success(isStandby ? "Standby mode off" : "Standby mode on – you're available for urgent gigs!");
+    } catch { toast.error("Failed to update"); }
+  };
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+
+  const getEventsForDay = (day) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const events = [];
+    gigs.forEach(g => {
+      g.sessions?.forEach(s => {
+        if (s.date === dateStr) {
+          events.push({ type: "gig", title: g.title, event_type: s.event_type, status: g.status });
+        }
+      });
+    });
+    invites.forEach(inv => {
+      if (inv.session_date === dateStr) {
+        events.push({ type: "invite", title: inv.gig_title, role: inv.role });
+      }
+    });
+    return events;
+  };
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  return (
+    <Layout>
+      <div className="max-w-4xl mx-auto space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white font-display">Calendar</h1>
+            <p className="text-zinc-500 text-sm mt-0.5">Your availability & scheduled gigs</p>
+          </div>
+          <button
+            data-testid="standby-toggle"
+            onClick={toggleStandby}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-display transition-all ${isStandby ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-white/10 text-zinc-400 hover:border-white/20"}`}
+          >
+            <Zap size={14} className={isStandby ? "text-emerald-400" : ""} />
+            {isStandby ? "Standby: ON" : "Standby: OFF"}
+          </button>
+        </div>
+
+        {/* Calendar */}
+        <div className="p-5 rounded-2xl border" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }}>
+          {/* Month nav */}
+          <div className="flex items-center justify-between mb-5">
+            <button data-testid="prev-month-btn" onClick={prevMonth} className="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors">
+              <ChevronLeft size={18} />
+            </button>
+            <h2 className="text-lg font-semibold text-white font-display">{MONTHS[month]} {year}</h2>
+            <button data-testid="next-month-btn" onClick={nextMonth} className="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors">
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          {/* Day headers */}
+          <div className="grid grid-cols-7 mb-2">
+            {DAYS.map(d => (
+              <div key={d} className="text-center text-xs text-zinc-600 font-display py-1.5">{d}</div>
+            ))}
+          </div>
+
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-px" style={{ background: "rgba(255,255,255,0.04)" }}>
+            {cells.map((day, idx) => {
+              if (!day) return <div key={`empty-${idx}`} style={{ background: "#131315", minHeight: "72px" }} />;
+              const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const isToday = dateStr === todayStr;
+              const events = getEventsForDay(day);
+              return (
+                <div key={day} data-testid={`calendar-day-${dateStr}`} className="p-2 min-h-[72px]" style={{ background: "#131315" }}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-display mb-1 ${isToday ? "bg-amber-500 text-black font-bold" : "text-zinc-400"}`}>
+                    {day}
+                  </div>
+                  <div className="space-y-0.5">
+                    {events.slice(0, 2).map((ev, i) => (
+                      <div key={i} className="text-[10px] px-1 py-0.5 rounded truncate font-display" style={{
+                        background: ev.type === "gig" ? "rgba(245,158,11,0.15)" : "rgba(59,130,246,0.15)",
+                        color: ev.type === "gig" ? "#F59E0B" : "#60A5FA"
+                      }}>
+                        {ev.type === "gig" ? ev.event_type : ev.role}
+                      </div>
+                    ))}
+                    {events.length > 2 && <div className="text-[10px] text-zinc-600 px-1">+{events.length - 2} more</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex items-center gap-4 text-xs text-zinc-500 font-display">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: "rgba(245,158,11,0.3)" }} />My Gigs</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: "rgba(59,130,246,0.3)" }} />Booked Sessions</span>
+          <span className="flex items-center gap-1.5"><Zap size={10} className="text-emerald-400" />Standby Active</span>
+        </div>
+
+        {/* Note about 90-min buffer */}
+        <div className="p-3 rounded-lg border text-xs text-zinc-500" style={{ borderColor: "rgba(245,158,11,0.1)", background: "rgba(245,158,11,0.04)" }}>
+          <span className="text-amber-500 font-display">90-min buffer rule:</span> The platform enforces a minimum 90-minute gap between back-to-back bookings on the same day to ensure gear pack-down and travel time.
+        </div>
+      </div>
+    </Layout>
+  );
+}
