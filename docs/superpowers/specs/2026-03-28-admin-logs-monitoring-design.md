@@ -202,6 +202,7 @@ Route: `/admin/logs`
 
 ---
 
+
 ## Out of Scope
 
 - Log retention / TTL policies
