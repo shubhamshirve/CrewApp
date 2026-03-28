@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Search, Users, Briefcase, Calendar,
-  Wallet, Bell, LogOut, Shield, User, ChevronLeft, ChevronRight,
+  Wallet, Bell, LogOut, User, ChevronLeft, ChevronRight,
   Menu, X, Globe
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -81,21 +81,7 @@ export default function Layout({ children }) {
             </Link>
           );
         })}
-        {user?.is_admin && (
-          <Link
-            to="/admin"
-            data-testid="nav-admin"
-            onClick={() => setMobileOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
-              location.pathname === "/admin"
-                ? "bg-amber-500/15 text-amber-400"
-                : "text-zinc-400 hover:text-white hover:bg-white/5"
-            } ${collapsed ? "justify-center" : ""}`}
-          >
-            <Shield size={18} />
-            {!collapsed && <span className="text-sm font-medium font-display">Admin</span>}
-          </Link>
-        )}
+        {/* Admin panel is separate — accessible at /admin/login */}
       </nav>
 
       {/* User */}

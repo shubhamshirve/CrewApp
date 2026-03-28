@@ -119,6 +119,14 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - [ ] 90-minute buffer enforcement in API
 - [ ] Email notifications (Resend/SendGrid)
 
+### What's New — Separated Admin Panel (DONE)
+- ✅ `AdminLogin.jsx` — Separate admin login at `/admin/login` (blue navy theme, shield branding)
+- ✅ `AdminLayout.jsx` — Distinct admin sidebar (blue accents, separate from user app)
+- ✅ Admin sub-pages: `AdminOverview`, `AdminVerification`, `AdminUsers`, `AdminPenalties`, `AdminGigBoard`
+- ✅ `App.js` refactored — `RootRouter` splits `/admin/*` → AdminApp and all else → UserApp
+- ✅ Admin link removed from user `Layout.jsx` — zero cross-contamination
+- ✅ Admin URL: `/admin/login` → `/admin/dashboard` (separate session, separate UI)
+
 ### What's New — Public Gig Board (DONE)
 - ✅ `routers/public_gigs.py` — Full CRUD: post, browse, apply, accept/reject, cancel
 - ✅ `services/rewards_service.py` — Milestone rewards (5/10/25/50/100 gigs)
