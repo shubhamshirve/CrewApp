@@ -1,8 +1,13 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, Request, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.exception_handlers import http_exception_handler as _default_http_handler
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
+import uuid
+import traceback as tb_module
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent
@@ -12,6 +17,46 @@ from routers import auth, users, admin, gigs, connections, wallet, notifications
 from db import client, db
 
 app = FastAPI(title="CrewBook API - Freelance Crew Booking Platform")
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    user_id = getattr(request.state, "user_id", None)
+    try:
+        await db.api_error_logs.insert_one({
+            "_id": str(uuid.uuid4()),
+            "status_code": exc.status_code,
+            "method": request.method,
+            "path": request.url.path,
+            "user_id": user_id,
+            "error_detail": str(exc.detail),
+            "traceback": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as log_err:
+        logger.error("api_error_log write failed: %s", log_err)
+    return await _default_http_handler(request, exc)
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    user_id = getattr(request.state, "user_id", None)
+    try:
+        await db.api_error_logs.insert_one({
+            "_id": str(uuid.uuid4()),
+            "status_code": 500,
+            "method": request.method,
+            "path": request.url.path,
+            "user_id": user_id,
+            "error_detail": str(exc),
+            "traceback": tb_module.format_exc(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as log_err:
+        logger.error("api_error_log write failed: %s", log_err)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 api_router = APIRouter(prefix="/api")
 
 api_router.include_router(auth.router, tags=["auth"])
@@ -58,6 +103,12 @@ async def startup():
     await db.gig_invites.create_index([("gig_id", 1)])
     await db.connections.create_index([("requester_id", 1), ("recipient_id", 1)])
     await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
+    await db.admin_logs.create_index([("created_at", -1)])
+    await db.api_error_logs.create_index([("created_at", -1)])
+    await db.payment_logs.create_index([("created_at", -1)])
+    await db.ai_usage_logs.create_index([("created_at", -1)])
+    await db.whatsapp_logs.create_index([("created_at", -1)])
+    await db.login_logs.create_index([("created_at", -1)])
     logger.info("CrewBook API started successfully")
 
 
