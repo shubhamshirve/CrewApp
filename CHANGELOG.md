@@ -32,6 +32,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `admin/AdminUsers.jsx`, `AdminUserProfile.jsx`
 - `admin/AdminSettings.jsx`, `AdminTemplates.jsx`, `AdminLogs.jsx`, `AdminGigBoard.jsx`
 
+**Auth**
+- Unified admin and user login into a single `/auth` page — admins log in via the same form and are automatically redirected to `/admin/dashboard` based on the `is_admin` flag
+- Removed separate `AdminLogin.jsx` page and `/admin/login` route; both now redirect to `/auth`
+- `AdminGuard` updated to redirect unauthenticated/non-admin users to `/auth`
+
 **Docs**
 - `CLAUDE.md` — updated design system section; added Agent Protocol (read on start, update on finish)
 

@@ -20,7 +20,6 @@ import Notifications from "@/pages/Notifications";
 import GigBoard from "@/pages/GigBoard";
 
 // Admin app pages
-import AdminLogin from "@/pages/AdminLogin";
 import AdminOverview from "@/pages/admin/AdminOverview";
 import AdminVerification from "@/pages/admin/AdminVerification";
 import AdminUsers from "@/pages/admin/AdminUsers";
@@ -50,8 +49,8 @@ function AdminGuard({ children }) {
       <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
-  if (!user) return <Navigate to="/admin/login" replace />;
-  if (!user.is_admin) return <Navigate to="/admin/login" replace />;
+  if (!user) return <Navigate to="/auth" replace />;
+  if (!user.is_admin) return <Navigate to="/auth" replace />;
   return children;
 }
 
@@ -60,10 +59,7 @@ function AdminRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
-      <Route
-        path="/admin/login"
-        element={user?.is_admin ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin />}
-      />
+      <Route path="/admin/login" element={<Navigate to="/auth" replace />} />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/admin/dashboard" element={<AdminGuard><AdminOverview /></AdminGuard>} />
       <Route path="/admin/verification" element={<AdminGuard><AdminVerification /></AdminGuard>} />
