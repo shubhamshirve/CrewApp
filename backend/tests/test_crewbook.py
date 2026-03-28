@@ -311,3 +311,104 @@ class TestAdminBulkAction:
             "user_ids": [],
         })
         assert resp.status_code == 400
+
+
+class TestAdminImpersonate:
+    """POST /admin/impersonate/{id} returns a short-lived user token"""
+
+    def test_impersonate_returns_token(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/impersonate/{user_id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "token" in data
+        assert data["expires_in"] == 3600
+
+    def test_impersonate_token_authenticates_as_user(self, api, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/impersonate/{user_id}")
+        token = resp.json()["token"]
+        me_resp = api.get(
+            f"{BASE_URL}/api/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert me_resp.status_code == 200
+        assert me_resp.json()["id"] == user_id
+
+    def test_impersonate_nonexistent_user(self, admin_client):
+        resp = admin_client.post(f"{BASE_URL}/api/admin/impersonate/nonexistent-id")
+        assert resp.status_code == 404
+
+
+class TestAdminWalletAdjust:
+    """POST /admin/wallet/{id}/adjust credits or debits user wallet"""
+
+    def test_credit_increases_balance(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/wallet/{user_id}/adjust", json={
+            "amount": 100.0,
+            "type": "credit",
+            "reason": "Goodwill credit for test",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "new_balance" in data
+        assert data["new_balance"] >= 100.0
+
+    def test_debit_decreases_balance(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        admin_client.post(f"{BASE_URL}/api/admin/wallet/{user_id}/adjust", json={
+            "amount": 200.0, "type": "credit", "reason": "Setup"
+        })
+        resp = admin_client.post(f"{BASE_URL}/api/admin/wallet/{user_id}/adjust", json={
+            "amount": 50.0,
+            "type": "debit",
+            "reason": "Correction debit",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["new_balance"] >= 150.0
+
+    def test_zero_amount_rejected(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/wallet/{user_id}/adjust", json={
+            "amount": 0,
+            "type": "credit",
+            "reason": "Bad input",
+        })
+        assert resp.status_code == 400
+
+    def test_missing_reason_rejected(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/wallet/{user_id}/adjust", json={
+            "amount": 10.0,
+            "type": "credit",
+            "reason": "",
+        })
+        assert resp.status_code == 400
+
+
+class TestAdminUserFlags:
+    """PUT /admin/users/{id}/flags sets is_featured and is_high_risk"""
+
+    def test_set_featured(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.put(f"{BASE_URL}/api/admin/users/{user_id}/flags", json={
+            "is_featured": True,
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["is_featured"] is True
+
+    def test_set_high_risk(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.put(f"{BASE_URL}/api/admin/users/{user_id}/flags", json={
+            "is_high_risk": True,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["is_high_risk"] is True
+
+    def test_flags_404_on_missing(self, admin_client):
+        resp = admin_client.put(f"{BASE_URL}/api/admin/users/nonexistent/flags", json={
+            "is_featured": False,
+        })
+        assert resp.status_code == 404

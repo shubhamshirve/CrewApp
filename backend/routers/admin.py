@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import uuid
 
 from db import get_db
-from auth_utils import get_admin_user, _clean_user
+from auth_utils import get_admin_user, _clean_user, create_impersonation_token
 from services.notifications_service import send_notification
 
 router = APIRouter(prefix="/admin")
@@ -26,6 +26,17 @@ class BulkActionRequest(BaseModel):
     user_ids: List[str]
     title: Optional[str] = None
     message: Optional[str] = None
+
+
+class WalletAdjustRequest(BaseModel):
+    amount: float
+    type: str  # credit | debit
+    reason: str
+
+
+class UserFlagsRequest(BaseModel):
+    is_featured: Optional[bool] = None
+    is_high_risk: Optional[bool] = None
 
 
 @router.get("/verification-queue")
@@ -202,6 +213,87 @@ async def bulk_action(data: BulkActionRequest, admin: dict = Depends(get_admin_u
         updated = len(data.user_ids)
 
     return {"updated": updated}
+
+
+@router.post("/impersonate/{user_id}")
+async def impersonate_user(user_id: str, admin: dict = Depends(get_admin_user)):
+    db = get_db()
+    user = await db.users.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    token = create_impersonation_token(user_id=user_id, admin_id=admin["id"])
+    return {"token": token, "expires_in": 3600}
+
+
+@router.post("/wallet/{user_id}/adjust")
+async def adjust_wallet(user_id: str, data: WalletAdjustRequest, admin: dict = Depends(get_admin_user)):
+    db = get_db()
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+    if not data.reason.strip():
+        raise HTTPException(status_code=400, detail="Reason is required")
+    if data.type not in ("credit", "debit"):
+        raise HTTPException(status_code=400, detail="type must be credit or debit")
+
+    user = await db.users.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    current_balance = user.get("wallet_balance", 0.0)
+    delta = data.amount if data.type == "credit" else -data.amount
+    new_balance = current_balance + delta
+
+    now = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"_id": user_id},
+        {"$set": {"wallet_balance": new_balance, "updated_at": now}},
+    )
+    await db.wallet_adjustments.insert_one({
+        "_id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "admin_id": admin["id"],
+        "type": data.type,
+        "amount": data.amount,
+        "reason": data.reason,
+        "created_at": now,
+    })
+    txn_type = "admin_credit" if data.type == "credit" else "admin_debit"
+    await db.wallet_transactions.insert_one({
+        "_id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "type": txn_type,
+        "amount": data.amount,
+        "description": data.reason,
+        "created_at": now,
+    })
+    await send_notification(
+        db, user_id, "wallet",
+        f"Wallet {'Credited' if data.type == 'credit' else 'Debited'}",
+        f"₹{data.amount:.2f} {'added to' if data.type == 'credit' else 'deducted from'} your wallet. Reason: {data.reason}",
+        {},
+    )
+    return {"new_balance": new_balance}
+
+
+@router.put("/users/{user_id}/flags")
+async def update_user_flags(user_id: str, data: UserFlagsRequest, admin: dict = Depends(get_admin_user)):
+    db = get_db()
+    user = await db.users.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if data.is_featured is not None:
+        updates["is_featured"] = data.is_featured
+    if data.is_high_risk is not None:
+        updates["is_high_risk"] = data.is_high_risk
+
+    await db.users.update_one({"_id": user_id}, {"$set": updates})
+    updated = await db.users.find_one({"_id": user_id})
+    return {
+        "is_featured": updated.get("is_featured", False),
+        "is_high_risk": updated.get("is_high_risk", False),
+    }
 
 
 @router.get("/stats")
