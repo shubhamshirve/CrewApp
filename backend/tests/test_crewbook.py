@@ -412,3 +412,112 @@ class TestAdminUserFlags:
             "is_featured": False,
         })
         assert resp.status_code == 404
+
+
+class TestAdminLogs:
+    """GET /admin/logs/* returns paginated log data"""
+
+    def test_admin_actions_returns_items_and_total(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/admin-actions")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_admin_actions_filter_by_action(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/admin-actions", params={"action": "verify_user"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_api_errors_returns_items_and_total(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/api-errors")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_api_errors_filter_by_status_code(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/api-errors", params={"status_code": 500})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_payments_returns_items_and_total(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/payments")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_payments_filter_by_event(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/payments", params={"event": "payment.captured"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_ai_usage_returns_items_and_total(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/ai-usage")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_whatsapp_returns_items_and_total(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/whatsapp")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_logins_returns_items_and_total(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/logins")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_logins_filter_by_user_id(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/logins", params={"user_id": user_id})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "total" in data
+        assert isinstance(data["items"], list)
+        assert isinstance(data["total"], int)
+
+    def test_logs_require_admin_auth(self, api):
+        # Remove Authorization header to test unauthenticated access
+        auth = api.headers.pop("Authorization", None)
+        resp = api.get(f"{BASE_URL}/api/admin/logs/admin-actions")
+        if auth:
+            api.headers.update({"Authorization": auth})
+        assert resp.status_code in [401, 403]
+
+    def test_limit_capped_at_100(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/logs/admin-actions", params={"limit": 999})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["items"]) <= 100
