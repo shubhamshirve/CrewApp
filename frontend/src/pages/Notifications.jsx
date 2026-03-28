@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Bell, Check, CheckCheck } from "lucide-react";
+import { Bell, Check, CheckCheck, BellOff, BellRing } from "lucide-react";
 import { toast } from "sonner";
+import { pushService } from "@/services/pushService";
 
 const TYPE_COLORS = {
   invite: "#F97316",
@@ -23,6 +24,58 @@ export default function Notifications() {
   const { api } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pushState, setPushState] = useState("default"); // 'default' | 'granted' | 'denied' | 'subscribed'
+  const [pushLoading, setPushLoading] = useState(false);
+
+  useEffect(() => { load(); checkPushState(); }, []);
+
+  const checkPushState = async () => {
+    if (!pushService.isSupported()) return;
+    const perm = pushService.getPermission();
+    if (perm === "granted") {
+      const existing = await pushService.getExistingSubscription();
+      setPushState(existing ? "subscribed" : "granted");
+    } else {
+      setPushState(perm); // 'default' or 'denied'
+    }
+  };
+
+  const handleEnablePush = async () => {
+    if (!pushService.isSupported()) {
+      toast.error("Push notifications are not supported in this browser");
+      return;
+    }
+    setPushLoading(true);
+    try {
+      const perm = await pushService.requestPermission();
+      if (perm !== "granted") {
+        toast.error("Notification permission denied. Please allow notifications in your browser settings.");
+        setPushState("denied");
+        return;
+      }
+      const subscription = await pushService.subscribe();
+      await pushService.saveSubscription(subscription, api);
+      setPushState("subscribed");
+      toast.success("Push notifications enabled!");
+    } catch (err) {
+      toast.error(err.message || "Failed to enable push notifications");
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    setPushLoading(true);
+    try {
+      await pushService.unsubscribe(api);
+      setPushState("default");
+      toast.success("Push notifications disabled");
+    } catch {
+      toast.error("Failed to disable push notifications");
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -65,11 +118,43 @@ export default function Notifications() {
             <h1 className="text-2xl font-semibold text-slate-900 font-display">Notifications</h1>
             {unreadCount > 0 && <p className="text-sm text-slate-500 mt-0.5">{unreadCount} unread</p>}
           </div>
-          {unreadCount > 0 && (
-            <Button size="sm" data-testid="mark-all-read-btn" onClick={markAllRead} variant="outline" className="border-slate-200 text-slate-500 hover:text-slate-900 gap-1.5 text-xs font-display">
-              <CheckCheck size={13} /> Mark all read
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Push notification toggle */}
+            {pushService.isSupported() && (
+              pushState === "subscribed" ? (
+                <Button
+                  size="sm"
+                  data-testid="disable-push-btn"
+                  onClick={handleDisablePush}
+                  disabled={pushLoading}
+                  variant="outline"
+                  className="border-slate-200 text-slate-500 hover:text-red-500 gap-1.5 text-xs font-display"
+                >
+                  <BellOff size={13} /> {pushLoading ? "..." : "Disable Alerts"}
+                </Button>
+              ) : pushState === "denied" ? (
+                <span className="text-xs text-slate-400 flex items-center gap-1">
+                  <BellOff size={12} /> Notifications blocked
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  data-testid="enable-push-btn"
+                  onClick={handleEnablePush}
+                  disabled={pushLoading}
+                  className="gap-1.5 text-xs font-display text-white"
+                  style={{ background: "#E05D26" }}
+                >
+                  <BellRing size={13} /> {pushLoading ? "Enabling..." : "Enable Alerts"}
+                </Button>
+              )
+            )}
+            {unreadCount > 0 && (
+              <Button size="sm" data-testid="mark-all-read-btn" onClick={markAllRead} variant="outline" className="border-slate-200 text-slate-500 hover:text-slate-900 gap-1.5 text-xs font-display">
+                <CheckCheck size={13} /> Mark all read
+              </Button>
+            )}
+          </div>
         </div>
 
         {loading ? (

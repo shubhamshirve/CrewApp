@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from routers import auth, users, admin, gigs, connections, wallet, notifications, ratings, ai_routes, public_gigs, platform_settings, templates, calendar_sync, notes
+from routers import auth, users, admin, gigs, connections, wallet, notifications, ratings, ai_routes, public_gigs, platform_settings, templates, calendar_sync, notes, push
 from db import client, db
 
 app = FastAPI(title="CrewBook API - Freelance Crew Booking Platform")
@@ -73,6 +73,7 @@ api_router.include_router(platform_settings.router, tags=["platform"])
 api_router.include_router(templates.router, tags=["templates"])
 api_router.include_router(calendar_sync.router, tags=["calendar-sync"])
 api_router.include_router(notes.router, tags=["notes"])
+api_router.include_router(push.router, tags=["push"])
 
 
 @api_router.get("/health")
@@ -116,6 +117,8 @@ async def startup():
     await db.notification_templates.create_index([("event_type", 1)], unique=True, sparse=True)
     await db.calendar_sync_logs.create_index([("user_id", 1), ("created_at", -1)])
     await db.lead_notes.create_index([("lead_id", 1), ("freelancer_id", 1)], unique=True, sparse=True)
+    await db.push_subscriptions.create_index([("user_id", 1)])
+    await db.push_subscriptions.create_index("endpoint", unique=True)
     logger.info("CrewBook API started successfully")
 
 

@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Search, Users, Briefcase, Calendar,
   Wallet, Bell, LogOut, User, ChevronLeft, ChevronRight,
-  Menu, Globe
+  Menu, Globe, Download, X
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -26,10 +26,39 @@ export default function Layout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [unread, setUnread] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   useEffect(() => {
     api.get("/notifications/unread-count").then(r => setUnread(r.data.count)).catch(() => {});
   }, [location.pathname]);
+
+  // Capture the browser's install prompt event
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      const dismissed = sessionStorage.getItem("pwa-install-dismissed");
+      if (!dismissed) setShowInstallBanner(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") {
+      setShowInstallBanner(false);
+      setInstallPrompt(null);
+    }
+  };
+
+  const dismissBanner = () => {
+    setShowInstallBanner(false);
+    sessionStorage.setItem("pwa-install-dismissed", "1");
+  };
 
   const handleLogout = () => { logout(); navigate("/"); };
 
@@ -161,6 +190,30 @@ export default function Layout({ children }) {
         </div>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* PWA Install Banner */}
+          {showInstallBanner && (
+            <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-orange-200 bg-orange-50 text-sm">
+              <div className="flex items-center gap-2">
+                <Download size={15} className="text-orange-500 flex-shrink-0" />
+                <span className="text-slate-700 font-display">
+                  Install <strong>CrewBook</strong> on your device for quick access
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  data-testid="pwa-install-btn"
+                  onClick={handleInstall}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white font-display"
+                  style={{ background: "#E05D26" }}
+                >
+                  Install
+                </button>
+                <button onClick={dismissBanner} className="text-slate-400 hover:text-slate-600 p-0.5">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
           {children}
         </main>
       </div>
