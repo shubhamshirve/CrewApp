@@ -114,7 +114,7 @@ Add two exception handlers:
 - `@app.exception_handler(HTTPException)` — writes `api_error_logs` for 4xx, re-raises
 - `@app.exception_handler(Exception)` — writes `api_error_logs` for 5xx with `traceback.format_exc()`, re-raises as 500
 
-Both extract `user_id` from request state if set by auth middleware (best-effort, nullable).
+Both receive `request: Request` as first argument. Extract `user_id` from `request.state` if set by auth dependency (best-effort, nullable — anonymous requests log `null`).
 
 ### `routers/admin.py`
 
@@ -144,13 +144,13 @@ All return `{ "items": [...], "total": int }`. Max `limit` capped at 100. Result
 ### `routers/wallet.py`
 Add `payment_logs` inserts:
 - In `create_subscription_order`: log `order_created` (or `wallet_covered` for full-wallet-cover path)
-- In `verify_payment`: log `payment_verified` on success, `payment_failed` on `BadSignature`
+- In `verify_payment`: log `payment_verified` on success, `payment_failed` **before raising** the `HTTPException(400)` on bad signature (do not rely on error middleware for this case)
 
 ### `routers/ai_routes.py`
 After each `chat.send_message()` call, insert `ai_usage_logs` document. Compute `prompt_chars` from the prompt string length, `response_chars` from `len(response)`.
 
 ### `services/whatsapp_mock.py`
-After each simulated send, insert `whatsapp_logs` document.
+Add `user_id: str` parameter to `send_whatsapp_message()`. All callers must pass the user's ID. After each simulated send, insert `whatsapp_logs` document.
 
 ### `server.py` — startup indexes
 ```python
