@@ -4,7 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Wallet, Briefcase, Bell, Star, Shield, ChevronRight, CheckCircle, Clock, XCircle, AlertCircle, User, Zap } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Wallet, Briefcase, Bell, Star, Shield, ChevronRight, CheckCircle, Clock, XCircle, AlertCircle, User, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_MAP = {
@@ -23,22 +24,84 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [gigs, setGigs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pendingRatings, setPendingRatings] = useState([]);
+  const [ratingModal, setRatingModal] = useState(null); // { gig, users_to_rate, currentIdx }
+  const [ratingForm, setRatingForm] = useState({ punctuality: 3, gear_handling: 3, teamwork: 3, notes: "" });
+  const [submittingRating, setSubmittingRating] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [invRes, notifRes, gigRes] = await Promise.all([
+        const [invRes, notifRes, gigRes, ratingRes] = await Promise.all([
           api.get("/gigs/invites/received"),
           api.get("/notifications"),
           api.get("/gigs"),
+          api.get("/ratings/pending"),
         ]);
         setInvites(invRes.data.filter(i => i.status === "pending").slice(0, 3));
         setNotifications(notifRes.data.slice(0, 5));
         setGigs(gigRes.data.filter(g => g.status === "active").slice(0, 3));
+        setPendingRatings(ratingRes.data || []);
       } catch { /* noop */ } finally { setLoading(false); }
     };
     load();
   }, []);
+
+  const openRatingModal = (item) => {
+    setRatingModal({ ...item, currentIdx: 0 });
+    setRatingForm({ punctuality: 3, gear_handling: 3, teamwork: 3, notes: "" });
+  };
+
+  const handleSubmitRating = async () => {
+    if (!ratingModal) return;
+    const userToRate = ratingModal.users_to_rate[ratingModal.currentIdx];
+    setSubmittingRating(true);
+    try {
+      await api.post("/ratings", {
+        gig_id: ratingModal.gig.id,
+        rated_user_id: userToRate.user_id,
+        punctuality: ratingForm.punctuality,
+        gear_handling: ratingForm.gear_handling,
+        teamwork: ratingForm.teamwork,
+        notes: ratingForm.notes || null,
+      });
+      toast.success(`Rated ${userToRate.full_name}!`);
+
+      const nextIdx = ratingModal.currentIdx + 1;
+      if (nextIdx < ratingModal.users_to_rate.length) {
+        // Rate next person in same gig
+        setRatingModal(m => ({ ...m, currentIdx: nextIdx }));
+        setRatingForm({ punctuality: 3, gear_handling: 3, teamwork: 3, notes: "" });
+      } else {
+        // All rated for this gig — remove from pending list
+        setRatingModal(null);
+        setPendingRatings(pr => pr.filter(r => r.gig.id !== ratingModal.gig.id));
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to submit rating");
+    } finally {
+      setSubmittingRating(false); }
+  };
+
+  const RatingSlider = ({ label, field }) => (
+    <div>
+      <div className="flex justify-between text-xs mb-2">
+        <span className="text-zinc-400 font-display">{label}</span>
+        <span className="text-amber-400 font-bold font-display">{ratingForm[field]}/5</span>
+      </div>
+      <input
+        type="range" min="1" max="5" step="1"
+        value={ratingForm[field]}
+        onChange={e => setRatingForm(f => ({ ...f, [field]: parseInt(e.target.value) }))}
+        data-testid={`rating-slider-${field}`}
+        className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+        style={{ accentColor: "#F59E0B" }}
+      />
+      <div className="flex justify-between text-[9px] text-zinc-700 mt-1 font-display">
+        <span>Poor</span><span>Average</span><span>Excellent</span>
+      </div>
+    </div>
+  );
 
   const status = STATUS_MAP[user?.verification_status || "not_submitted"];
   const StatusIcon = status.icon;
@@ -87,6 +150,44 @@ export default function Dashboard() {
             <Button size="sm" data-testid="complete-verification-btn" onClick={() => navigate("/onboarding")} style={{ background: "#F59E0B", color: "#000" }} className="flex-shrink-0 text-xs font-display font-semibold">
               Verify Now
             </Button>
+          </div>
+        )}
+
+        {/* Post-event Rating Prompt */}
+        {pendingRatings.length > 0 && (
+          <div className="rounded-xl border" style={{ background: "rgba(139,92,246,0.06)", borderColor: "rgba(139,92,246,0.25)" }}>
+            <div className="p-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)" }}>
+                  <Star size={17} className="text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white font-display">
+                    Rate your crew — {pendingRatings.reduce((n, r) => n + r.users_to_rate.length, 0)} review{pendingRatings.reduce((n, r) => n + r.users_to_rate.length, 0) !== 1 ? "s" : ""} pending
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-0.5">Help build trust in the community by rating your collaborators</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-4 pb-4 space-y-2">
+              {pendingRatings.map(item => (
+                <div key={item.gig.id} className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)" }}>
+                  <div className="min-w-0">
+                    <p className="text-sm text-white font-display font-medium truncate">{item.gig.title}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">{item.users_to_rate.length} person{item.users_to_rate.length !== 1 ? "s" : ""} to rate: {item.users_to_rate.map(u => u.full_name).join(", ")}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    data-testid={`rate-gig-btn-${item.gig.id}`}
+                    onClick={() => openRatingModal(item)}
+                    className="ml-3 flex-shrink-0 text-xs font-display"
+                    style={{ background: "#8B5CF6", color: "#fff" }}
+                  >
+                    Rate Now
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -181,6 +282,74 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Rating Modal */}
+      {ratingModal && (
+        <Dialog open={true} onOpenChange={() => setRatingModal(null)}>
+          <DialogContent className="max-w-md" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.1)" }}>
+            <DialogHeader>
+              <DialogTitle className="text-white font-display flex items-center gap-2">
+                <Star size={16} className="text-purple-400" />
+                Rate your collaborator
+              </DialogTitle>
+            </DialogHeader>
+
+            {/* Progress */}
+            {ratingModal.users_to_rate.length > 1 && (
+              <div className="flex items-center gap-2 text-xs text-zinc-500 font-display">
+                <span>{ratingModal.currentIdx + 1} of {ratingModal.users_to_rate.length}</span>
+                <div className="flex-1 h-1 rounded-full bg-zinc-800">
+                  <div className="h-full rounded-full bg-purple-500 transition-all" style={{ width: `${((ratingModal.currentIdx + 1) / ratingModal.users_to_rate.length) * 100}%` }} />
+                </div>
+              </div>
+            )}
+
+            {/* Person being rated */}
+            <div className="p-3 rounded-lg" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
+              <p className="text-sm font-semibold text-white font-display">
+                {ratingModal.users_to_rate[ratingModal.currentIdx]?.full_name}
+              </p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {ratingModal.users_to_rate[ratingModal.currentIdx]?.role} · {ratingModal.gig.title}
+              </p>
+            </div>
+
+            {/* Rating sliders */}
+            <div className="space-y-4 mt-2">
+              <RatingSlider label="Punctuality" field="punctuality" />
+              <RatingSlider label="Gear Handling" field="gear_handling" />
+              <RatingSlider label="Teamwork" field="teamwork" />
+            </div>
+
+            {/* Private note */}
+            <div>
+              <label className="text-xs text-zinc-400 font-display block mb-1.5">Private Note (optional)</label>
+              <textarea
+                data-testid="rating-notes-input"
+                className="w-full bg-zinc-900 border border-white/10 text-white placeholder:text-zinc-600 text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500/50 resize-none h-16"
+                placeholder="Private note — only you can see this"
+                value={ratingForm.notes}
+                onChange={e => setRatingForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setRatingModal(null)} className="flex-1 border-white/10 text-zinc-400 text-xs">
+                Skip
+              </Button>
+              <Button
+                data-testid="submit-rating-btn"
+                onClick={handleSubmitRating}
+                disabled={submittingRating}
+                className="flex-1 text-xs font-display"
+                style={{ background: "#8B5CF6", color: "#fff" }}
+              >
+                {submittingRating ? "Submitting…" : ratingModal.currentIdx + 1 < ratingModal.users_to_rate.length ? "Rate & Next" : "Submit Rating"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Layout>
   );
 }

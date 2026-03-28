@@ -27,25 +27,85 @@ class AppealRequest(BaseModel):
 
 @router.get("/pending")
 async def get_pending_ratings(current_user: dict = Depends(get_current_user)):
-    """Gigs awaiting rating from current user."""
+    """
+    Returns gigs awaiting rating from current user, with the specific users to rate.
+    Lead photographers rate accepted freelancers; freelancers rate the lead.
+    """
     db = get_db()
     uid = current_user["id"]
-    completed_gig_ids = await db.gigs.distinct("_id", {"status": "completed"})
-    already_rated_gig_ids = await db.ratings.distinct("gig_id", {"rater_id": uid})
-    pending_ids = [g for g in completed_gig_ids if g not in already_rated_gig_ids]
-
     result = []
-    for gig_id in pending_ids[:20]:
-        gig = await db.gigs.find_one({"_id": gig_id})
+
+    # ── As Lead: rate each accepted freelancer on completed gigs ──────────────
+    lead_gigs = await db.gigs.find(
+        {"lead_photographer_id": uid, "status": "completed"}
+    ).sort("updated_at", -1).to_list(50)
+
+    for gig in lead_gigs:
+        gig_id = gig["_id"]
+        accepted_invites = await db.gig_invites.find(
+            {"gig_id": gig_id, "status": "accepted"}
+        ).to_list(50)
+        users_to_rate = []
+        for inv in accepted_invites:
+            already = await db.ratings.find_one({
+                "gig_id": gig_id,
+                "rater_id": uid,
+                "rated_user_id": inv["freelancer_id"],
+            })
+            if not already:
+                fl = await db.users.find_one(
+                    {"_id": inv["freelancer_id"]},
+                    {"password_hash": 0, "_id": 0}
+                )
+                if fl:
+                    users_to_rate.append({
+                        "user_id": inv["freelancer_id"],
+                        "full_name": fl.get("full_name", "Unknown"),
+                        "primary_role": fl.get("primary_role", ""),
+                        "role": inv["role"],
+                    })
+        if users_to_rate:
+            gig_dict = dict(gig)
+            gig_dict["id"] = str(gig_dict.pop("_id"))
+            result.append({"gig": gig_dict, "users_to_rate": users_to_rate})
+
+    # ── As Freelancer: rate the lead on completed gigs ────────────────────────
+    my_invites = await db.gig_invites.find(
+        {"freelancer_id": uid, "status": "accepted"}
+    ).to_list(100)
+
+    rated_gig_ids_as_freelancer = set()
+    for inv in my_invites:
+        gig = await db.gigs.find_one({"_id": inv["gig_id"], "status": "completed"})
         if not gig:
             continue
-        invite = await db.gig_invites.find_one({"gig_id": gig_id, "freelancer_id": uid, "status": "accepted"})
-        is_lead = gig.get("lead_photographer_id") == uid
-        if not invite and not is_lead:
+        gig_id = gig["_id"]
+        if gig_id in rated_gig_ids_as_freelancer:
             continue
-        gig_dict = dict(gig)
-        gig_dict["id"] = str(gig_dict.pop("_id"))
-        result.append(gig_dict)
+        already = await db.ratings.find_one({
+            "gig_id": gig_id,
+            "rater_id": uid,
+            "rated_user_id": gig["lead_photographer_id"],
+        })
+        if not already:
+            lead = await db.users.find_one(
+                {"_id": gig["lead_photographer_id"]},
+                {"password_hash": 0, "_id": 0}
+            )
+            if lead:
+                gig_dict = dict(gig)
+                gig_dict["id"] = str(gig_dict.pop("_id"))
+                result.append({
+                    "gig": gig_dict,
+                    "users_to_rate": [{
+                        "user_id": gig["lead_photographer_id"],
+                        "full_name": lead.get("full_name", "Unknown"),
+                        "primary_role": lead.get("primary_role", ""),
+                        "role": "Lead Photographer",
+                    }],
+                })
+                rated_gig_ids_as_freelancer.add(gig_id)
+
     return result
 
 

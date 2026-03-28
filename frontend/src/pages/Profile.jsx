@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Shield, MapPin, Star, Camera, CheckCircle, User, UserPlus, UserCheck, Zap } from "lucide-react";
+import { Shield, MapPin, Star, Camera, CheckCircle, User, UserPlus, UserCheck, Zap, StickyNote, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const CAT_COLORS = { Camera: "#3B82F6", Lens: "#8B5CF6", Lighting: "#F59E0B", Drone: "#10B981", Audio: "#EC4899", Other: "#6B7280" };
@@ -16,6 +16,10 @@ export default function Profile() {
   const [ratings, setRatings] = useState({ avg_rating: null, total_ratings: 0, ratings: [] });
   const [connectionStatus, setConnectionStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [note, setNote] = useState("");
+  const [noteLoading, setNoteLoading] = useState(false);
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteExists, setNoteExists] = useState(false);
 
   const isOwn = user?.id === id;
 
@@ -32,6 +36,12 @@ export default function Profile() {
           const conns = await api.get("/connections");
           const found = conns.data.find(c => c.user?.id === id);
           setConnectionStatus(found ? "connected" : null);
+          // Load private note
+          setNoteLoading(true);
+          const noteRes = await api.get(`/notes/${id}`);
+          setNote(noteRes.data.content || "");
+          setNoteExists(noteRes.data.exists || false);
+          setNoteLoading(false);
         }
       } catch { toast.error("Failed to load profile"); } finally { setLoading(false); }
     };
@@ -44,6 +54,26 @@ export default function Profile() {
       setConnectionStatus("pending");
       toast.success("Connection request sent!");
     } catch (err) { toast.error(err.response?.data?.detail || "Failed"); }
+  };
+
+  const handleSaveNote = async () => {
+    setNoteSaving(true);
+    try {
+      await api.put(`/notes/${id}`, { content: note });
+      setNoteExists(true);
+      toast.success("Note saved privately!");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to save note");
+    } finally { setNoteSaving(false); }
+  };
+
+  const handleDeleteNote = async () => {
+    try {
+      await api.delete(`/notes/${id}`);
+      setNote("");
+      setNoteExists(false);
+      toast.success("Note deleted");
+    } catch { toast.error("Failed to delete note"); }
   };
 
   if (loading) return <Layout><div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div></Layout>;
@@ -172,6 +202,62 @@ export default function Profile() {
             </div>
           )}
         </div>
+
+        {/* Private Lead Notes — only shown when viewing someone else's profile */}
+        {!isOwn && (
+          <div data-testid="lead-notes-section" className="p-5 rounded-xl border" style={{ background: "#131315", borderColor: "rgba(245,158,11,0.15)" }}>
+            <div className="flex items-center gap-2 mb-3">
+              <StickyNote size={14} className="text-amber-500" />
+              <h3 className="text-sm font-semibold text-white font-display">Private Notes</h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-display ml-auto" style={{ background: "rgba(245,158,11,0.1)", color: "#F59E0B" }}>
+                Only visible to you
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 mb-3">
+              Keep private notes about this crew member — availability, strengths, past experience. Nobody else can see these.
+            </p>
+            {noteLoading ? (
+              <div className="flex items-center gap-2 py-2">
+                <div className="w-4 h-4 border-2 border-amber-500/40 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-zinc-600">Loading…</span>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  data-testid="lead-note-input"
+                  className="w-full bg-zinc-900 border border-white/10 text-white placeholder:text-zinc-600 text-sm rounded-lg px-3 py-2.5 outline-none focus:border-amber-500/50 resize-none h-24 transition-colors"
+                  placeholder={`Private notes about ${profile.full_name}…`}
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    data-testid="save-note-btn"
+                    onClick={handleSaveNote}
+                    disabled={noteSaving || !note.trim()}
+                    className="gap-1.5 text-xs font-display"
+                    style={{ background: "#F59E0B", color: "#000" }}
+                  >
+                    <Save size={12} />
+                    {noteSaving ? "Saving…" : "Save Note"}
+                  </Button>
+                  {noteExists && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      data-testid="delete-note-btn"
+                      onClick={handleDeleteNote}
+                      className="gap-1.5 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10 font-display"
+                    >
+                      <Trash2 size={12} /> Delete
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </Layout>
   );
