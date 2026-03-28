@@ -436,3 +436,119 @@ async def seed_admin():
     }
     await db.users.insert_one(admin_doc)
     return {"message": "Admin created", "email": "admin@crewbook.in", "password": "Admin@123"}
+
+
+# ── Log Read Endpoints ─────────────────────────────────────────────────────────
+
+@router.get("/logs/admin-actions")
+async def get_admin_action_logs(
+    limit: int = 50,
+    skip: int = 0,
+    action: Optional[str] = None,
+    admin: dict = Depends(get_admin_user),
+):
+    db = get_db()
+    limit = min(limit, 100)
+    query = {}
+    if action:
+        query["action"] = action
+    items = await db.admin_logs.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.admin_logs.count_documents(query)
+    for item in items:
+        item["id"] = str(item.pop("_id"))
+    return {"items": items, "total": total}
+
+
+@router.get("/logs/api-errors")
+async def get_api_error_logs(
+    limit: int = 50,
+    skip: int = 0,
+    status_code: Optional[int] = None,
+    admin: dict = Depends(get_admin_user),
+):
+    db = get_db()
+    limit = min(limit, 100)
+    query = {}
+    if status_code:
+        query["status_code"] = status_code
+    items = await db.api_error_logs.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.api_error_logs.count_documents(query)
+    for item in items:
+        item["id"] = str(item.pop("_id"))
+    return {"items": items, "total": total}
+
+
+@router.get("/logs/payments")
+async def get_payment_logs(
+    limit: int = 50,
+    skip: int = 0,
+    event: Optional[str] = None,
+    admin: dict = Depends(get_admin_user),
+):
+    db = get_db()
+    limit = min(limit, 100)
+    query = {}
+    if event:
+        query["event"] = event
+    items = await db.payment_logs.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.payment_logs.count_documents(query)
+    for item in items:
+        item["id"] = str(item.pop("_id"))
+    return {"items": items, "total": total}
+
+
+@router.get("/logs/ai-usage")
+async def get_ai_usage_logs(
+    limit: int = 50,
+    skip: int = 0,
+    endpoint: Optional[str] = None,
+    admin: dict = Depends(get_admin_user),
+):
+    db = get_db()
+    limit = min(limit, 100)
+    query = {}
+    if endpoint:
+        query["endpoint"] = endpoint
+    items = await db.ai_usage_logs.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.ai_usage_logs.count_documents(query)
+    for item in items:
+        item["id"] = str(item.pop("_id"))
+    return {"items": items, "total": total}
+
+
+@router.get("/logs/whatsapp")
+async def get_whatsapp_logs(
+    limit: int = 50,
+    skip: int = 0,
+    status: Optional[str] = None,
+    admin: dict = Depends(get_admin_user),
+):
+    db = get_db()
+    limit = min(limit, 100)
+    query = {}
+    if status:
+        query["status"] = status
+    items = await db.whatsapp_logs.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.whatsapp_logs.count_documents(query)
+    for item in items:
+        item["id"] = str(item.pop("_id"))
+    return {"items": items, "total": total}
+
+
+@router.get("/logs/logins")
+async def get_login_logs(
+    limit: int = 50,
+    skip: int = 0,
+    user_id: Optional[str] = None,
+    admin: dict = Depends(get_admin_user),
+):
+    db = get_db()
+    limit = min(limit, 100)
+    query = {}
+    if user_id:
+        query["user_id"] = user_id
+    items = await db.login_logs.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.login_logs.count_documents(query)
+    for item in items:
+        item["id"] = str(item.pop("_id"))
+    return {"items": items, "total": total}
