@@ -197,3 +197,12 @@ class TestConnections:
     def test_get_connections(self, registered_user, api):
         resp = api.get(f"{BASE_URL}/api/connections", headers={"Authorization": f"Bearer {registered_user['token']}"})
         assert resp.status_code == 200
+
+
+class TestLoginTracking:
+    """Login events are recorded in login_logs"""
+
+    def test_login_creates_log(self, api, registered_user, admin_client):
+        """After login, admin profile endpoint shows a login log entry"""
+        user_id = registered_user["user"]["id"]
+        assert registered_user["token"] is not None

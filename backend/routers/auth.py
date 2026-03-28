@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone
@@ -92,7 +92,7 @@ async def register(data: RegisterRequest):
 
 
 @router.post("/login")
-async def login(data: LoginRequest):
+async def login(data: LoginRequest, request: Request):
     db = get_db()
     user = await db.users.find_one({"email": data.email.lower()})
     if not user or not verify_password(data.password, user["password_hash"]):
@@ -100,6 +100,13 @@ async def login(data: LoginRequest):
     if user.get("is_suspended"):
         raise HTTPException(status_code=403, detail="Account suspended. Please contact support.")
     token = create_access_token(str(user["_id"]))
+    await db.login_logs.insert_one({
+        "_id": str(uuid.uuid4()),
+        "user_id": str(user["_id"]),
+        "ip": request.client.host if request.client else "unknown",
+        "user_agent": request.headers.get("user-agent", "unknown"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
     return {"token": token, "user": _clean_user({**user})}
 
 
