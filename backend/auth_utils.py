@@ -27,6 +27,15 @@ def create_access_token(user_id: str) -> str:
     return jwt.encode({"sub": user_id, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_impersonation_token(user_id: str, admin_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=1)
+    return jwt.encode(
+        {"sub": user_id, "exp": expire, "impersonated_by": admin_id},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
 def _clean_user(user: dict) -> dict:
     user = {k: v for k, v in user.items() if k != "password_hash"}
     if "_id" in user:
