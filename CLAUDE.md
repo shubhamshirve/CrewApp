@@ -4,6 +4,16 @@ This file tells Claude Code how to work in this repository.
 
 ---
 
+## Agent Protocol
+
+Every agent (subagent or main) working in this repo MUST:
+1. **On start:** Read `CLAUDE.md` fully before writing any code.
+2. **On finish:** Update `CLAUDE.md` if any conventions, stack, or design system info has changed during the task.
+
+This keeps all agents in sync without needing to re-explore the codebase each time.
+
+---
+
 ## Project Overview
 
 **CrewBook** is a freelance crew booking platform for the Indian film/events industry. Users post gigs, connect with crew members, manage subscriptions, and communicate via WhatsApp. Admins manage users, handle verification, and monitor platform activity.
@@ -79,7 +89,7 @@ CrewBook/
 
 ### Frontend
 
-**Design system:** Dark luxury theme. Card backgrounds `#0F1628`, page background `#080B12`, blue active accents. Source of truth: `docs/design_guidelines.json`.
+**Design system:** Light, Minimal, Rounded UI. Page background `#F9F9F8`, cards `#FFFFFF`, primary accent `#E05D26` (Cinematic Amber), admin accent blue (`#2563EB`). Fonts: Outfit (headings via `font-display`), Manrope (body). Radii: `rounded-3xl` for cards, `rounded-full` for buttons and avatars. CSS variables and Tailwind config are in `frontend/src/index.css` and `frontend/tailwind.config.js`. Source of truth: `docs/design_guidelines.json`.
 
 **API calls:** Always import the shared axios instance: `import api from "@/lib/api"`. Never create a new `axios.create()` in a component.
 
@@ -155,7 +165,7 @@ Tests are real HTTP integration tests against a live server — no mocks, no fix
 - `1.x` — feature branches (one per sprint/feature set)
 - Always branch from `main`, PR back to `main`
 
-Current active branch: `1.5`
+Current active branch: `1.7`
 
 ---
 
