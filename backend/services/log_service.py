@@ -19,13 +19,13 @@ async def log_admin_action(
     try:
         await db.admin_logs.insert_one({
             "_id": str(uuid.uuid4()),
-            "admin_id": admin["id"],
+            "admin_id": admin.get("id", "unknown"),
             "admin_email": admin.get("email", ""),
             "action": action,
             "target_type": target_type,
             "target_id": str(target_id),
-            "before": before,
-            "after": after,
+            "before": before or {},
+            "after": after or {},
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
     except Exception as exc:
