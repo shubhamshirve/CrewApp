@@ -5,6 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8] — 2026-03-29 — Light, Minimal, Rounded UI Overhaul
+
+### Changed
+
+**Frontend — Complete Theme Transition (Dark → Light)**
+- Replaced dark luxury theme (`#0A0A0A` / `#131315` backgrounds) with Light, Minimal, Rounded UI across all 24 React pages and components
+- CSS variables in `index.css` and `tailwind.config.js` already updated in 1.7; this release completes the component-level conversion
+- **Design tokens:** Page background `#F9F9F8` (`bg-background`), cards `bg-white border border-border rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]`, primary accent `#E05D26` Cinematic Amber (`bg-primary`), admin accent blue (`bg-blue-600`)
+- **Typography:** Replaced all `Cormorant Garamond` inline `fontFamily` style props with `font-display` class (Outfit); Manrope for body text
+- **Buttons:** All primary buttons `bg-primary text-primary-foreground rounded-full`; all ghost/outline buttons `border-border text-slate-600 rounded-full`
+- **Inputs:** All form inputs `bg-slate-50 border-border text-foreground placeholder:text-muted-foreground rounded-xl`
+
+**Pages converted:**
+- `Landing.jsx` — full rewrite with alabaster hero image, light navbar, feature cards, pricing cards
+- `Auth.jsx` — light card, TabsList, inputs, submit buttons
+- `Onboarding.jsx` — light stepper, upload zones, gear chips
+- `AdminLogin.jsx` — light card, blue admin accent
+- `Dashboard.jsx` — stat cards, section panels, modals
+- `GigBoard.jsx` — all 3 modals (Post, Apply, Manage), gig cards, tab bar, filters
+- `Gigs.jsx`, `GigDetail.jsx`, `Profile.jsx` — cards, badges, dialogs, gear vault, ratings
+- `Search.jsx`, `Connections.jsx`, `Notifications.jsx` — result cards, unread highlight
+- `Wallet.jsx`, `Calendar.jsx` — plan cards, balance display, calendar grid
+- `AdminDashboard.jsx` — stat cards, user lists, verification dialogs
+- `admin/AdminOverview.jsx`, `AdminVerification.jsx`, `AdminPenalties.jsx`
+- `admin/AdminUsers.jsx`, `AdminUserProfile.jsx`
+- `admin/AdminSettings.jsx`, `AdminTemplates.jsx`, `AdminLogs.jsx`, `AdminGigBoard.jsx`
+
+**Docs**
+- `CLAUDE.md` — updated design system section; added Agent Protocol (read on start, update on finish)
+
+---
+
 ## [1.5] — 2026-03-28 — Admin Logs & Monitoring
 
 ### Added
