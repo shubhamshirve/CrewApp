@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Camera, Video, Star, Shield, Users, Zap, ChevronRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,7 @@ export default function Landing() {
             <Button onClick={() => navigate("/auth")} data-testid="hero-get-started-btn" size="lg" className="gap-2 font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-8">
               Get Started Free <ChevronRight size={16} />
             </Button>
-            <Button variant="outline" size="lg" className="border-border text-slate-600 hover:text-foreground hover:bg-slate-50 rounded-full" onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}>
+            <Button variant="outline" size="lg" data-testid="hero-see-how-btn" className="border-border text-slate-600 hover:text-foreground hover:bg-slate-50 rounded-full" onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}>
               See How It Works
             </Button>
           </div>
@@ -149,7 +149,7 @@ export default function Landing() {
                 ))}
               </ul>
               <Button
-                data-testid={`pricing-${plan.name.toLowerCase().replace(' ', '-')}-btn`}
+                data-testid={`pricing-${plan.name.toLowerCase().replace(/\s+/g, '-')}-btn`}
                 onClick={() => navigate("/auth")}
                 className={`w-full font-semibold rounded-full ${plan.popular ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
               >
@@ -164,7 +164,7 @@ export default function Landing() {
       <footer className="py-10 px-6 border-t border-border text-center bg-white">
         <div className="flex items-center justify-center gap-2 mb-3">
           <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-white font-bold text-xs">C</span>
+            <span className="text-white font-bold text-xs font-display">C</span>
           </div>
           <span className="text-foreground font-semibold font-display">CrewBook</span>
         </div>
