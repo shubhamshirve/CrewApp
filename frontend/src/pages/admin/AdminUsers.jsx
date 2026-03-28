@@ -81,11 +81,13 @@ export default function AdminUsers() {
   };
 
   const handleBulkAction = async (action) => {
+    if (action === "notify" && (!notifyForm.title || !notifyForm.message)) {
+      toast.error("Title and message required"); return;
+    }
     setBulkLoading(true);
     try {
       const body = { action, user_ids: Array.from(selected) };
       if (action === "notify") {
-        if (!notifyForm.title || !notifyForm.message) { toast.error("Title and message required"); return; }
         body.title = notifyForm.title;
         body.message = notifyForm.message;
       }

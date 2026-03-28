@@ -221,6 +221,8 @@ async def impersonate_user(user_id: str, admin: dict = Depends(get_admin_user)):
     user = await db.users.find_one({"_id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if user.get("is_admin"):
+        raise HTTPException(status_code=400, detail="Cannot impersonate an admin account")
     token = create_impersonation_token(user_id=user_id, admin_id=admin["id"])
     return {"token": token, "expires_in": 3600}
 

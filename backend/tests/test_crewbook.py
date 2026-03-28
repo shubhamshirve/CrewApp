@@ -308,7 +308,7 @@ class TestAdminBulkAction:
     def test_bulk_invalid_action(self, admin_client):
         resp = admin_client.post(f"{BASE_URL}/api/admin/users/bulk-action", json={
             "action": "delete_everything",
-            "user_ids": [],
+            "user_ids": ["fake-id-for-validation-test"],
         })
         assert resp.status_code == 400
 
