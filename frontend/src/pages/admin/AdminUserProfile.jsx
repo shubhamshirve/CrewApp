@@ -110,10 +110,8 @@ export default function AdminUserProfile() {
     finally { setPenaltyLoading(false); }
   };
 
-  const cardCls = "p-4 rounded-2xl border";
-  const cardStyle = { background: "#0D1220", borderColor: "rgba(255,255,255,0.07)" };
-  const inputCls = "w-full rounded-xl px-3 py-2.5 text-sm text-white border border-white/10 focus:outline-none focus:border-blue-500/50";
-  const inputStyle = { background: "rgba(255,255,255,0.04)" };
+  const cardCls = "p-4 rounded-2xl border border-border bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]";
+  const inputCls = "w-full rounded-xl px-3 py-2.5 text-sm text-foreground bg-slate-50 border border-border focus:outline-none focus:border-blue-500/50 placeholder:text-muted-foreground";
 
   if (loading) {
     return (
@@ -145,16 +143,15 @@ export default function AdminUserProfile() {
         <div>
           <button
             onClick={() => navigate("/admin/users")}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-4"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-4"
           >
             <ArrowLeft size={13} /> Back to Users
           </button>
 
-          <div className={`${cardCls} flex flex-col sm:flex-row items-start sm:items-center gap-4`} style={cardStyle}>
+          <div className={`${cardCls} flex flex-col sm:flex-row items-start sm:items-center gap-4`}>
             {/* Avatar */}
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold font-display flex-shrink-0"
-              style={{ background: "#1D4ED820", color: "#3B82F6" }}
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold font-display flex-shrink-0 bg-primary/10 text-primary"
             >
               {user.full_name?.[0]?.toUpperCase()}
             </div>
@@ -162,14 +159,14 @@ export default function AdminUserProfile() {
             {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h1 className="text-xl font-bold text-white font-display">{user.full_name}</h1>
-                {user.is_verified && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Verified</span>}
-                {user.is_suspended && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Suspended</span>}
-                {user.is_featured && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Featured</span>}
-                {user.is_high_risk && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400">High Risk</span>}
+                <h1 className="text-xl font-bold text-foreground font-display">{user.full_name}</h1>
+                {user.is_verified && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600">Verified</span>}
+                {user.is_suspended && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-500">Suspended</span>}
+                {user.is_featured && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700">Featured</span>}
+                {user.is_high_risk && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600">High Risk</span>}
               </div>
-              <p className="text-xs text-zinc-400">{user.email} · {user.phone} · {user.location}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">{user.primary_role || "No role"} · {user.subscription_plan} plan</p>
+              <p className="text-xs text-muted-foreground">{user.email} · {user.phone} · {user.location}</p>
+              <p className="text-xs text-slate-600 mt-0.5">{user.primary_role || "No role"} · {user.subscription_plan} plan</p>
             </div>
 
             {/* Actions */}
@@ -205,7 +202,7 @@ export default function AdminUserProfile() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview">
-          <TabsList className="border border-white/5" style={{ background: "#0D1220" }}>
+          <TabsList className="border border-border bg-slate-100">
             {[
               { value: "overview", label: "Overview", icon: UserCheck },
               { value: "gigs", label: `Gigs (${gigs.length})`, icon: Briefcase },
@@ -216,7 +213,7 @@ export default function AdminUserProfile() {
               <TabsTrigger
                 key={value}
                 value={value}
-                className="data-[state=active]:bg-blue-600/30 data-[state=active]:text-blue-300 font-display text-xs gap-1.5"
+                className="data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm font-display text-xs gap-1.5"
               >
                 <Icon size={11} /> {label}
               </TabsTrigger>
@@ -225,8 +222,8 @@ export default function AdminUserProfile() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="mt-4 space-y-4">
-            <div className={cardCls} style={cardStyle}>
-              <h3 className="text-sm font-semibold text-white font-display mb-3">Profile Details</h3>
+            <div className={cardCls}>
+              <h3 className="text-sm font-semibold text-foreground font-display mb-3">Profile Details</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
                   ["ID", user.id],
@@ -243,48 +240,48 @@ export default function AdminUserProfile() {
                   ["Referral Code", user.referral_code || "—"],
                 ].map(([label, val]) => (
                   <div key={label}>
-                    <p className="text-[10px] text-zinc-600 font-display uppercase tracking-wide">{label}</p>
-                    <p className="text-xs text-zinc-300 mt-0.5 truncate">{val}</p>
+                    <p className="text-[10px] text-muted-foreground font-display uppercase tracking-wide">{label}</p>
+                    <p className="text-xs text-foreground mt-0.5 truncate">{val}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className={cardCls} style={cardStyle}>
-              <h3 className="text-sm font-semibold text-white font-display mb-3">Role Overrides</h3>
+            <div className={cardCls}>
+              <h3 className="text-sm font-semibold text-foreground font-display mb-3">Role Overrides</h3>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <div
                     onClick={() => handleFlag("is_featured", !user.is_featured)}
                     className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
-                      user.is_featured ? "bg-amber-500" : "bg-zinc-700"
+                      user.is_featured ? "bg-amber-500" : "bg-slate-200"
                     }`}
                   >
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
                       user.is_featured ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </div>
-                  <span className="text-sm text-zinc-300 font-display">Featured</span>
+                  <span className="text-sm text-slate-600 font-display">Featured</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <div
                     onClick={() => handleFlag("is_high_risk", !user.is_high_risk)}
                     className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
-                      user.is_high_risk ? "bg-rose-500" : "bg-zinc-700"
+                      user.is_high_risk ? "bg-rose-500" : "bg-slate-200"
                     }`}
                   >
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
                       user.is_high_risk ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </div>
-                  <span className="text-sm text-zinc-300 font-display">High Risk</span>
+                  <span className="text-sm text-slate-600 font-display">High Risk</span>
                 </label>
               </div>
             </div>
 
-            <div className={cardCls} style={cardStyle}>
+            <div className={cardCls}>
               <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-semibold text-white font-display">Wallet Balance</h3>
+                <h3 className="text-sm font-semibold text-foreground font-display">Wallet Balance</h3>
                 <button
                   onClick={() => setShowWallet(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
@@ -293,7 +290,7 @@ export default function AdminUserProfile() {
                   <Wallet size={11} /> Credit / Debit
                 </button>
               </div>
-              <p className="text-3xl font-bold text-white font-display">
+              <p className="text-3xl font-bold text-foreground font-display">
                 ₹{(user.wallet_balance || 0).toFixed(2)}
               </p>
             </div>
@@ -302,17 +299,17 @@ export default function AdminUserProfile() {
           {/* Gigs Tab */}
           <TabsContent value="gigs" className="mt-4">
             {gigs.length === 0 ? (
-              <div className="text-center py-16 text-zinc-600">
+              <div className="text-center py-16 text-muted-foreground">
                 <Briefcase size={32} className="mx-auto mb-3 opacity-40" />
                 <p className="text-sm">No gigs created</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {gigs.map(g => (
-                  <div key={g.id} className={`${cardCls} flex items-center justify-between`} style={cardStyle}>
+                  <div key={g.id} className={`${cardCls} flex items-center justify-between`}>
                     <div>
-                      <p className="text-sm text-white font-display font-medium">{g.title}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{fmt(g.created_at)}</p>
+                      <p className="text-sm text-foreground font-display font-medium">{g.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{fmt(g.created_at)}</p>
                     </div>
                     <span className="text-[10px] px-2 py-1 rounded-full bg-blue-500/15 text-blue-400">
                       {g.status || "draft"}
@@ -326,7 +323,7 @@ export default function AdminUserProfile() {
           {/* Wallet Tab */}
           <TabsContent value="wallet" className="mt-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-zinc-400">{walletTimeline.length} transactions</p>
+              <p className="text-sm text-muted-foreground">{walletTimeline.length} transactions</p>
               <button
                 onClick={() => setShowWallet(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
@@ -336,24 +333,24 @@ export default function AdminUserProfile() {
               </button>
             </div>
             {walletTimeline.length === 0 ? (
-              <div className="text-center py-16 text-zinc-600">
+              <div className="text-center py-16 text-muted-foreground">
                 <Wallet size={32} className="mx-auto mb-3 opacity-40" />
                 <p className="text-sm">No transactions yet</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {walletTimeline.map((t, i) => (
-                  <div key={t.id || i} className={`${cardCls} flex items-center justify-between`} style={cardStyle}>
+                  <div key={t.id || i} className={`${cardCls} flex items-center justify-between`}>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm text-white font-display font-medium">
+                        <p className="text-sm text-foreground font-display font-medium">
                           {t.description || t.reason || t.type}
                         </p>
                         {t._source === "adj" && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-display">Admin</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 font-display">Admin</span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-0.5">{fmt(t.created_at)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{fmt(t.created_at)}</p>
                     </div>
                     <p className={`text-sm font-semibold font-display ${
                       t.type === "credit" || t.type === "admin_credit" ? "text-emerald-400" : "text-red-400"
@@ -369,34 +366,34 @@ export default function AdminUserProfile() {
           {/* Ratings Tab */}
           <TabsContent value="ratings" className="mt-4">
             {ratings.length === 0 ? (
-              <div className="text-center py-16 text-zinc-600">
+              <div className="text-center py-16 text-muted-foreground">
                 <Star size={32} className="mx-auto mb-3 opacity-40" />
                 <p className="text-sm">No ratings received</p>
               </div>
             ) : (
               <>
                 {user.avg_rating && (
-                  <div className={`${cardCls} flex items-center gap-3 mb-3`} style={cardStyle}>
-                    <Star size={18} className="text-amber-400" />
-                    <p className="text-2xl font-bold text-white font-display">{user.avg_rating.toFixed(2)}</p>
-                    <p className="text-xs text-zinc-500">avg across {ratings.length} ratings</p>
+                  <div className={`${cardCls} flex items-center gap-3 mb-3`}>
+                    <Star size={18} className="text-amber-500" />
+                    <p className="text-2xl font-bold text-foreground font-display">{user.avg_rating.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">avg across {ratings.length} ratings</p>
                   </div>
                 )}
                 <div className="space-y-2">
                   {ratings.map((r, i) => {
                     const avg = ((r.punctuality + r.gear_handling + r.teamwork) / 3).toFixed(1);
                     return (
-                      <div key={r.id || i} className={cardCls} style={cardStyle}>
+                      <div key={r.id || i} className={cardCls}>
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs text-zinc-400">{fmt(r.created_at)}</p>
-                          <span className="text-xs text-amber-400 font-display">★ {avg}</span>
+                          <p className="text-xs text-muted-foreground">{fmt(r.created_at)}</p>
+                          <span className="text-xs text-amber-600 font-display">★ {avg}</span>
                         </div>
-                        <div className="flex gap-4 text-xs text-zinc-500">
+                        <div className="flex gap-4 text-xs text-slate-600">
                           <span>Punctuality: {r.punctuality}/5</span>
                           <span>Gear: {r.gear_handling}/5</span>
                           <span>Teamwork: {r.teamwork}/5</span>
                         </div>
-                        {r.notes && <p className="text-xs text-zinc-400 mt-1 italic">"{r.notes}"</p>}
+                        {r.notes && <p className="text-xs text-muted-foreground mt-1 italic">"{r.notes}"</p>}
                       </div>
                     );
                   })}
@@ -408,20 +405,20 @@ export default function AdminUserProfile() {
           {/* Login History Tab */}
           <TabsContent value="logins" className="mt-4">
             {login_logs.length === 0 ? (
-              <div className="text-center py-16 text-zinc-600">
+              <div className="text-center py-16 text-muted-foreground">
                 <Monitor size={32} className="mx-auto mb-3 opacity-40" />
                 <p className="text-sm">No login history recorded</p>
-                <p className="text-xs text-zinc-700 mt-1">Login tracking started from this deployment</p>
+                <p className="text-xs text-muted-foreground mt-1">Login tracking started from this deployment</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {login_logs.map((l, i) => (
-                  <div key={l.id || i} className={`${cardCls} flex items-start justify-between`} style={cardStyle}>
+                  <div key={l.id || i} className={`${cardCls} flex items-start justify-between`}>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-zinc-300 font-display font-medium">{l.ip}</p>
-                      <p className="text-[10px] text-zinc-600 truncate mt-0.5">{l.user_agent}</p>
+                      <p className="text-xs text-foreground font-display font-medium">{l.ip}</p>
+                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">{l.user_agent}</p>
                     </div>
-                    <p className="text-[10px] text-zinc-500 flex-shrink-0 ml-4">{fmt(l.created_at)}</p>
+                    <p className="text-[10px] text-muted-foreground flex-shrink-0 ml-4">{fmt(l.created_at)}</p>
                   </div>
                 ))}
               </div>
@@ -432,32 +429,30 @@ export default function AdminUserProfile() {
 
       {/* Wallet Adjust Modal */}
       <Dialog open={showWallet} onOpenChange={setShowWallet}>
-        <DialogContent style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.1)" }}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-white font-display flex items-center gap-2">
-              <Wallet size={16} className="text-blue-400" /> Wallet Adjustment
+            <DialogTitle className="text-foreground font-display flex items-center gap-2">
+              <Wallet size={16} className="text-blue-500" /> Wallet Adjustment
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Amount (₹) *</label>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Amount (₹) *</label>
                 <input
                   type="number"
                   min="0.01"
                   step="0.01"
                   className={inputCls}
-                  style={inputStyle}
                   placeholder="0.00"
                   value={walletForm.amount}
                   onChange={e => setWalletForm(f => ({ ...f, amount: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Type *</label>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Type *</label>
                 <select
                   className={`${inputCls} appearance-none`}
-                  style={{ background: "#111827" }}
                   value={walletForm.type}
                   onChange={e => setWalletForm(f => ({ ...f, type: e.target.value }))}
                 >
@@ -467,10 +462,9 @@ export default function AdminUserProfile() {
               </div>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Reason *</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block">Reason *</label>
               <textarea
                 className={`${inputCls} resize-none h-20`}
-                style={inputStyle}
                 placeholder="Reason for adjustment (support credit, correction…)"
                 value={walletForm.reason}
                 onChange={e => setWalletForm(f => ({ ...f, reason: e.target.value }))}
@@ -479,7 +473,7 @@ export default function AdminUserProfile() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowWallet(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm text-zinc-400 border border-white/10 hover:bg-white/5 transition-colors"
+                className="flex-1 py-2.5 rounded-xl text-sm text-slate-600 border border-border hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
@@ -498,18 +492,17 @@ export default function AdminUserProfile() {
 
       {/* Penalty Modal */}
       <Dialog open={showPenalty} onOpenChange={setShowPenalty}>
-        <DialogContent style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.1)" }}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-white font-display flex items-center gap-2">
+            <DialogTitle className="text-foreground font-display flex items-center gap-2">
               <AlertTriangle size={16} className="text-orange-400" /> Apply Penalty
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Stars to deduct</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block">Stars to deduct</label>
               <select
-                className="w-full rounded-xl px-3 py-2.5 text-sm text-white border border-white/10 focus:outline-none"
-                style={{ background: "#111827" }}
+                className="w-full rounded-xl px-3 py-2.5 text-sm text-foreground bg-slate-50 border border-border focus:outline-none focus:border-blue-500/50"
                 value={penaltyForm.stars}
                 onChange={e => setPenaltyForm(f => ({ ...f, stars: parseInt(e.target.value) }))}
               >
@@ -519,10 +512,9 @@ export default function AdminUserProfile() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Reason *</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block">Reason *</label>
               <textarea
                 className={`${inputCls} resize-none h-20`}
-                style={inputStyle}
                 placeholder="Explain the penalty reason…"
                 value={penaltyForm.reason}
                 onChange={e => setPenaltyForm(f => ({ ...f, reason: e.target.value }))}
@@ -531,7 +523,7 @@ export default function AdminUserProfile() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowPenalty(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm text-zinc-400 border border-white/10 hover:bg-white/5 transition-colors"
+                className="flex-1 py-2.5 rounded-xl text-sm text-slate-600 border border-border hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
