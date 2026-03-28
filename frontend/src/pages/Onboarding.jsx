@@ -45,7 +45,7 @@ export default function Onboarding() {
 
   const [idData, setIdData] = useState({ id_type: "Aadhar", govt_id_base64: "", selfie_base64: "" });
 
-  const inputClass = "bg-zinc-900 border-white/10 text-white placeholder:text-zinc-600 focus:border-amber-500/50";
+  const inputClass = "bg-slate-50 border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50 rounded-xl";
 
   const toggleTag = (arr, val, field) => {
     const cur = profileData[field];
@@ -104,14 +104,14 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "#0A0A0A" }}>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-xl">
         {/* Logo */}
         <div className="flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#F59E0B" }}>
-            <span className="text-black font-bold text-sm">C</span>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary">
+            <span className="text-white font-bold text-sm font-display">C</span>
           </div>
-          <span className="text-white font-semibold font-display text-lg">CrewBook</span>
+          <span className="text-foreground font-semibold font-display text-lg">CrewBook</span>
         </div>
 
         {/* Progress */}
@@ -119,43 +119,43 @@ export default function Onboarding() {
           {STEPS.map((s, i) => (
             <React.Fragment key={s}>
               <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i < step ? "bg-amber-500" : i === step ? "bg-amber-500" : "bg-zinc-800 text-zinc-500"}`} style={{ color: i <= step ? "#000" : undefined }}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i <= step ? "bg-primary text-white" : "bg-slate-200 text-slate-400"}`}>
                   {i < step ? <Check size={12} /> : i + 1}
                 </div>
-                {i < 3 && <span className="text-xs text-zinc-500 hidden sm:block font-display">{s}</span>}
+                {i < 3 && <span className="text-xs text-muted-foreground hidden sm:block font-display">{s}</span>}
               </div>
-              {i < STEPS.length - 1 && <div className={`flex-1 h-px ${i < step ? "bg-amber-500" : "bg-zinc-800"}`} />}
+              {i < STEPS.length - 1 && <div className={`flex-1 h-px ${i < step ? "bg-primary" : "bg-border"}`} />}
             </React.Fragment>
           ))}
         </div>
 
-        <div className="p-6 rounded-2xl border" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.08)" }}>
+        <div className="bg-white border border-border rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6">
           {step === 0 && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-white font-display mb-4">Your Role & Day Rates</h2>
+              <h2 className="text-xl font-semibold text-foreground font-display mb-4">Your Role & Day Rates</h2>
               <div>
-                <Label className="text-zinc-300 text-sm font-display">Primary Role *</Label>
+                <Label className="text-slate-700 text-sm font-display">Primary Role *</Label>
                 <select data-testid="primary-role-select" value={profileData.primary_role} onChange={e => setProfileData(p => ({ ...p, primary_role: e.target.value }))} className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`}>
                   <option value="">Select role...</option>
                   {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>
-                <Label className="text-zinc-300 text-sm font-display">Primary Day Rate (₹)</Label>
+                <Label className="text-slate-700 text-sm font-display">Primary Day Rate (₹)</Label>
                 <Input data-testid="primary-rate-input" className={`mt-1 ${inputClass}`} type="number" placeholder="e.g. 8000" value={profileData.primary_rate} onChange={e => setProfileData(p => ({ ...p, primary_rate: e.target.value }))} />
               </div>
               <div>
-                <Label className="text-zinc-300 text-sm font-display">Secondary Role (optional)</Label>
+                <Label className="text-slate-700 text-sm font-display">Secondary Role (optional)</Label>
                 <select data-testid="secondary-role-select" value={profileData.secondary_role} onChange={e => setProfileData(p => ({ ...p, secondary_role: e.target.value }))} className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`}>
                   <option value="">None</option>
                   {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>
-                <Label className="text-zinc-300 text-sm font-display">Bio (optional)</Label>
+                <Label className="text-slate-700 text-sm font-display">Bio (optional)</Label>
                 <textarea data-testid="bio-input" value={profileData.bio} onChange={e => setProfileData(p => ({ ...p, bio: e.target.value }))} className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border resize-none h-20`} placeholder="Tell leads about yourself..." />
               </div>
-              <Button data-testid="step-0-next" onClick={saveStep0} className="w-full font-semibold font-display" style={{ background: "#F59E0B", color: "#000" }} disabled={loading}>
+              <Button data-testid="step-0-next" onClick={saveStep0} className="w-full font-semibold font-display bg-primary text-primary-foreground hover:bg-primary/90 rounded-full" disabled={loading}>
                 {loading ? "Saving..." : "Continue"} <ChevronRight size={16} />
               </Button>
             </div>
@@ -163,49 +163,49 @@ export default function Onboarding() {
 
           {step === 1 && (
             <div className="space-y-5">
-              <h2 className="text-xl font-semibold text-white font-display mb-4">Style & Gear</h2>
+              <h2 className="text-xl font-semibold text-foreground font-display mb-4">Style & Gear</h2>
               <div>
-                <Label className="text-zinc-300 text-sm font-display mb-2 block">Shooting Style</Label>
+                <Label className="text-slate-700 text-sm font-display mb-2 block">Shooting Style</Label>
                 <div className="flex flex-wrap gap-2">
                   {STYLES.map(s => (
-                    <button key={s} data-testid={`style-tag-${s}`} onClick={() => toggleTag(profileData.style_tags, s, "style_tags")} className={`px-3 py-1.5 rounded-full text-xs border transition-all font-display ${profileData.style_tags.includes(s) ? "border-amber-500 bg-amber-500/15 text-amber-400" : "border-white/10 text-zinc-400 hover:border-white/20"}`}>
+                    <button key={s} data-testid={`style-tag-${s}`} onClick={() => toggleTag(profileData.style_tags, s, "style_tags")} className={`px-3 py-1.5 rounded-full text-xs border transition-all font-display ${profileData.style_tags.includes(s) ? "border-primary bg-primary/10 text-primary" : "border-border text-slate-600 hover:border-primary/40"}`}>
                       {s}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <Label className="text-zinc-300 text-sm font-display mb-2 block">Editing Software</Label>
+                <Label className="text-slate-700 text-sm font-display mb-2 block">Editing Software</Label>
                 <div className="flex flex-wrap gap-2">
                   {EDITING.map(e => (
-                    <button key={e} data-testid={`editing-tag-${e}`} onClick={() => toggleTag(profileData.editing_ecosystem, e, "editing_ecosystem")} className={`px-3 py-1.5 rounded-full text-xs border transition-all font-display ${profileData.editing_ecosystem.includes(e) ? "border-amber-500 bg-amber-500/15 text-amber-400" : "border-white/10 text-zinc-400 hover:border-white/20"}`}>
+                    <button key={e} data-testid={`editing-tag-${e}`} onClick={() => toggleTag(profileData.editing_ecosystem, e, "editing_ecosystem")} className={`px-3 py-1.5 rounded-full text-xs border transition-all font-display ${profileData.editing_ecosystem.includes(e) ? "border-primary bg-primary/10 text-primary" : "border-border text-slate-600 hover:border-primary/40"}`}>
                       {e}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <Label className="text-zinc-300 text-sm font-display mb-2 block">Gear Vault</Label>
+                <Label className="text-slate-700 text-sm font-display mb-2 block">Gear Vault</Label>
                 <div className="flex gap-2 mb-2">
                   <Input data-testid="gear-name-input" className={`flex-1 ${inputClass} text-xs`} placeholder="Gear name (e.g. Sony A7IV)" value={gear.name} onChange={e => setGear(p => ({ ...p, name: e.target.value }))} />
                   <select data-testid="gear-category-select" value={gear.category} onChange={e => setGear(p => ({ ...p, category: e.target.value }))} className={`px-2 py-1.5 rounded-lg text-xs ${inputClass} border`}>
                     {GEAR_CATS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <button data-testid="add-gear-btn" onClick={() => { if (gear.name) { setGearList(p => [...p, { ...gear, id: Date.now().toString() }]); setGear({ name: "", category: "Camera", brand: "" }); }}} className="p-2 rounded-lg border border-amber-500/30 text-amber-500 hover:bg-amber-500/10">
+                  <button data-testid="add-gear-btn" onClick={() => { if (gear.name) { setGearList(p => [...p, { ...gear, id: Date.now().toString() }]); setGear({ name: "", category: "Camera", brand: "" }); }}} className="p-2 rounded-lg border border-primary/30 text-primary hover:bg-primary/10">
                     <Plus size={16} />
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {gearList.map(g => (
-                    <span key={g.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs" style={{ borderColor: "rgba(255,255,255,0.1)", background: "#1C1C1F", color: "#a1a1aa" }}>
+                    <span key={g.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-slate-50 text-slate-600 text-xs">
                       {g.name} <button onClick={() => setGearList(p => p.filter(x => x.id !== g.id))}><X size={10} /></button>
                     </span>
                   ))}
                 </div>
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setStep(0)} className="border-white/10 text-zinc-400 hover:text-white">Back</Button>
-                <Button data-testid="step-1-next" onClick={saveStep1} className="flex-1 font-semibold font-display" style={{ background: "#F59E0B", color: "#000" }} disabled={loading}>
+                <Button variant="outline" onClick={() => setStep(0)} className="border-border text-slate-600 hover:text-foreground rounded-full">Back</Button>
+                <Button data-testid="step-1-next" onClick={saveStep1} className="flex-1 font-semibold font-display bg-primary text-primary-foreground hover:bg-primary/90 rounded-full" disabled={loading}>
                   {loading ? "Saving..." : "Continue"} <ChevronRight size={16} />
                 </Button>
               </div>
@@ -214,31 +214,31 @@ export default function Onboarding() {
 
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-white font-display mb-2">Verify Your Identity</h2>
-              <p className="text-sm text-zinc-400 mb-4">Upload your government ID and a selfie. Our admin team will review within 24 hours.</p>
+              <h2 className="text-xl font-semibold text-foreground font-display mb-2">Verify Your Identity</h2>
+              <p className="text-sm text-muted-foreground mb-4">Upload your government ID and a selfie. Our admin team will review within 24 hours.</p>
               <div>
-                <Label className="text-zinc-300 text-sm font-display">ID Type</Label>
+                <Label className="text-slate-700 text-sm font-display">ID Type</Label>
                 <select data-testid="id-type-select" value={idData.id_type} onChange={e => setIdData(p => ({ ...p, id_type: e.target.value }))} className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`}>
                   {ID_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
-                <Label className="text-zinc-300 text-sm font-display">Government ID Photo *</Label>
-                <label data-testid="govt-id-upload" className="mt-1 flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer hover:border-amber-500/50 transition-colors" style={{ borderColor: idData.govt_id_base64 ? "rgba(245,158,11,0.5)" : "rgba(255,255,255,0.1)", background: "#0D0D0F" }}>
-                  {idData.govt_id_base64 ? <span className="text-amber-400 text-sm flex items-center gap-2"><Check size={16} /> ID Uploaded</span> : <><Upload size={20} className="text-zinc-500 mb-1" /><span className="text-xs text-zinc-500">Upload Aadhar/PAN/DL</span></>}
+                <Label className="text-slate-700 text-sm font-display">Government ID Photo *</Label>
+                <label data-testid="govt-id-upload" className="mt-1 flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-2xl cursor-pointer hover:border-primary/50 transition-colors bg-slate-50 border-border">
+                  {idData.govt_id_base64 ? <span className="text-primary text-sm flex items-center gap-2"><Check size={16} /> ID Uploaded</span> : <><Upload size={20} className="text-muted-foreground mb-1" /><span className="text-xs text-muted-foreground">Upload Aadhar/PAN/DL</span></>}
                   <input type="file" accept="image/*" className="hidden" onChange={e => handleFileToBase64(e, "govt_id_base64")} />
                 </label>
               </div>
               <div>
-                <Label className="text-zinc-300 text-sm font-display">Live Selfie *</Label>
-                <label data-testid="selfie-upload" className="mt-1 flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer hover:border-amber-500/50 transition-colors" style={{ borderColor: idData.selfie_base64 ? "rgba(245,158,11,0.5)" : "rgba(255,255,255,0.1)", background: "#0D0D0F" }}>
-                  {idData.selfie_base64 ? <span className="text-amber-400 text-sm flex items-center gap-2"><Check size={16} /> Selfie Uploaded</span> : <><Upload size={20} className="text-zinc-500 mb-1" /><span className="text-xs text-zinc-500">Take a selfie now</span></>}
+                <Label className="text-slate-700 text-sm font-display">Live Selfie *</Label>
+                <label data-testid="selfie-upload" className="mt-1 flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-2xl cursor-pointer hover:border-primary/50 transition-colors bg-slate-50 border-border">
+                  {idData.selfie_base64 ? <span className="text-primary text-sm flex items-center gap-2"><Check size={16} /> Selfie Uploaded</span> : <><Upload size={20} className="text-muted-foreground mb-1" /><span className="text-xs text-muted-foreground">Take a selfie now</span></>}
                   <input type="file" accept="image/*" capture="user" className="hidden" onChange={e => handleFileToBase64(e, "selfie_base64")} />
                 </label>
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setStep(1)} className="border-white/10 text-zinc-400 hover:text-white">Back</Button>
-                <Button data-testid="submit-id-btn" onClick={saveStep2} className="flex-1 font-semibold font-display" style={{ background: "#F59E0B", color: "#000" }} disabled={loading}>
+                <Button variant="outline" onClick={() => setStep(1)} className="border-border text-slate-600 hover:text-foreground rounded-full">Back</Button>
+                <Button data-testid="submit-id-btn" onClick={saveStep2} className="flex-1 font-semibold font-display bg-primary text-primary-foreground hover:bg-primary/90 rounded-full" disabled={loading}>
                   {loading ? "Uploading..." : "Submit for Verification"}
                 </Button>
               </div>
@@ -247,13 +247,13 @@ export default function Onboarding() {
 
           {step === 3 && (
             <div className="text-center py-6 space-y-4">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: "rgba(245,158,11,0.15)" }}>
-                <Check size={32} className="text-amber-400" />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto bg-primary/10">
+                <Check size={32} className="text-primary" />
               </div>
-              <h2 className="text-2xl font-semibold text-white font-display">Profile Complete!</h2>
-              <p className="text-zinc-400 text-sm">Your ID is being reviewed. You'll be notified once verified.</p>
-              <p className="text-zinc-500 text-xs">In the meantime, explore the platform and set up your availability.</p>
-              <Button data-testid="go-to-dashboard-btn" onClick={() => navigate("/dashboard")} className="font-semibold font-display w-full mt-2" style={{ background: "#F59E0B", color: "#000" }}>
+              <h2 className="text-2xl font-semibold text-foreground font-display">Profile Complete!</h2>
+              <p className="text-muted-foreground text-sm">Your ID is being reviewed. You'll be notified once verified.</p>
+              <p className="text-muted-foreground text-xs">In the meantime, explore the platform and set up your availability.</p>
+              <Button data-testid="go-to-dashboard-btn" onClick={() => navigate("/dashboard")} className="font-semibold font-display w-full mt-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                 Go to Dashboard
               </Button>
             </div>
