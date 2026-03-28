@@ -43,8 +43,8 @@ export default function AdminVerification() {
     <AdminLayout>
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
-          <h1 className="text-4xl font-bold text-white font-display">Verification Queue</h1>
-          <p className="text-zinc-500 text-sm mt-1">{queue.length} user{queue.length !== 1 ? "s" : ""} awaiting review</p>
+          <h1 className="text-4xl font-bold text-foreground font-display">Verification Queue</h1>
+          <p className="text-muted-foreground text-sm mt-1">{queue.length} user{queue.length !== 1 ? "s" : ""} awaiting review</p>
         </div>
 
         {loading ? (
@@ -53,8 +53,8 @@ export default function AdminVerification() {
           </div>
         ) : queue.length === 0 ? (
           <div className="text-center py-20">
-            <Shield size={40} className="text-zinc-700 mx-auto mb-4" />
-            <p className="text-zinc-500 text-sm">Queue is empty — all users verified!</p>
+            <Shield size={40} className="text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground text-sm">Queue is empty — all users verified!</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -62,29 +62,28 @@ export default function AdminVerification() {
               <div
                 key={u.id}
                 data-testid={`verify-card-${u.id}`}
-                className="p-5 rounded-2xl border"
-                style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.07)" }}
+                className="p-5 rounded-2xl border border-border bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-base font-semibold text-white font-display">{u.full_name}</p>
+                      <p className="text-base font-semibold text-foreground font-display">{u.full_name}</p>
                       {u.id_type && (
-                        <span className="text-xs px-2 py-0.5 rounded text-amber-400 bg-amber-400/10">
+                        <span className="text-xs px-2 py-0.5 rounded text-amber-700 bg-amber-500/15">
                           {u.id_type}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-400">{u.email} · {u.phone} · {u.location}</p>
+                    <p className="text-xs text-muted-foreground">{u.email} · {u.phone} · {u.location}</p>
                     {u.primary_role && (
-                      <p className="text-xs text-blue-400 mt-0.5 font-display">{u.primary_role}</p>
+                      <p className="text-xs text-blue-500 mt-0.5 font-display">{u.primary_role}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       data-testid={`view-docs-${u.id}`}
                       onClick={() => setSelectedUser(u)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-300 border border-white/10 hover:bg-white/5 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-600 border border-border hover:bg-slate-50 transition-colors"
                     >
                       <Eye size={12} /> View Docs
                     </button>
@@ -116,10 +115,9 @@ export default function AdminVerification() {
         <Dialog open={!!selectedUser} onOpenChange={() => { setSelectedUser(null); setRejectReason(""); }}>
           <DialogContent
             className="max-w-xl"
-            style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.1)" }}
           >
             <DialogHeader>
-              <DialogTitle className="text-white font-display">
+              <DialogTitle className="text-foreground font-display">
                 ID Documents — {selectedUser.full_name}
               </DialogTitle>
             </DialogHeader>
@@ -127,35 +125,34 @@ export default function AdminVerification() {
               <div className="grid grid-cols-2 gap-4">
                 {selectedUser.govt_id_url && (
                   <div>
-                    <p className="text-xs text-zinc-400 mb-2">Government ID ({selectedUser.id_type})</p>
+                    <p className="text-xs text-muted-foreground mb-2">Government ID ({selectedUser.id_type})</p>
                     <img
                       src={selectedUser.govt_id_url}
                       alt="Govt ID"
-                      className="w-full rounded-xl border border-white/10 object-contain max-h-48"
+                      className="w-full rounded-xl border border-border object-contain max-h-48"
                     />
                   </div>
                 )}
                 {selectedUser.selfie_url && (
                   <div>
-                    <p className="text-xs text-zinc-400 mb-2">Selfie</p>
+                    <p className="text-xs text-muted-foreground mb-2">Selfie</p>
                     <img
                       src={selectedUser.selfie_url}
                       alt="Selfie"
-                      className="w-full rounded-xl border border-white/10 object-contain max-h-48"
+                      className="w-full rounded-xl border border-border object-contain max-h-48"
                     />
                   </div>
                 )}
                 {!selectedUser.govt_id_url && !selectedUser.selfie_url && (
-                  <div className="col-span-2 text-center py-8 text-zinc-600 text-sm">
+                  <div className="col-span-2 text-center py-8 text-muted-foreground text-sm">
                     No documents uploaded yet
                   </div>
                 )}
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Rejection Reason (if rejecting)</label>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Rejection Reason (if rejecting)</label>
                 <textarea
-                  className="w-full rounded-xl px-3 py-2.5 text-sm text-white border border-white/10 resize-none h-16 focus:outline-none focus:border-blue-500/50"
-                  style={{ background: "rgba(255,255,255,0.04)" }}
+                  className="w-full rounded-xl px-3 py-2.5 text-sm text-foreground bg-slate-50 border border-border resize-none h-16 focus:outline-none focus:border-blue-500/50"
                   placeholder="Optional — explain why..."
                   value={rejectReason}
                   onChange={e => setRejectReason(e.target.value)}
