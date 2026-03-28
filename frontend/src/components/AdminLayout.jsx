@@ -24,7 +24,7 @@ export default function AdminLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogout = () => { logout(); navigate("/admin/login"); };
+  const handleLogout = () => { logout(); navigate("/"); };
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">

@@ -60,7 +60,7 @@ function AdminRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
-      <Route path="/admin/login" element={<Navigate to="/auth" replace />} />
+      <Route path="/admin/login" element={<Navigate to="/" replace />} />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/admin/dashboard" element={<AdminGuard><AdminOverview /></AdminGuard>} />
       <Route path="/admin/verification" element={<AdminGuard><AdminVerification /></AdminGuard>} />
