@@ -1,0 +1,70 @@
+{
+  "summary": "Tested all new features: Templates API, Calendar Sync, 90-min buffer, PDF contract. Found and fixed 3 critical bugs. All 22 backend tests pass. All frontend tests pass. Admin login, Templates page (12 event types, stats, expand/collapse, save, search, variable pills), Calendar connect/disconnect all working correctly.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "PUT /api/gigs/invites/{invite_id}/respond (action=accept)",
+        "issue": "FIXED: Status stored as 'accept'/'reject' instead of 'accepted'/'rejected'. This broke contract download (400 for accepted invites), 90-min buffer checks (queries status=='accepted'), and Calendar invite filtering. Root cause: line 282 `update = {\"status\": data.action, ...}` - action verbs were not mapped to canonical status strings.",
+        "priority": "CRITICAL",
+        "fix_applied": "Added _STATUS_MAP = {'accept': 'accepted', 'reject': 'rejected', 'counter': 'counter_offered'} in routers/gigs.py"
+      },
+      {
+        "endpoint": "PUT /api/templates/{event_type}",
+        "issue": "FIXED: Pydantic model TemplateUpsert had required field `event_type: str` but frontend only sends form fields (platform_message, whatsapp_template_name, etc.) without event_type in body - caused 422 Unprocessable Entity on every template save from frontend.",
+        "priority": "HIGH",
+        "fix_applied": "Changed `event_type: str` to `event_type: Optional[str] = None` in templates.py since event_type is already in URL path"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminTemplates - handleSave error handler",
+        "issue": "FIXED: Error toast tried to render Pydantic array `[{type, loc, msg, input, url}]` as React child causing 'Objects are not valid as a React child' crash. Occurred when 422 from backend returned array-type detail.",
+        "selector": "AdminTemplates.jsx handleSave catch block",
+        "priority": "HIGH",
+        "fix_applied": "Added typeof check: `const msg = typeof detail === 'string' ? detail : 'Failed to save template'`"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Templates page - initial load",
+        "issues": ["Stats bar shows 0/0/0 briefly during loading before data arrives (minor flicker - acceptable UX)"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/new_features_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "respond_to_invite in gigs.py had the action→status bug fixed but also consider: lead_accept_counter correctly uses 'accepted' - keep consistency",
+    "TemplateUpsert model now has Optional event_type which is unused body param - clean approach since URL path is source of truth",
+    "Email mocking (Resend) logs to DB correctly when no API key - working as expected (MOCKED)",
+    "Google Calendar (MOCKED) properly updates DB and returns correct connect/disconnect status",
+    "PDF generation with reportlab is REAL - verified generates valid PDF bytes with %PDF magic header"
+  ],
+  "updated_files": [
+    "/app/backend/routers/gigs.py (line 282 - status mapping fix)",
+    "/app/backend/routers/templates.py (event_type made Optional)",
+    "/app/frontend/src/pages/admin/AdminTemplates.jsx (error handler fix)"
+  ],
+  "success_rate": {
+    "backend": "100% (22/22 tests passed after bug fix)",
+    "frontend": "100% (all flows working after fixes)"
+  },
+  "seed_data_creation": "Created test users via /api/auth/register, test gigs, and test invites (accepted) during backend tests. Template saved for invite_sent event type.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "3 bugs found and fixed. Backend 22/22 pass. Frontend fully functional. Key areas: (1) Admin /admin/templates page works - 12 templates, expand/collapse, save, search, variable pills all working. (2) Calendar connect/disconnect toggle works with mocked API. (3) PDF contract generation works (real reportlab). (4) 90-min buffer correctly returns 409. Admin: admin@crewbook.in / Admin@123. MOCKED: WhatsApp, Email (Resend), Google Calendar OAuth.",
+  "test_credentials": {
+    "admin": "admin@crewbook.in / Admin@123"
+  },
+  "rca_of_issues": {
+    "critical_bug": "In routers/gigs.py respond_to_invite(), the invite status was set from data.action directly (e.g., 'accept') instead of the canonical status string ('accepted'). Only the 'counter' action was correctly overridden to 'counter_offered'. Fix: Added _STATUS_MAP = {'accept': 'accepted', 'reject': 'rejected', 'counter': 'counter_offered'} and applied mapping. Reproduction: Accept an invite then try to download contract -> gets 400 instead of PDF.",
+    "templates_422": "TemplateUpsert Pydantic model had `event_type: str` as required field. Frontend's handleSave only sends form fields (no event_type). Backend returned 422, which had array-format detail that React couldn't render as toast text, causing runtime crash. Fix: Made event_type Optional in model; fixed frontend error handler to check typeof detail."
+  }
+}

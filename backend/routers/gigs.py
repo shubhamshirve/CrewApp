@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
@@ -8,6 +9,8 @@ from db import get_db
 from auth_utils import get_current_user, _clean_user
 from services.notifications_service import send_notification
 from services.whatsapp_mock import send_gig_invite_whatsapp
+from services.email_service import send_invite_email, send_booking_confirmed_email, send_gig_completed_email
+from services.pdf_service import generate_contract_pdf
 
 router = APIRouter(prefix="/gigs")
 
@@ -55,6 +58,51 @@ def _gig_to_dict(g: dict) -> dict:
     if "_id" in g:
         g["id"] = str(g.pop("_id"))
     return g
+
+
+def _parse_dt(date_str: str, time_str: str) -> datetime | None:
+    """Parse date + time strings into a timezone-aware datetime. Returns None on failure."""
+    try:
+        dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        return dt.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+async def _check_90min_buffer(db, freelancer_id: str, new_date: str, new_start: str, new_end: str) -> str | None:
+    """
+    Check if a new session conflicts (within 90-minute buffer) with freelancer's existing accepted sessions.
+    Returns an error message string if conflict found, None otherwise.
+    """
+    new_s = _parse_dt(new_date, new_start)
+    new_e = _parse_dt(new_date, new_end)
+    if not new_s or not new_e:
+        return None  # Can't validate — skip
+
+    buffer = timedelta(minutes=90)
+    # Get all accepted invites for this freelancer
+    existing_invites = await db.gig_invites.find(
+        {"freelancer_id": freelancer_id, "status": "accepted"}
+    ).to_list(200)
+
+    for inv in existing_invites:
+        gig = await db.gigs.find_one({"_id": inv["gig_id"]})
+        if not gig:
+            continue
+        session = next((s for s in gig.get("sessions", []) if s.get("id") == inv.get("session_id")), None)
+        if not session:
+            continue
+        ex_s = _parse_dt(session.get("date", ""), session.get("start_time", ""))
+        ex_e = _parse_dt(session.get("date", ""), session.get("end_time", ""))
+        if not ex_s or not ex_e:
+            continue
+        # Check if new session overlaps within 90 min buffer
+        if new_s < ex_e + buffer and new_e + buffer > ex_s:
+            return (
+                f"Freelancer has a session on {session['date']} from {session['start_time']} to {session['end_time']}. "
+                f"A 90-minute buffer is required between sessions."
+            )
+    return None
 
 
 @router.post("")
@@ -156,6 +204,18 @@ async def send_invite(gig_id: str, data: InviteRequest, current_user: dict = Dep
     if existing:
         raise HTTPException(status_code=400, detail="Invite already sent for this session")
 
+    # 90-minute buffer check
+    session = next((s for s in gig.get("sessions", []) if s.get("id") == data.session_id), None)
+    if session:
+        conflict = await _check_90min_buffer(
+            db, data.freelancer_id,
+            session.get("date", data.session_date),
+            session.get("start_time", ""),
+            session.get("end_time", ""),
+        )
+        if conflict:
+            raise HTTPException(status_code=409, detail=f"Schedule conflict: {conflict}")
+
     now = datetime.now(timezone.utc)
     invite = {
         "_id": str(uuid.uuid4()),
@@ -192,6 +252,15 @@ async def send_invite(gig_id: str, data: InviteRequest, current_user: dict = Dep
             user_id=freelancer["_id"],
         )
 
+    # Send email notification (gracefully mocked if no API key)
+    if freelancer.get("email"):
+        import asyncio
+        asyncio.create_task(send_invite_email(
+            db, freelancer["email"], freelancer["full_name"],
+            current_user["full_name"], gig["title"],
+            data.proposed_fee, invite["_id"]
+        ))
+
     invite["id"] = invite.pop("_id")
     return invite
 
@@ -210,7 +279,9 @@ async def respond_to_invite(invite_id: str, data: InviteResponse, current_user: 
         await db.gig_invites.update_one({"_id": invite_id}, {"$set": {"status": "expired"}})
         raise HTTPException(status_code=400, detail="Invite has expired")
 
-    update = {"status": data.action, "updated_at": now_iso}
+    # Map action verbs to canonical status strings
+    _STATUS_MAP = {"accept": "accepted", "reject": "rejected", "counter": "counter_offered"}
+    update = {"status": _STATUS_MAP.get(data.action, data.action), "updated_at": now_iso}
     if data.action == "counter" and data.counter_fee:
         update["status"] = "counter_offered"
         update["counter_fee"] = data.counter_fee
@@ -228,6 +299,18 @@ async def respond_to_invite(invite_id: str, data: InviteResponse, current_user: 
         "counter": f"{current_user['full_name']} sent a counter-offer of ₹{data.counter_fee} for {invite['gig_title']}",
     }
     await send_notification(db, invite["lead_id"], notif_type, f"Invite {notif_type.title()}", msg_map.get(data.action, ""), {"invite_id": invite_id})
+
+    # Email: booking confirmed
+    if data.action == "accept":
+        import asyncio
+        freelancer = await db.users.find_one({"_id": current_user["id"]})
+        if freelancer and freelancer.get("email"):
+            agreed = update.get("agreed_fee") or invite.get("proposed_fee", 0)
+            asyncio.create_task(send_booking_confirmed_email(
+                db, freelancer["email"], freelancer["full_name"],
+                invite["gig_title"], agreed
+            ))
+
     return {"status": update["status"]}
 
 
@@ -285,4 +368,53 @@ async def mark_data_delivered(gig_id: str, current_user: dict = Depends(get_curr
         "Data Delivered!", f"{current_user['full_name']} has marked data as delivered for {gig['title']}",
         {"gig_id": gig_id}
     )
+    # Email: gig completed to lead
+    import asyncio
+    lead = await db.users.find_one({"_id": gig["lead_photographer_id"]})
+    if lead and lead.get("email"):
+        asyncio.create_task(send_gig_completed_email(db, lead["email"], lead["full_name"], gig["title"]))
+
     return {"data_delivered": True}
+
+
+@router.get("/invites/{invite_id}/contract")
+async def download_contract(invite_id: str, current_user: dict = Depends(get_current_user)):
+    """Generate and download a PDF contract for an accepted invite."""
+    db = get_db()
+    invite = await db.gig_invites.find_one({"_id": invite_id})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+
+    # Only lead or freelancer can download
+    uid = current_user["id"]
+    if invite["lead_id"] != uid and invite["freelancer_id"] != uid:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if invite["status"] != "accepted":
+        raise HTTPException(status_code=400, detail="Contract is only available for accepted invites")
+
+    gig = await db.gigs.find_one({"_id": invite["gig_id"]})
+    if not gig:
+        raise HTTPException(status_code=404, detail="Gig not found")
+
+    lead_user = await db.users.find_one({"_id": invite["lead_id"]}, {"password_hash": 0, "_id": 0})
+    freelancer_user = await db.users.find_one({"_id": invite["freelancer_id"]}, {"password_hash": 0, "_id": 0})
+
+    if not lead_user or not freelancer_user:
+        raise HTTPException(status_code=404, detail="User data not found")
+
+    invite_clean = dict(invite)
+    invite_clean["id"] = str(invite_clean.pop("_id"))
+
+    gig_clean = _gig_to_dict(dict(gig))
+
+    pdf_bytes = generate_contract_pdf(gig_clean, invite_clean, lead_user, freelancer_user)
+
+    safe_title = gig.get("title", "contract").replace(" ", "_")[:40]
+    filename = f"crewbook_contract_{safe_title}_{invite_id[:8]}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

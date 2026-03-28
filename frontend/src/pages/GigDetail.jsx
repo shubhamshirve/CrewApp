@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Clock, MapPin, Users, UserPlus, Check, X, ArrowRightLeft, Upload, PackageCheck, Sparkles } from "lucide-react";
+import { Calendar, Clock, MapPin, Users, UserPlus, Check, X, ArrowRightLeft, Upload, PackageCheck, Sparkles, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 const DEFAULT_ROLES = ["Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician"];
@@ -122,6 +122,31 @@ export default function GigDetail() {
     } catch { toast.error("AI service unavailable"); } finally { setAiLoading(false); }
   };
 
+  const handleDownloadContract = async (inviteId) => {
+    try {
+      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${BACKEND_URL}/api/gigs/invites/${inviteId}/contract`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        toast.error(err.detail || "Failed to download contract");
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `crewbook_contract_${inviteId.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Contract downloaded!");
+    } catch {
+      toast.error("Failed to download contract");
+    }
+  };
+
   if (loading) return <Layout><div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div></Layout>;
   if (!gig) return <Layout><p className="text-zinc-400 text-center mt-20">Gig not found.</p></Layout>;
 
@@ -186,6 +211,9 @@ export default function GigDetail() {
                 {myInvite.status === "accepted" && !gig.data_delivered && (
                   <Button size="sm" data-testid="handover-btn" onClick={handleHandover} variant="outline" className="border-emerald-500/30 text-emerald-400 text-xs hover:bg-emerald-500/10 gap-1 mt-2"><PackageCheck size={13} /> Mark Data Delivered</Button>
                 )}
+                {myInvite.status === "accepted" && (
+                  <Button size="sm" data-testid="download-contract-btn" onClick={() => handleDownloadContract(myInvite.id)} variant="outline" className="border-blue-500/30 text-blue-400 text-xs hover:bg-blue-500/10 gap-1 mt-2 ml-2"><FileText size={13} /> Download Contract</Button>
+                )}
               </div>
             )}
           </TabsContent>
@@ -226,6 +254,11 @@ export default function GigDetail() {
                       {isLead && inv.status === "counter_offered" && (
                         <Button size="sm" data-testid={`accept-counter-${inv.id}`} onClick={() => handleLeadAcceptCounter(inv.id)} style={{ background: "#10B981", color: "#fff" }} className="text-xs font-display">
                           Accept Counter
+                        </Button>
+                      )}
+                      {inv.status === "accepted" && (
+                        <Button size="sm" data-testid={`download-contract-${inv.id}`} onClick={() => handleDownloadContract(inv.id)} variant="outline" className="border-blue-500/30 text-blue-400 text-xs hover:bg-blue-500/10 gap-1">
+                          <FileText size={12} /> Contract
                         </Button>
                       )}
                     </div>

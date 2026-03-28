@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Zap, ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
+import { Zap, ChevronLeft, ChevronRight, Calendar as CalIcon, Link, Link2Off, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -15,16 +15,20 @@ export default function CalendarPage() {
   const [gigs, setGigs] = useState([]);
   const [invites, setInvites] = useState([]);
   const [isStandby, setIsStandby] = useState(user?.is_standby || false);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [gigRes, invRes] = await Promise.all([
+        const [gigRes, invRes, calRes] = await Promise.all([
           api.get("/gigs"),
           api.get("/gigs/invites/received"),
+          api.get("/calendar/status"),
         ]);
         setGigs(gigRes.data);
         setInvites(invRes.data.filter(i => i.status === "accepted"));
+        setCalendarConnected(calRes.data.connected || false);
       } catch {}
     };
     load();
@@ -36,6 +40,22 @@ export default function CalendarPage() {
       setIsStandby(!isStandby);
       toast.success(isStandby ? "Standby mode off" : "Standby mode on – you're available for urgent gigs!");
     } catch { toast.error("Failed to update"); }
+  };
+
+  const handleCalendarConnect = async () => {
+    setCalendarLoading(true);
+    try {
+      if (calendarConnected) {
+        await api.post("/calendar/disconnect");
+        setCalendarConnected(false);
+        toast.success("Google Calendar disconnected");
+      } else {
+        await api.post("/calendar/connect");
+        setCalendarConnected(true);
+        toast.success("Google Calendar connected! (Preview mode — sync coming soon)");
+      }
+    } catch { toast.error("Failed to update calendar connection"); }
+    finally { setCalendarLoading(false); }
   };
 
   const year = currentDate.getFullYear();
@@ -75,20 +95,46 @@ export default function CalendarPage() {
     <Layout>
       <div className="max-w-4xl mx-auto space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl font-semibold text-white font-display">Calendar</h1>
             <p className="text-zinc-500 text-sm mt-0.5">Your availability & scheduled gigs</p>
           </div>
-          <button
-            data-testid="standby-toggle"
-            onClick={toggleStandby}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-display transition-all ${isStandby ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-white/10 text-zinc-400 hover:border-white/20"}`}
-          >
-            <Zap size={14} className={isStandby ? "text-emerald-400" : ""} />
-            {isStandby ? "Standby: ON" : "Standby: OFF"}
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Google Calendar connect */}
+            <Button
+              data-testid="google-calendar-btn"
+              size="sm"
+              variant="outline"
+              onClick={handleCalendarConnect}
+              disabled={calendarLoading}
+              className={`text-xs gap-1.5 ${calendarConnected ? "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10" : "border-white/10 text-zinc-400 hover:border-blue-500/40 hover:text-blue-400"}`}
+            >
+              {calendarLoading
+                ? <RefreshCw size={12} className="animate-spin" />
+                : calendarConnected ? <Link size={12} /> : <Link2Off size={12} />
+              }
+              {calendarConnected ? "Google Cal: Connected" : "Connect Google Calendar"}
+            </Button>
+            <button
+              data-testid="standby-toggle"
+              onClick={toggleStandby}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-display transition-all ${isStandby ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-white/10 text-zinc-400 hover:border-white/20"}`}
+            >
+              <Zap size={14} className={isStandby ? "text-emerald-400" : ""} />
+              {isStandby ? "Standby: ON" : "Standby: OFF"}
+            </button>
+          </div>
         </div>
+
+        {/* Google Calendar preview banner */}
+        {calendarConnected && (
+          <div className="p-3 rounded-lg border flex items-center gap-2 text-xs" style={{ background: "rgba(16,185,129,0.05)", borderColor: "rgba(16,185,129,0.2)" }}>
+            <Link size={12} className="text-emerald-400 flex-shrink-0" />
+            <span className="text-emerald-400 font-display font-medium">Google Calendar connected</span>
+            <span className="text-zinc-500">— Two-way sync is in preview mode. Your gig sessions will auto-sync once Google OAuth credentials are configured.</span>
+          </div>
+        )}
 
         {/* Calendar */}
         <div className="p-5 rounded-2xl border" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }}>
