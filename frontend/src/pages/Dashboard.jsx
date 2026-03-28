@@ -9,7 +9,7 @@ import { Wallet, Briefcase, Bell, Star, Shield, ChevronRight, CheckCircle, Clock
 import { toast } from "sonner";
 
 const STATUS_MAP = {
-  not_submitted: { label: "ID Not Submitted", color: "bg-zinc-700 text-zinc-300", icon: AlertCircle },
+  not_submitted: { label: "ID Not Submitted", color: "bg-slate-100 text-slate-500", icon: AlertCircle },
   pending: { label: "Pending Verification", color: "bg-amber-500/20 text-amber-400", icon: Clock },
   approved: { label: "Verified Professional", color: "bg-emerald-500/20 text-emerald-400", icon: CheckCircle },
   rejected: { label: "Verification Rejected", color: "bg-red-500/20 text-red-400", icon: XCircle },
@@ -86,7 +86,7 @@ export default function Dashboard() {
   const RatingSlider = ({ label, field }) => (
     <div>
       <div className="flex justify-between text-xs mb-2">
-        <span className="text-zinc-400 font-display">{label}</span>
+        <span className="text-muted-foreground font-display">{label}</span>
         <span className="text-amber-400 font-bold font-display">{ratingForm[field]}/5</span>
       </div>
       <input
@@ -97,7 +97,7 @@ export default function Dashboard() {
         className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
         style={{ accentColor: "#F59E0B" }}
       />
-      <div className="flex justify-between text-[9px] text-zinc-700 mt-1 font-display">
+      <div className="flex justify-between text-[9px] text-slate-400 mt-1 font-display">
         <span>Poor</span><span>Average</span><span>Excellent</span>
       </div>
     </div>
@@ -107,16 +107,16 @@ export default function Dashboard() {
   const StatusIcon = status.icon;
 
   const StatCard = ({ icon: Icon, label, value, sub, to, color = "#F59E0B" }) => (
-    <Link to={to || "#"} className="p-5 rounded-xl border card-hover block" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }} data-testid={`stat-${label.toLowerCase().replace(/ /g, "-")}`}>
+    <Link to={to || "#"} className="bg-white border border-border rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 card-hover block" data-testid={`stat-${label.toLowerCase().replace(/ /g, "-")}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${color}1A` }}>
           <Icon size={18} style={{ color }} />
         </div>
-        <ChevronRight size={14} className="text-zinc-600" />
+        <ChevronRight size={14} className="text-muted-foreground" />
       </div>
-      <p className="text-2xl font-bold text-white font-display">{value}</p>
-      <p className="text-xs text-zinc-500 mt-0.5 font-display">{label}</p>
-      {sub && <p className="text-[10px] text-zinc-600 mt-0.5">{sub}</p>}
+      <p className="text-2xl font-bold text-foreground font-display">{value}</p>
+      <p className="text-xs text-muted-foreground mt-0.5 font-display">{label}</p>
+      {sub && <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>}
     </Link>
   );
 
@@ -126,10 +126,10 @@ export default function Dashboard() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl text-white font-display font-semibold">
+            <h1 className="text-2xl text-foreground font-display font-semibold">
               Welcome back, {user?.full_name?.split(" ")[0]}
             </h1>
-            <p className="text-zinc-500 text-sm mt-0.5">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
+            <p className="text-muted-foreground text-sm mt-0.5">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-display ${status.color}`}>
             <StatusIcon size={12} />
@@ -143,8 +143,8 @@ export default function Dashboard() {
             <div className="flex items-center gap-3">
               <Shield size={18} className="text-amber-400 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-white font-display">Complete your verification</p>
-                <p className="text-xs text-zinc-400">Upload your government ID to get the verified badge and start booking.</p>
+                <p className="text-sm font-medium text-foreground font-display">Complete your verification</p>
+                <p className="text-xs text-muted-foreground">Upload your government ID to get the verified badge and start booking.</p>
               </div>
             </div>
             <Button size="sm" data-testid="complete-verification-btn" onClick={() => navigate("/onboarding")} style={{ background: "#F59E0B", color: "#000" }} className="flex-shrink-0 text-xs font-display font-semibold">
@@ -162,10 +162,10 @@ export default function Dashboard() {
                   <Star size={17} className="text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white font-display">
+                  <p className="text-sm font-semibold text-foreground font-display">
                     Rate your crew — {pendingRatings.reduce((n, r) => n + r.users_to_rate.length, 0)} review{pendingRatings.reduce((n, r) => n + r.users_to_rate.length, 0) !== 1 ? "s" : ""} pending
                   </p>
-                  <p className="text-xs text-zinc-500 mt-0.5">Help build trust in the community by rating your collaborators</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Help build trust in the community by rating your collaborators</p>
                 </div>
               </div>
             </div>
@@ -173,8 +173,8 @@ export default function Dashboard() {
               {pendingRatings.map(item => (
                 <div key={item.gig.id} className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)" }}>
                   <div className="min-w-0">
-                    <p className="text-sm text-white font-display font-medium truncate">{item.gig.title}</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">{item.users_to_rate.length} person{item.users_to_rate.length !== 1 ? "s" : ""} to rate: {item.users_to_rate.map(u => u.full_name).join(", ")}</p>
+                    <p className="text-sm text-foreground font-display font-medium truncate">{item.gig.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.users_to_rate.length} person{item.users_to_rate.length !== 1 ? "s" : ""} to rate: {item.users_to_rate.map(u => u.full_name).join(", ")}</p>
                   </div>
                   <Button
                     size="sm"
@@ -202,22 +202,22 @@ export default function Dashboard() {
         {/* Body */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Pending Invites */}
-          <div className="p-5 rounded-xl border" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }}>
+          <div className="bg-white border border-border rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white font-display">Pending Invites</h3>
+              <h3 className="text-sm font-semibold text-foreground font-display">Pending Invites</h3>
               <Link to="/gigs" className="text-xs text-amber-400 hover:text-amber-300 font-display">View all</Link>
             </div>
             {invites.length === 0 ? (
-              <p className="text-xs text-zinc-600 py-4 text-center">No pending invites</p>
+              <p className="text-xs text-slate-400 py-4 text-center">No pending invites</p>
             ) : (
               <div className="space-y-3">
                 {invites.map(inv => (
-                  <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg" style={{ background: "#1C1C1F" }}>
+                  <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-border">
                     <div>
-                      <p className="text-sm text-white font-display font-medium">{inv.gig?.title || "Untitled Gig"}</p>
-                      <p className="text-xs text-zinc-400">{inv.role} • ₹{inv.proposed_fee?.toLocaleString("en-IN")}</p>
+                      <p className="text-sm text-foreground font-display font-medium">{inv.gig?.title || "Untitled Gig"}</p>
+                      <p className="text-xs text-muted-foreground">{inv.role} • ₹{inv.proposed_fee?.toLocaleString("en-IN")}</p>
                     </div>
-                    <Button size="sm" data-testid={`invite-view-${inv.id}`} onClick={() => navigate(`/gigs/${inv.gig_id}`)} variant="outline" className="text-xs border-white/10 text-zinc-300 hover:text-white">
+                    <Button size="sm" data-testid={`invite-view-${inv.id}`} onClick={() => navigate(`/gigs/${inv.gig_id}`)} variant="outline" className="text-xs border-border text-slate-600 hover:text-foreground hover:bg-slate-50">
                       View
                     </Button>
                   </div>
@@ -227,23 +227,23 @@ export default function Dashboard() {
           </div>
 
           {/* Notifications */}
-          <div className="p-5 rounded-xl border" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }}>
+          <div className="bg-white border border-border rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white font-display">Recent Activity</h3>
+              <h3 className="text-sm font-semibold text-foreground font-display">Recent Activity</h3>
               <Link to="/notifications" className="text-xs text-amber-400 hover:text-amber-300 font-display">View all</Link>
             </div>
             {notifications.length === 0 ? (
-              <p className="text-xs text-zinc-600 py-4 text-center">No activity yet</p>
+              <p className="text-xs text-slate-400 py-4 text-center">No activity yet</p>
             ) : (
               <div className="space-y-3">
                 {notifications.map(n => {
                   const Icon = NOTIF_ICONS[n.type] || Bell;
                   return (
-                    <div key={n.id} className={`flex items-start gap-3 p-3 rounded-lg ${!n.is_read ? "bg-amber-500/5 border border-amber-500/10" : ""}`} style={{ background: n.is_read ? "#1C1C1F" : undefined }}>
-                      <Icon size={14} className={`mt-0.5 flex-shrink-0 ${n.is_read ? "text-zinc-500" : "text-amber-400"}`} />
+                    <div key={n.id} className={`flex items-start gap-3 p-3 rounded-lg ${!n.is_read ? "bg-amber-500/5 border border-amber-500/10" : "bg-slate-50"}`}>
+                      <Icon size={14} className={`mt-0.5 flex-shrink-0 ${n.is_read ? "text-muted-foreground" : "text-amber-400"}`} />
                       <div className="min-w-0">
-                        <p className="text-xs text-white font-display font-medium truncate">{n.title}</p>
-                        <p className="text-[11px] text-zinc-500 truncate">{n.message}</p>
+                        <p className="text-xs text-foreground font-display font-medium truncate">{n.title}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{n.message}</p>
                       </div>
                     </div>
                   );
@@ -253,9 +253,9 @@ export default function Dashboard() {
           </div>
 
           {/* Active Gigs */}
-          <div className="p-5 rounded-xl border lg:col-span-2" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }}>
+          <div className="bg-white border border-border rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white font-display">Active Gigs</h3>
+              <h3 className="text-sm font-semibold text-foreground font-display">Active Gigs</h3>
               <div className="flex gap-2">
                 <Link to="/gigs" className="text-xs text-amber-400 hover:text-amber-300 font-display">View all</Link>
                 <Button size="sm" data-testid="create-gig-btn" onClick={() => navigate("/gigs")} style={{ background: "#F59E0B", color: "#000" }} className="text-xs font-display font-semibold">
@@ -265,15 +265,15 @@ export default function Dashboard() {
             </div>
             {gigs.length === 0 ? (
               <div className="text-center py-8">
-                <Briefcase size={28} className="text-zinc-700 mx-auto mb-2" />
-                <p className="text-sm text-zinc-500">No active gigs. Create one to assemble your crew.</p>
+                <Briefcase size={28} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No active gigs. Create one to assemble your crew.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {gigs.map(g => (
-                  <Link key={g.id} to={`/gigs/${g.id}`} data-testid={`gig-card-${g.id}`} className="p-4 rounded-lg border card-hover" style={{ background: "#1C1C1F", borderColor: "rgba(255,255,255,0.05)" }}>
-                    <p className="text-sm text-white font-display font-medium truncate">{g.title}</p>
-                    <p className="text-xs text-zinc-400 mt-1">{g.sessions?.length || 0} sessions</p>
+                  <Link key={g.id} to={`/gigs/${g.id}`} data-testid={`gig-card-${g.id}`} className="p-4 rounded-lg border border-border bg-slate-50 card-hover">
+                    <p className="text-sm text-foreground font-display font-medium truncate">{g.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{g.sessions?.length || 0} sessions</p>
                     <span className="inline-flex items-center mt-2 text-[10px] px-2 py-0.5 rounded-full font-display" style={{ background: "rgba(16,185,129,0.15)", color: "#10B981" }}>Active</span>
                   </Link>
                 ))}
@@ -286,9 +286,9 @@ export default function Dashboard() {
       {/* Rating Modal */}
       {ratingModal && (
         <Dialog open={true} onOpenChange={() => setRatingModal(null)}>
-          <DialogContent className="max-w-md" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.1)" }}>
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-white font-display flex items-center gap-2">
+              <DialogTitle className="text-foreground font-display flex items-center gap-2">
                 <Star size={16} className="text-purple-400" />
                 Rate your collaborator
               </DialogTitle>
@@ -296,9 +296,9 @@ export default function Dashboard() {
 
             {/* Progress */}
             {ratingModal.users_to_rate.length > 1 && (
-              <div className="flex items-center gap-2 text-xs text-zinc-500 font-display">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-display">
                 <span>{ratingModal.currentIdx + 1} of {ratingModal.users_to_rate.length}</span>
-                <div className="flex-1 h-1 rounded-full bg-zinc-800">
+                <div className="flex-1 h-1 rounded-full bg-slate-200">
                   <div className="h-full rounded-full bg-purple-500 transition-all" style={{ width: `${((ratingModal.currentIdx + 1) / ratingModal.users_to_rate.length) * 100}%` }} />
                 </div>
               </div>
@@ -306,10 +306,10 @@ export default function Dashboard() {
 
             {/* Person being rated */}
             <div className="p-3 rounded-lg" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
-              <p className="text-sm font-semibold text-white font-display">
+              <p className="text-sm font-semibold text-foreground font-display">
                 {ratingModal.users_to_rate[ratingModal.currentIdx]?.full_name}
               </p>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {ratingModal.users_to_rate[ratingModal.currentIdx]?.role} · {ratingModal.gig.title}
               </p>
             </div>
@@ -323,10 +323,10 @@ export default function Dashboard() {
 
             {/* Private note */}
             <div>
-              <label className="text-xs text-zinc-400 font-display block mb-1.5">Private Note (optional)</label>
+              <label className="text-xs text-muted-foreground font-display block mb-1.5">Private Note (optional)</label>
               <textarea
                 data-testid="rating-notes-input"
-                className="w-full bg-zinc-900 border border-white/10 text-white placeholder:text-zinc-600 text-sm rounded-lg px-3 py-2 outline-none focus:border-purple-500/50 resize-none h-16"
+                className="w-full bg-slate-50 border border-border text-foreground placeholder:text-muted-foreground text-sm rounded-xl px-3 py-2 outline-none focus:border-purple-500/50 resize-none h-16"
                 placeholder="Private note — only you can see this"
                 value={ratingForm.notes}
                 onChange={e => setRatingForm(f => ({ ...f, notes: e.target.value }))}
@@ -334,7 +334,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setRatingModal(null)} className="flex-1 border-white/10 text-zinc-400 text-xs">
+              <Button variant="outline" onClick={() => setRatingModal(null)} className="flex-1 border-border text-slate-600 hover:text-foreground hover:bg-slate-50 text-xs">
                 Skip
               </Button>
               <Button
