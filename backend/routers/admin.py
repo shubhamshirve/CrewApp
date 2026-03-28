@@ -21,6 +21,13 @@ class PenaltyRequest(BaseModel):
     stars: int = 1
 
 
+class BulkActionRequest(BaseModel):
+    action: str  # suspend | unsuspend | verify | notify
+    user_ids: List[str]
+    title: Optional[str] = None
+    message: Optional[str] = None
+
+
 @router.get("/verification-queue")
 async def get_verification_queue(admin: dict = Depends(get_admin_user)):
     db = get_db()
@@ -101,6 +108,100 @@ async def list_users(
     users = await db.users.find(query, {"password_hash": 0}).skip(skip).limit(limit).to_list(limit)
     total = await db.users.count_documents(query)
     return {"users": [_clean_user(u) for u in users], "total": total, "page": page}
+
+
+@router.get("/users/{user_id}/profile")
+async def get_user_profile(user_id: str, admin: dict = Depends(get_admin_user)):
+    db = get_db()
+    user = await db.users.find_one({"_id": user_id}, {"password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    gigs = await db.gigs.find({"lead_id": user_id}).sort("created_at", -1).limit(50).to_list(50)
+    for g in gigs:
+        g["id"] = str(g.pop("_id"))
+
+    invites = await db.gig_invites.find(
+        {"$or": [{"lead_id": user_id}, {"freelancer_id": user_id}]}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    for inv in invites:
+        inv["id"] = str(inv.pop("_id"))
+
+    wallet_txns = await db.wallet_transactions.find(
+        {"user_id": user_id}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    for t in wallet_txns:
+        t["id"] = str(t.pop("_id"))
+
+    wallet_adjs = await db.wallet_adjustments.find(
+        {"user_id": user_id}
+    ).sort("created_at", -1).to_list(100)
+    for a in wallet_adjs:
+        a["id"] = str(a.pop("_id"))
+
+    ratings = await db.ratings.find(
+        {"ratee_id": user_id}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    for r in ratings:
+        r["id"] = str(r.pop("_id"))
+
+    login_logs = await db.login_logs.find(
+        {"user_id": user_id}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    for l in login_logs:
+        l["id"] = str(l.pop("_id"))
+
+    return {
+        "user": _clean_user(user),
+        "gigs": gigs,
+        "invites": invites,
+        "wallet_transactions": wallet_txns,
+        "wallet_adjustments": wallet_adjs,
+        "ratings": ratings,
+        "login_logs": login_logs,
+    }
+
+
+@router.post("/users/bulk-action")
+async def bulk_action(data: BulkActionRequest, admin: dict = Depends(get_admin_user)):
+    db = get_db()
+    if data.action not in ("suspend", "unsuspend", "verify", "notify"):
+        raise HTTPException(status_code=400, detail=f"Unknown action: {data.action}")
+    if not data.user_ids:
+        return {"updated": 0}
+
+    now = datetime.now(timezone.utc).isoformat()
+    updated = 0
+
+    if data.action == "suspend":
+        result = await db.users.update_many(
+            {"_id": {"$in": data.user_ids}},
+            {"$set": {"is_suspended": True, "updated_at": now}},
+        )
+        updated = result.modified_count
+
+    elif data.action == "unsuspend":
+        result = await db.users.update_many(
+            {"_id": {"$in": data.user_ids}},
+            {"$set": {"is_suspended": False, "updated_at": now}},
+        )
+        updated = result.modified_count
+
+    elif data.action == "verify":
+        result = await db.users.update_many(
+            {"_id": {"$in": data.user_ids}},
+            {"$set": {"is_verified": True, "verification_status": "approved", "updated_at": now}},
+        )
+        updated = result.modified_count
+
+    elif data.action == "notify":
+        if not data.title or not data.message:
+            raise HTTPException(status_code=400, detail="title and message required for notify action")
+        for uid in data.user_ids:
+            await send_notification(db, uid, "admin_broadcast", data.title, data.message, {})
+        updated = len(data.user_ids)
+
+    return {"updated": updated}
 
 
 @router.get("/stats")

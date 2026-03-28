@@ -231,3 +231,83 @@ class TestAdminUsersFilters:
         users = resp.json()["users"]
         for u in users:
             assert u["is_suspended"] is True
+
+
+class TestAdminUserProfile:
+    """GET /admin/users/{id}/profile returns aggregated user data"""
+
+    def test_profile_returns_all_sections(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.get(f"{BASE_URL}/api/admin/users/{user_id}/profile")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "user" in data
+        assert "gigs" in data
+        assert "invites" in data
+        assert "wallet_transactions" in data
+        assert "wallet_adjustments" in data
+        assert "ratings" in data
+        assert "login_logs" in data
+
+    def test_profile_user_no_password(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.get(f"{BASE_URL}/api/admin/users/{user_id}/profile")
+        assert "password_hash" not in resp.json()["user"]
+
+    def test_profile_404_on_missing_user(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/users/nonexistent-id/profile")
+        assert resp.status_code == 404
+
+
+class TestAdminBulkAction:
+    """POST /admin/users/bulk-action applies actions to multiple users"""
+
+    def test_bulk_suspend(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/users/bulk-action", json={
+            "action": "suspend",
+            "user_ids": [user_id],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["updated"] == 1
+        user_resp = admin_client.get(f"{BASE_URL}/api/admin/users")
+        users = user_resp.json()["users"]
+        target = next((u for u in users if u["id"] == user_id), None)
+        assert target is not None
+        assert target["is_suspended"] is True
+
+    def test_bulk_unsuspend(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/users/bulk-action", json={
+            "action": "unsuspend",
+            "user_ids": [user_id],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["updated"] == 1
+
+    def test_bulk_verify(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/users/bulk-action", json={
+            "action": "verify",
+            "user_ids": [user_id],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["updated"] == 1
+
+    def test_bulk_notify(self, admin_client, registered_user):
+        user_id = registered_user["user"]["id"]
+        resp = admin_client.post(f"{BASE_URL}/api/admin/users/bulk-action", json={
+            "action": "notify",
+            "user_ids": [user_id],
+            "title": "Test announcement",
+            "message": "This is a bulk notification",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["updated"] == 1
+
+    def test_bulk_invalid_action(self, admin_client):
+        resp = admin_client.post(f"{BASE_URL}/api/admin/users/bulk-action", json={
+            "action": "delete_everything",
+            "user_ids": [],
+        })
+        assert resp.status_code == 400
