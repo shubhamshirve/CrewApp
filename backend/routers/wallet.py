@@ -14,9 +14,24 @@ from services.notifications_service import send_notification
 
 router = APIRouter(prefix="/wallet")
 
-PLAN_PRICES = {"base": 6900, "premium": 9900}  # paise
-PLAN_NAMES = {"base": "Base Plan (₹69/mo)", "premium": "Premium Plan (₹99/mo)"}
-REFERRAL_REWARD = int(os.environ.get("REFERRAL_REWARD_AMOUNT", 50))
+# Static fallback defaults (overridden by DB at runtime)
+_DEFAULT_BASE_PRICE_RS = 69
+_DEFAULT_PREMIUM_PRICE_RS = 99
+_DEFAULT_REFERRAL_REWARD = 50
+
+
+async def _get_platform_settings(db):
+    """Return pricing settings from DB, with fallback to defaults."""
+    doc = await db.platform_settings.find_one({"_id": "platform_settings"})
+    if not doc:
+        return {
+            "base_plan_price": _DEFAULT_BASE_PRICE_RS,
+            "premium_plan_price": _DEFAULT_PREMIUM_PRICE_RS,
+            "base_plan_name": "Base Plan",
+            "premium_plan_name": "Premium Plan",
+            "referral_reward": _DEFAULT_REFERRAL_REWARD,
+        }
+    return doc
 
 
 def get_razorpay_client():
@@ -58,11 +73,16 @@ async def get_wallet(current_user: dict = Depends(get_current_user)):
 
 @router.post("/subscribe/create-order")
 async def create_subscription_order(data: SubscribeRequest, current_user: dict = Depends(get_current_user)):
-    if data.plan not in PLAN_PRICES:
+    if data.plan not in ("base", "premium"):
         raise HTTPException(status_code=400, detail="Invalid plan")
     db = get_db()
-    bill_paise = PLAN_PRICES[data.plan]
-    bill_rs = bill_paise / 100
+    cfg = await _get_platform_settings(db)
+
+    # Dynamic prices from DB (stored in ₹, convert to paise for Razorpay)
+    plan_price_rs = cfg.get(f"{data.plan}_plan_price",
+                            _DEFAULT_BASE_PRICE_RS if data.plan == "base" else _DEFAULT_PREMIUM_PRICE_RS)
+    bill_rs = float(plan_price_rs)
+    remaining_paise = int(bill_rs * 100)
 
     wallet_balance = current_user.get("wallet_balance", 0.0)
     wallet_deducted = min(wallet_balance, bill_rs)
@@ -100,7 +120,11 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
 async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depends(get_current_user)):
     """Activate subscription when fully covered by wallet."""
     db = get_db()
-    bill_rs = PLAN_PRICES[data.plan] / 100
+    cfg = await _get_platform_settings(db)
+    bill_rs = float(cfg.get(f"{data.plan}_plan_price",
+                            _DEFAULT_BASE_PRICE_RS if data.plan == "base" else _DEFAULT_PREMIUM_PRICE_RS))
+    plan_name = cfg.get(f"{data.plan}_plan_name", data.plan.capitalize() + " Plan")
+
     wallet_balance = current_user.get("wallet_balance", 0.0)
     if wallet_balance < bill_rs:
         raise HTTPException(status_code=400, detail="Insufficient wallet balance")
@@ -123,7 +147,7 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
         "user_id": current_user["id"],
         "type": "debit",
         "amount": bill_rs,
-        "description": f"Subscription: {PLAN_NAMES[data.plan]}",
+        "description": f"Subscription: {plan_name}",
         "balance_after": new_balance,
         "created_at": now.isoformat(),
     }
@@ -150,6 +174,11 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
     wallet_balance = current_user.get("wallet_balance", 0.0)
     new_balance = max(0.0, wallet_balance - data.wallet_deducted)
 
+    cfg = await _get_platform_settings(db)
+    plan_price_rs = float(cfg.get(f"{data.plan}_plan_price",
+                                  _DEFAULT_BASE_PRICE_RS if data.plan == "base" else _DEFAULT_PREMIUM_PRICE_RS))
+    plan_name = cfg.get(f"{data.plan}_plan_name", data.plan.capitalize() + " Plan")
+
     await db.users.update_one(
         {"_id": current_user["id"]},
         {"$set": {
@@ -159,13 +188,12 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
             "whatsapp_enabled": data.plan == "premium",
         }}
     )
-    bill_rs = PLAN_PRICES[data.plan] / 100
     tx = {
         "_id": str(uuid.uuid4()),
         "user_id": current_user["id"],
         "type": "debit",
-        "amount": bill_rs,
-        "description": f"Subscription: {PLAN_NAMES[data.plan]} (via Razorpay)",
+        "amount": plan_price_rs,
+        "description": f"Subscription: {plan_name} (via Razorpay)",
         "reference": data.razorpay_payment_id,
         "balance_after": new_balance,
         "created_at": now.isoformat(),
@@ -174,7 +202,7 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
     await _check_and_reward_referrer(db, current_user)
     await send_notification(
         db, current_user["id"], "subscription",
-        "Subscription Activated!", f"Your {PLAN_NAMES[data.plan]} is now active."
+        "Subscription Activated!", f"Your {plan_name} is now active."
     )
     return {"message": "Payment verified. Subscription active!", "plan": data.plan, "expires_at": expires_at}
 
@@ -191,14 +219,17 @@ async def _check_and_reward_referrer(db, user: dict):
     referrer = await db.users.find_one({"_id": user["referred_by"]})
     if not referrer:
         return
-    new_balance = referrer.get("wallet_balance", 0.0) + REFERRAL_REWARD
+    # Read dynamic referral reward amount from platform settings
+    cfg = await _get_platform_settings(db)
+    referral_reward = cfg.get("referral_reward", _DEFAULT_REFERRAL_REWARD)
+    new_balance = referrer.get("wallet_balance", 0.0) + referral_reward
     now = datetime.now(timezone.utc).isoformat()
     await db.users.update_one({"_id": user["referred_by"]}, {"$set": {"wallet_balance": new_balance}})
     tx = {
         "_id": str(uuid.uuid4()),
         "user_id": user["referred_by"],
         "type": "credit",
-        "amount": REFERRAL_REWARD,
+        "amount": referral_reward,
         "description": f"Referral reward: {user['full_name']} subscribed",
         "balance_after": new_balance,
         "created_at": now,
@@ -206,7 +237,7 @@ async def _check_and_reward_referrer(db, user: dict):
     await db.wallet_transactions.insert_one(tx)
     await send_notification(
         db, user["referred_by"], "wallet_credit",
-        f"₹{REFERRAL_REWARD} Referral Reward!",
-        f"Your referral {user['full_name']} just subscribed. ₹{REFERRAL_REWARD} added to wallet!",
-        {"amount": REFERRAL_REWARD}
+        f"₹{referral_reward} Referral Reward!",
+        f"Your referral {user['full_name']} just subscribed. ₹{referral_reward} added to wallet!",
+        {"amount": referral_reward}
     )

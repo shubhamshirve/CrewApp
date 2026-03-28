@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Check, ChevronRight, Plus, X, Upload } from "lucide-react";
 
-const ROLES = ["Lead Photographer","Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician","Photo Editor","Video Editor"];
 const STYLES = ["Cinematic","Candid","Traditional","Documentary","Fine Art","Dark & Moody","Bright & Airy"];
 const EDITING = ["Lightroom","Photoshop","Final Cut Pro","Premiere Pro","DaVinci Resolve","Capture One"];
 const GEAR_CATS = ["Camera","Lens","Lighting","Drone","Audio","Other"];
@@ -16,11 +15,20 @@ const ID_TYPES = ["Aadhar","PAN","Driving License","Passport"];
 
 const STEPS = ["Your Role & Rates", "Style & Gear", "Verify Identity", "Complete"];
 
+const DEFAULT_ROLES = ["Lead Photographer","Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician","Photo Editor","Video Editor"];
+
 export default function Onboarding() {
   const { user, api, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [rolesList, setRolesList] = useState(DEFAULT_ROLES);
+
+  useEffect(() => {
+    api.get("/platform/roles").then(r => {
+      if (r.data?.roles?.length) setRolesList(r.data.roles);
+    }).catch(() => {});
+  }, []);
 
   const [profileData, setProfileData] = useState({
     primary_role: user?.primary_role || "",
@@ -129,7 +137,7 @@ export default function Onboarding() {
                 <Label className="text-zinc-300 text-sm font-display">Primary Role *</Label>
                 <select data-testid="primary-role-select" value={profileData.primary_role} onChange={e => setProfileData(p => ({ ...p, primary_role: e.target.value }))} className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`}>
                   <option value="">Select role...</option>
-                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>
@@ -140,7 +148,7 @@ export default function Onboarding() {
                 <Label className="text-zinc-300 text-sm font-display">Secondary Role (optional)</Label>
                 <select data-testid="secondary-role-select" value={profileData.secondary_role} onChange={e => setProfileData(p => ({ ...p, secondary_role: e.target.value }))} className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`}>
                   <option value="">None</option>
-                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>

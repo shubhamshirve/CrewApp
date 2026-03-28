@@ -36,7 +36,7 @@ const APP_STATUS_COLORS = {
 };
 
 // ── Post Gig Modal ─────────────────────────────────────────────────────────────
-function PostGigModal({ onClose, onSuccess, api }) {
+function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, roles: propRoles }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -48,7 +48,10 @@ function PostGigModal({ onClose, onSuccess, api }) {
     { role: "Second Shooter", budget: 5000, slots: 1, verified_only: false, min_rating: null, gear_required: "" }
   ]);
 
-  const addRole = () => setRoles(r => [...r, { role: "Videographer", budget: 6000, slots: 1, verified_only: false, min_rating: null, gear_required: "" }]);
+  const rolesList = propRoles?.length ? propRoles : ROLES;
+  const eventTypesList = propEventTypes?.length ? propEventTypes : EVENT_TYPES;
+
+  const addRole = () => setRoles(r => [...r, { role: rolesList[0] || "Videographer", budget: 6000, slots: 1, verified_only: false, min_rating: null, gear_required: "" }]);
   const removeRole = (i) => setRoles(r => r.filter((_, idx) => idx !== i));
   const updateRole = (i, field, val) => setRoles(r => r.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
 
@@ -106,7 +109,7 @@ function PostGigModal({ onClose, onSuccess, api }) {
                   onChange={e => setForm(f => ({ ...f, event_type: e.target.value }))}
                   style={{ background: "#1A1A1E" }}
                 >
-                  {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  {eventTypesList.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
@@ -225,7 +228,7 @@ function PostGigModal({ onClose, onSuccess, api }) {
                         onChange={e => updateRole(i, "role", e.target.value)}
                         style={{ background: "#1A1A1E" }}
                       >
-                        {ROLES.map(rl => <option key={rl} value={rl}>{rl}</option>)}
+                        {rolesList.map(rl => <option key={rl} value={rl}>{rl}</option>)}
                       </select>
                     </div>
                     <div>
@@ -707,6 +710,18 @@ export default function GigBoard() {
   const [manageModal, setManageModal] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ role: "", city: "", event_type: "", budget_min: "", budget_max: "" });
+  const [dynamicRoles, setDynamicRoles] = useState(ROLES);
+  const [dynamicEventTypes, setDynamicEventTypes] = useState(EVENT_TYPES);
+
+  // Load dynamic roles and event types
+  useEffect(() => {
+    api.get("/platform/roles").then(r => {
+      if (r.data?.roles?.length) setDynamicRoles(r.data.roles);
+    }).catch(() => {});
+    api.get("/platform/event-types").then(r => {
+      if (r.data?.event_types?.length) setDynamicEventTypes(r.data.event_types);
+    }).catch(() => {});
+  }, []);
 
   const fetchBrowse = useCallback(async () => {
     setLoading(true);
@@ -869,7 +884,7 @@ export default function GigBoard() {
                     onChange={e => setFilters(f => ({ ...f, role: e.target.value }))}
                   >
                     <option value="">All Roles</option>
-                    {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    {dynamicRoles.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div>
@@ -882,7 +897,7 @@ export default function GigBoard() {
                     onChange={e => setFilters(f => ({ ...f, event_type: e.target.value }))}
                   >
                     <option value="">All Events</option>
-                    {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    {dynamicEventTypes.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1024,6 +1039,8 @@ export default function GigBoard() {
           api={api}
           onClose={() => setShowPostModal(false)}
           onSuccess={() => { if (tab === "my-posts") fetchMyPosts(); }}
+          eventTypes={dynamicEventTypes}
+          roles={dynamicRoles}
         />
       )}
       {applyModal && (

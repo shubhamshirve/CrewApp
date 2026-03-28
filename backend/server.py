@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from routers import auth, users, admin, gigs, connections, wallet, notifications, ratings, ai_routes, public_gigs
+from routers import auth, users, admin, gigs, connections, wallet, notifications, ratings, ai_routes, public_gigs, platform_settings
 from db import client, db
 
 app = FastAPI(title="CrewBook API - Freelance Crew Booking Platform")
@@ -24,6 +24,7 @@ api_router.include_router(notifications.router, tags=["notifications"])
 api_router.include_router(ratings.router, tags=["ratings"])
 api_router.include_router(ai_routes.router, tags=["ai"])
 api_router.include_router(public_gigs.router, tags=["public-gigs"])
+api_router.include_router(platform_settings.router, tags=["platform"])
 
 
 @api_router.get("/health")

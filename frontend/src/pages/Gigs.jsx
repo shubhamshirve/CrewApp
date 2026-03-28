@@ -9,8 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Plus, ChevronRight, Calendar, Users, Briefcase, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-
-const EVENT_TYPES = ["Haldi","Mehendi","Sangeet","Baraat","Wedding","Reception","Pre-Wedding Shoot","Corporate","Birthday","Other"];
 const STATUS_COLORS = {
   draft: { bg: "rgba(107,114,128,0.15)", color: "#9CA3AF" },
   active: { bg: "rgba(16,185,129,0.15)", color: "#10B981" },
@@ -26,12 +24,18 @@ export default function Gigs() {
   const [gigs, setGigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [eventTypes, setEventTypes] = useState(["Wedding"]);
 
   const [newGig, setNewGig] = useState({ title: "", description: "" });
   const [sessions, setSessions] = useState([{ date: "", start_time: "09:00", end_time: "18:00", location: "", venue_name: "", event_type: "Wedding" }]);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.get("/platform/event-types").then(r => {
+      if (r.data?.event_types?.length) setEventTypes(r.data.event_types);
+    }).catch(() => {});
+  }, []);
 
   const load = async () => {
     try {
@@ -156,7 +160,7 @@ export default function Gigs() {
                       <div>
                         <Label className="text-zinc-400 text-xs font-display">Event Type</Label>
                         <select className={`mt-1 w-full px-3 py-2 rounded-lg text-xs ${inputClass} border`} value={s.event_type} onChange={e => updateSession(i, "event_type", e.target.value)}>
-                          {EVENT_TYPES.map(et => <option key={et} value={et}>{et}</option>)}
+                          {eventTypes.map(et => <option key={et} value={et}>{et}</option>)}
                         </select>
                       </div>
                       <div>

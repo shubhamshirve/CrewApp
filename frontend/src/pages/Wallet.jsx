@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Wallet as WalletIcon, Check, Crown, MessageSquare, Gift, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 
-const PLANS = [
+const DEFAULT_PLANS = [
   {
     id: "base",
     name: "Base Plan",
@@ -28,8 +28,33 @@ export default function Wallet() {
   const [walletData, setWalletData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(null);
+  const [plans, setPlans] = useState(DEFAULT_PLANS);
 
-  useEffect(() => { loadWallet(); }, []);
+  useEffect(() => {
+    loadWallet();
+    // Fetch dynamic pricing from admin settings
+    api.get("/platform/settings").then(r => {
+      if (r.data) {
+        setPlans([
+          {
+            id: "base",
+            name: r.data.base_plan_name || "Base Plan",
+            price: r.data.base_plan_price || 69,
+            features: ["Verified professional badge", "Unlimited bookings", "In-app & email alerts", "Digital wallet & referrals", "Calendar sync"],
+            color: "#9CA3AF",
+          },
+          {
+            id: "premium",
+            name: r.data.premium_plan_name || "Premium Plan",
+            price: r.data.premium_plan_price || 99,
+            features: ["Everything in Base", "WhatsApp actionable alerts", "Accept/Reject from WhatsApp", "Sunday schedule dispatch"],
+            color: "#F59E0B",
+            popular: true,
+          },
+        ]);
+      }
+    }).catch(() => {});
+  }, []);
 
   const loadWallet = async () => {
     try {
@@ -72,7 +97,7 @@ export default function Wallet() {
         amount: order.amount,
         currency: "INR",
         name: "CrewBook",
-        description: `${planId === "base" ? "Base Plan ₹69" : "Premium Plan ₹99"}/month`,
+        description: `${plans.find(p => p.id === planId)?.name || planId} ₹${plans.find(p => p.id === planId)?.price || ""}/month`,
         order_id: order.id,
         handler: async (response) => {
           try {
@@ -162,7 +187,7 @@ export default function Wallet() {
 
         {/* Plans */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {PLANS.map(plan => {
+          {plans.map(plan => {
             const isActive = currentPlan === plan.id;
             const isUpgrade = currentPlan === "free" || (currentPlan === "base" && plan.id === "premium");
             return (

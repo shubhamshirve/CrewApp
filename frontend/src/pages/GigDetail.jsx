@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Clock, MapPin, Users, UserPlus, Check, X, ArrowRightLeft, Upload, PackageCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
-const ROLES = ["Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician"];
+const DEFAULT_ROLES = ["Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician"];
 const STATUS_BADGE = {
   pending: { bg: "rgba(245,158,11,0.15)", color: "#F59E0B", label: "Pending" },
   accepted: { bg: "rgba(16,185,129,0.15)", color: "#10B981", label: "Accepted" },
@@ -33,12 +33,19 @@ export default function GigDetail() {
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [connections, setConnections] = useState([]);
+  const [rolesList, setRolesList] = useState(DEFAULT_ROLES);
 
-  const [inviteForm, setInviteForm] = useState({ freelancer_id: "", session_id: "", session_date: "", role: ROLES[0], proposed_fee: "" });
+  const [inviteForm, setInviteForm] = useState({ freelancer_id: "", session_id: "", session_date: "", role: DEFAULT_ROLES[0], proposed_fee: "" });
   const [workspaceForm, setWorkspaceForm] = useState({ type: "moodboard", title: "", content: "" });
   const [counterFee, setCounterFee] = useState({});
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    api.get("/platform/roles").then(r => {
+      if (r.data?.roles?.length) setRolesList(r.data.roles);
+    }).catch(() => {});
+  }, []);
 
   const load = async () => {
     try {
@@ -109,7 +116,7 @@ export default function GigDetail() {
         event_types: gig.sessions.map(s => s.event_type),
         dates: gig.sessions.map(s => s.date),
         location: gig.sessions[0]?.location || "",
-        roles_needed: ROLES.slice(0, 3),
+        roles_needed: rolesList.slice(0, 3),
       });
       setAiSuggestion(res.data.suggestion);
     } catch { toast.error("AI service unavailable"); } finally { setAiLoading(false); }
@@ -281,7 +288,7 @@ export default function GigDetail() {
             <div>
               <Label className="text-zinc-300 text-sm font-display">Role *</Label>
               <select data-testid="invite-role-select" className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`} value={inviteForm.role} onChange={e => setInviteForm(p => ({ ...p, role: e.target.value }))}>
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>

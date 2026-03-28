@@ -9,7 +9,6 @@ import { Search as SearchIcon, MapPin, Star, Shield, Zap, SlidersHorizontal, X }
 import { toast } from "sonner";
 import { useApi } from "@/contexts/AuthContext";
 
-const ROLES = ["Lead Photographer","Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician"];
 const STYLES = ["Cinematic","Candid","Traditional","Documentary","Fine Art","Dark & Moody","Bright & Airy"];
 
 export default function Search() {
@@ -22,6 +21,13 @@ export default function Search() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [roles, setRoles] = useState(["Lead Photographer","Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician"]);
+
+  useEffect(() => {
+    api.get("/platform/roles").then(r => {
+      if (r.data?.roles?.length) setRoles(r.data.roles);
+    }).catch(() => {});
+  }, []);
 
   const doSearch = useCallback(async () => {
     setLoading(true);
@@ -71,7 +77,7 @@ export default function Search() {
                 <label className="text-xs text-zinc-400 font-display mb-1 block">Role</label>
                 <select data-testid="filter-role" value={role} onChange={e => setRole(e.target.value)} className={`w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`}>
                   <option value="">All Roles</option>
-                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  {roles.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>

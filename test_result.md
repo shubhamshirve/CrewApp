@@ -101,3 +101,97 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Add dynamic pricing rules (admin sets referral reward, plan prices), event type manager (add/remove wedding event types), and role category manager (add new professional roles) — all in the admin panel's respective tabs."
+
+backend:
+  - task: "Platform Settings API — GET/PUT pricing"
+    implemented: true
+    working: true
+    file: "backend/routers/platform_settings.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Created /api/platform/settings GET (public) and PUT (admin-only). Tested with curl."
+
+  - task: "Event Types API — GET/POST/DELETE"
+    implemented: true
+    working: true
+    file: "backend/routers/platform_settings.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "All three methods tested with curl and admin token. Stored in platform_meta collection."
+
+  - task: "Role Categories API — GET/POST/DELETE"
+    implemented: true
+    working: true
+    file: "backend/routers/platform_settings.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "All three methods tested with curl and admin token."
+
+  - task: "wallet.py updated to read dynamic pricing from DB"
+    implemented: true
+    working: true
+    file: "backend/routers/wallet.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Now reads prices from platform_settings collection at runtime."
+
+frontend:
+  - task: "AdminSettings page — Pricing, Event Types, Roles tabs"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/admin/AdminSettings.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created AdminSettings.jsx with 3 tabs. Added to AdminLayout nav and App.js route at /admin/settings."
+
+  - task: "Dynamic event types and roles in all user pages"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/pages/Gigs.jsx, GigBoard.jsx, Onboarding.jsx, GigDetail.jsx, Search.jsx, Wallet.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "All pages fetch from /platform/event-types and /platform/roles on mount. Wallet fetches /platform/settings for dynamic prices."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "AdminSettings page — Pricing, Event Types, Roles tabs"
+    - "Dynamic event types and roles in all user pages"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented 3 admin panel features: 1) Dynamic pricing via /api/platform/settings, 2) Event type manager via /api/platform/event-types, 3) Role category manager via /api/platform/roles. All backend verified with curl. AdminSettings.jsx created with tabs. Frontend pages updated to fetch dynamic data. Admin creds: admin@crewbook.in / Admin@123"
