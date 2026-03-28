@@ -28,6 +28,7 @@ import AdminPenalties from "@/pages/admin/AdminPenalties";
 import AdminGigBoard from "@/pages/admin/AdminGigBoard";
 import AdminSettings from "@/pages/admin/AdminSettings";
 import AdminUserProfile from "@/pages/admin/AdminUserProfile";
+import AdminLogs from "@/pages/admin/AdminLogs";
 
 // ── Guards ────────────────────────────────────────────────────────────────────
 function ProtectedRoute({ children }) {
@@ -70,6 +71,7 @@ function AdminRoutes() {
       <Route path="/admin/gig-board" element={<AdminGuard><AdminGigBoard /></AdminGuard>} />
       <Route path="/admin/settings" element={<AdminGuard><AdminSettings /></AdminGuard>} />
       <Route path="/admin/users/:id" element={<AdminGuard><AdminUserProfile /></AdminGuard>} />
+      <Route path="/admin/logs" element={<AdminGuard><AdminLogs /></AdminGuard>} />
       <Route path="/admin/*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
   );
