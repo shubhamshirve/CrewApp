@@ -309,11 +309,11 @@ async def update_user_flags(user_id: str, data: UserFlagsRequest, admin: dict = 
     if data.is_high_risk is not None:
         updates["is_high_risk"] = data.is_high_risk
 
-    await db.users.update_one({"_id": user_id}, {"$set": updates})
     before_flags = {
         "is_featured": user.get("is_featured", False),
         "is_high_risk": user.get("is_high_risk", False),
     }
+    await db.users.update_one({"_id": user_id}, {"$set": updates})
     await log_admin_action(
         db, admin, "set_flags",
         "user", user_id,
