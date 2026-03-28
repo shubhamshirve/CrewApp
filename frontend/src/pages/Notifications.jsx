@@ -6,13 +6,13 @@ import { Bell, Check, CheckCheck } from "lucide-react";
 import { toast } from "sonner";
 
 const TYPE_COLORS = {
-  invite: "#F59E0B",
+  invite: "#F97316",
   accepted: "#10B981",
   rejected: "#EF4444",
   counter: "#8B5CF6",
   connection_request: "#3B82F6",
   connection_accepted: "#10B981",
-  wallet_credit: "#F59E0B",
+  wallet_credit: "#F97316",
   verification: "#3B82F6",
   penalty: "#EF4444",
   subscription: "#10B981",
@@ -62,45 +62,61 @@ export default function Notifications() {
       <div className="max-w-2xl mx-auto space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-white font-display">Notifications</h1>
-            {unreadCount > 0 && <p className="text-sm text-zinc-500 mt-0.5">{unreadCount} unread</p>}
+            <h1 className="text-2xl font-semibold text-slate-900 font-display">Notifications</h1>
+            {unreadCount > 0 && <p className="text-sm text-slate-500 mt-0.5">{unreadCount} unread</p>}
           </div>
           {unreadCount > 0 && (
-            <Button size="sm" data-testid="mark-all-read-btn" onClick={markAllRead} variant="outline" className="border-white/10 text-zinc-400 hover:text-white gap-1.5 text-xs font-display">
+            <Button size="sm" data-testid="mark-all-read-btn" onClick={markAllRead} variant="outline" className="border-slate-200 text-slate-500 hover:text-slate-900 gap-1.5 text-xs font-display">
               <CheckCheck size={13} /> Mark all read
             </Button>
           )}
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20"><div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>
+          <div className="flex justify-center py-20">
+            <div className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : notifications.length === 0 ? (
           <div className="text-center py-20">
-            <Bell size={32} className="text-zinc-700 mx-auto mb-3" />
-            <p className="text-sm text-zinc-500">No notifications yet</p>
+            <Bell size={32} className="text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-400">No notifications yet</p>
           </div>
         ) : (
           Object.entries(grouped).map(([date, items]) => (
             <div key={date}>
-              <p className="text-xs text-zinc-600 font-display uppercase tracking-wide mb-3">{date}</p>
+              <p className="text-xs text-slate-400 font-display uppercase tracking-wide mb-3">{date}</p>
               <div className="space-y-2">
                 {items.map(n => (
                   <div
                     key={n.id}
                     data-testid={`notification-${n.id}`}
                     onClick={() => !n.is_read && markRead(n.id)}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${!n.is_read ? "border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/8" : "border-white/5 hover:border-white/10"}`}
-                    style={{ background: n.is_read ? "#131315" : undefined }}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                      !n.is_read
+                        ? "border-orange-200 bg-orange-50 hover:bg-orange-100/60"
+                        : "border-slate-100 bg-white hover:border-slate-200"
+                    }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: n.is_read ? "#3f3f46" : (TYPE_COLORS[n.type] || "#F59E0B") }} />
+                      <div
+                        className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                        style={{ background: n.is_read ? "#CBD5E1" : (TYPE_COLORS[n.type] || "#F97316") }}
+                      />
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-display font-medium ${n.is_read ? "text-zinc-300" : "text-white"}`}>{n.title}</p>
-                        <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">{n.message}</p>
-                        <p className="text-[10px] text-zinc-600 mt-1">{new Date(n.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+                        <p className={`text-sm font-display font-medium ${n.is_read ? "text-slate-600" : "text-slate-900"}`}>
+                          {n.title}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{n.message}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          {new Date(n.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
                       </div>
                       {!n.is_read && (
-                        <button onClick={e => { e.stopPropagation(); markRead(n.id); }} className="text-zinc-600 hover:text-amber-400 flex-shrink-0" data-testid={`mark-read-${n.id}`}>
+                        <button
+                          onClick={e => { e.stopPropagation(); markRead(n.id); }}
+                          className="text-slate-400 hover:text-orange-500 flex-shrink-0"
+                          data-testid={`mark-read-${n.id}`}
+                        >
                           <Check size={14} />
                         </button>
                       )}
