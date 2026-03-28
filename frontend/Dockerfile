@@ -4,8 +4,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies (cached layer)
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile --network-timeout 300000
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
 
 # Copy source and build
 COPY . .
@@ -15,7 +15,7 @@ ARG REACT_APP_BACKEND_URL=""
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
 ENV GENERATE_SOURCEMAP=false
 
-RUN yarn build
+RUN npm run build
 
 # ── Stage 2: Serve with nginx ──────────────────────────────────────────────
 FROM nginx:1.27-alpine
