@@ -1,4 +1,5 @@
 import os
+import logging
 import razorpay
 import hmac
 import hashlib
@@ -11,6 +12,8 @@ import uuid
 from db import get_db
 from auth_utils import get_current_user, _clean_user
 from services.notifications_service import send_notification
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wallet")
 
@@ -106,6 +109,21 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
         "receipt": f"sub_{current_user['id'][:8]}_{uuid.uuid4().hex[:8]}",
         "notes": {"user_id": current_user["id"], "plan": data.plan}
     })
+    try:
+        await db.payment_logs.insert_one({
+            "_id": str(uuid.uuid4()),
+            "user_id": current_user["id"],
+            "event": "order_created",
+            "razorpay_order_id": order.get("id"),
+            "razorpay_payment_id": None,
+            "amount_paise": remaining_paise,
+            "plan": data.plan,
+            "status": "pending",
+            "detail": "Razorpay order created",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:
+        logger.error("payment_log write failed: %s", e)
     return {
         "full_wallet_cover": False,
         "wallet_deducted": wallet_deducted,
@@ -152,6 +170,21 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
         "created_at": now.isoformat(),
     }
     await db.wallet_transactions.insert_one(tx)
+    try:
+        await db.payment_logs.insert_one({
+            "_id": str(uuid.uuid4()),
+            "user_id": current_user["id"],
+            "event": "wallet_covered",
+            "razorpay_order_id": None,
+            "razorpay_payment_id": None,
+            "amount_paise": int(bill_rs * 100),
+            "plan": data.plan,
+            "status": "success",
+            "detail": f"Full wallet cover: ₹{bill_rs:.2f}",
+            "created_at": now.isoformat(),
+        })
+    except Exception as e:
+        logger.error("payment_log write failed: %s", e)
     await _check_and_reward_referrer(db, current_user)
     return {"message": "Subscription activated", "plan": data.plan, "expires_at": expires_at}
 
@@ -159,6 +192,10 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
 @router.post("/subscribe/verify")
 async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depends(get_current_user)):
     rp = get_razorpay_client()
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    expires_at = (now + timedelta(days=30)).isoformat()
+
     try:
         rp.utility.verify_payment_signature({
             "razorpay_order_id": data.razorpay_order_id,
@@ -166,11 +203,23 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
             "razorpay_signature": data.razorpay_signature,
         })
     except Exception:
+        try:
+            await db.payment_logs.insert_one({
+                "_id": str(uuid.uuid4()),
+                "user_id": current_user["id"],
+                "event": "payment_failed",
+                "razorpay_order_id": data.razorpay_order_id,
+                "razorpay_payment_id": data.razorpay_payment_id,
+                "amount_paise": None,
+                "plan": data.plan,
+                "status": "failed",
+                "detail": "Signature verification failed",
+                "created_at": now.isoformat(),
+            })
+        except Exception as log_err:
+            logger.error("payment_log write failed: %s", log_err)
         raise HTTPException(status_code=400, detail="Payment verification failed")
 
-    db = get_db()
-    now = datetime.now(timezone.utc)
-    expires_at = (now + timedelta(days=30)).isoformat()
     wallet_balance = current_user.get("wallet_balance", 0.0)
     new_balance = max(0.0, wallet_balance - data.wallet_deducted)
 
@@ -204,6 +253,21 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
         db, current_user["id"], "subscription",
         "Subscription Activated!", f"Your {plan_name} is now active."
     )
+    try:
+        await db.payment_logs.insert_one({
+            "_id": str(uuid.uuid4()),
+            "user_id": current_user["id"],
+            "event": "payment_verified",
+            "razorpay_order_id": data.razorpay_order_id,
+            "razorpay_payment_id": data.razorpay_payment_id,
+            "amount_paise": int(plan_price_rs * 100),
+            "plan": data.plan,
+            "status": "success",
+            "detail": f"Subscription activated: {plan_name}",
+            "created_at": now.isoformat(),
+        })
+    except Exception as e:
+        logger.error("payment_log write failed: %s", e)
     return {"message": "Payment verified. Subscription active!", "plan": data.plan, "expires_at": expires_at}
 
 
