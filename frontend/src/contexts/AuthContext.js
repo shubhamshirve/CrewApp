@@ -3,14 +3,17 @@ import axios from "axios";
 
 const AuthContext = createContext(null);
 
-// When REACT_APP_BACKEND_URL is empty (Docker/nginx-proxy mode), use relative /api
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 export const API = BACKEND_URL ? `${BACKEND_URL}/api` : "/api";
 
 const api = axios.create({ baseURL: API });
 
+function getToken() {
+  return localStorage.getItem("crewbook_token") || sessionStorage.getItem("crewbook_token") || null;
+}
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("crewbook_token");
+  const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -22,13 +25,14 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const fetchMe = useCallback(async () => {
-    const token = localStorage.getItem("crewbook_token");
+    const token = getToken();
     if (!token) { setLoading(false); return; }
     try {
       const res = await api.get("/auth/me");
       setUser(res.data);
     } catch {
       localStorage.removeItem("crewbook_token");
+      sessionStorage.removeItem("crewbook_token");
     } finally {
       setLoading(false);
     }
@@ -52,6 +56,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem("crewbook_token");
+    sessionStorage.removeItem("crewbook_token");
     setUser(null);
   };
 
