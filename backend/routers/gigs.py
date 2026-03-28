@@ -188,7 +188,8 @@ async def send_invite(gig_id: str, data: InviteRequest, current_user: dict = Dep
     if freelancer.get("whatsapp_enabled") and freelancer.get("phone"):
         await send_gig_invite_whatsapp(
             db, freelancer["phone"], freelancer["full_name"],
-            gig["title"], data.proposed_fee, invite["_id"]
+            gig["title"], data.proposed_fee, invite["_id"],
+            user_id=freelancer["_id"],
         )
 
     invite["id"] = invite.pop("_id")
