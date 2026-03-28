@@ -147,8 +147,8 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ `/gig-board` route added to App.js, "Gig Board" nav item in Layout.jsx
 
 ### P1 (Important)
-- [ ] Post-event rating flow trigger
-- [ ] Private lead notes on freelancer profiles
+- [x] **Post-event rating flow trigger** ✅ DONE — Dashboard banner + rating modal with sliders
+- [x] **Private lead notes on freelancer profiles** ✅ DONE — Profile page section, only visible to note author
 - [ ] Financial ledger (advance paid / balance due)
 - [ ] Sunday dispatch cron job
 - [ ] Appeal review UI for admin
