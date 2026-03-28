@@ -147,7 +147,7 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">Upload your government ID to get the verified badge and start booking.</p>
               </div>
             </div>
-            <Button size="sm" data-testid="complete-verification-btn" onClick={() => navigate("/onboarding")} style={{ background: "#F59E0B", color: "#000" }} className="flex-shrink-0 text-xs font-display font-semibold">
+            <Button size="sm" data-testid="complete-verification-btn" onClick={() => navigate("/onboarding")} className="flex-shrink-0 text-xs font-display font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
               Verify Now
             </Button>
           </div>
@@ -257,8 +257,8 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground font-display">Active Gigs</h3>
               <div className="flex gap-2">
-                <Link to="/gigs" className="text-xs text-amber-400 hover:text-amber-300 font-display">View all</Link>
-                <Button size="sm" data-testid="create-gig-btn" onClick={() => navigate("/gigs")} style={{ background: "#F59E0B", color: "#000" }} className="text-xs font-display font-semibold">
+                <Link to="/gigs" className="text-xs text-primary hover:text-primary/80 font-display">View all</Link>
+                <Button size="sm" data-testid="create-gig-btn" onClick={() => navigate("/gigs")} className="text-xs font-display font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-full">
                   + New Gig
                 </Button>
               </div>
