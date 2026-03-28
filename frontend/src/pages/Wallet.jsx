@@ -130,50 +130,50 @@ export default function Wallet() {
     <Layout>
       <div className="max-w-3xl mx-auto space-y-5">
         <div>
-          <h1 className="text-2xl font-semibold text-white font-display">Wallet & Subscription</h1>
-          <p className="text-zinc-500 text-sm mt-0.5">Manage your plan, wallet balance, and referrals</p>
+          <h1 className="text-2xl font-semibold text-foreground font-display">Wallet & Subscription</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Manage your plan, wallet balance, and referrals</p>
         </div>
 
         {/* Wallet Balance Card */}
-        <div className="p-6 rounded-2xl border relative overflow-hidden" style={{ background: "#131315", borderColor: "rgba(245,158,11,0.2)" }}>
-          <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(90deg, transparent, #F59E0B, transparent)" }} />
+        <div className="bg-white border border-border rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-zinc-500 font-display uppercase tracking-wide">Wallet Balance</p>
-              <p data-testid="wallet-balance" className="text-4xl font-bold text-white font-display mt-1 font-mono">₹{walletData?.balance?.toFixed(2) || "0.00"}</p>
-              <p className="text-xs text-zinc-500 mt-1 font-display">Auto-applied on next renewal</p>
+              <p className="text-xs text-muted-foreground font-display uppercase tracking-wide">Wallet Balance</p>
+              <p data-testid="wallet-balance" className="text-4xl font-bold text-foreground font-display mt-1 font-mono">₹{walletData?.balance?.toFixed(2) || "0.00"}</p>
+              <p className="text-xs text-muted-foreground mt-1 font-display">Auto-applied on next renewal</p>
             </div>
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "rgba(245,158,11,0.1)" }}>
-              <WalletIcon size={24} style={{ color: "#F59E0B" }} />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-primary/10">
+              <WalletIcon size={24} className="text-primary" />
             </div>
           </div>
 
-          <div className="mt-5 pt-4 border-t border-white/5 flex items-center gap-6 text-sm">
+          <div className="mt-5 pt-4 border-t border-border flex items-center gap-6 text-sm">
             <div>
-              <p className="text-xs text-zinc-500 font-display">Referral Code</p>
+              <p className="text-xs text-muted-foreground font-display">Referral Code</p>
               <div className="flex items-center gap-2 mt-1">
                 <code data-testid="referral-code" className="text-amber-400 font-mono font-bold text-base">{walletData?.referral_code || user?.referral_code}</code>
-                <button onClick={() => { navigator.clipboard.writeText(walletData?.referral_code || user?.referral_code || ""); toast.success("Copied!"); }} className="text-xs text-zinc-500 hover:text-zinc-300 border border-white/10 px-2 py-0.5 rounded font-display" data-testid="copy-referral-btn">
+                <button onClick={() => { navigator.clipboard.writeText(walletData?.referral_code || user?.referral_code || ""); toast.success("Copied!"); }} className="text-xs text-muted-foreground hover:text-foreground border border-border px-2 py-0.5 rounded font-display" data-testid="copy-referral-btn">
                   Copy
                 </button>
               </div>
             </div>
             <div>
-              <p className="text-xs text-zinc-500 font-display">Reward per referral</p>
-              <p className="text-white font-display font-semibold mt-1 flex items-center gap-1"><Gift size={13} className="text-amber-400" />₹50 credit</p>
+              <p className="text-xs text-muted-foreground font-display">Reward per referral</p>
+              <p className="text-foreground font-display font-semibold mt-1 flex items-center gap-1"><Gift size={13} className="text-amber-400" />₹50 credit</p>
             </div>
           </div>
         </div>
 
         {/* Current Plan */}
         {currentPlan !== "free" && (
-          <div className="p-4 rounded-xl border flex items-center justify-between gap-3" style={{ background: "rgba(245,158,11,0.06)", borderColor: "rgba(245,158,11,0.2)" }}>
+          <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <Crown size={18} className="text-amber-400" />
               <div>
-                <p className="text-sm font-semibold text-white font-display">{currentPlan === "premium" ? "Premium Plan" : "Base Plan"} Active</p>
+                <p className="text-sm font-semibold text-foreground font-display">{currentPlan === "premium" ? "Premium Plan" : "Base Plan"} Active</p>
                 {walletData?.subscription_expires_at && (
-                  <p className="text-xs text-zinc-400">Renews: {new Date(walletData.subscription_expires_at).toLocaleDateString("en-IN")}</p>
+                  <p className="text-xs text-muted-foreground">Renews: {new Date(walletData.subscription_expires_at).toLocaleDateString("en-IN")}</p>
                 )}
               </div>
             </div>
@@ -191,28 +191,28 @@ export default function Wallet() {
             const isActive = currentPlan === plan.id;
             const isUpgrade = currentPlan === "free" || (currentPlan === "base" && plan.id === "premium");
             return (
-              <div key={plan.id} data-testid={`plan-card-${plan.id}`} className="p-6 rounded-2xl border relative overflow-hidden" style={{ background: "#131315", borderColor: plan.popular ? "rgba(245,158,11,0.4)" : "rgba(255,255,255,0.07)" }}>
-                {plan.popular && <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(90deg, transparent, #F59E0B, transparent)" }} />}
+              <div key={plan.id} data-testid={`plan-card-${plan.id}`} className={`bg-white border rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 relative overflow-hidden ${plan.popular ? "border-primary/40" : "border-border"}`}>
+                {plan.popular && <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />}
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <p className="text-xs text-zinc-500 font-display">{plan.name}</p>
+                    <p className="text-xs text-muted-foreground font-display">{plan.name}</p>
                     <div className="flex items-baseline gap-1 mt-1">
-                      <span className="text-3xl font-bold text-white font-display">₹{plan.price}</span>
-                      <span className="text-zinc-500 text-xs">/month</span>
+                      <span className="text-3xl font-bold text-foreground font-display">₹{plan.price}</span>
+                      <span className="text-muted-foreground text-xs">/month</span>
                     </div>
                   </div>
-                  {plan.popular && <span className="text-xs px-2 py-0.5 rounded-full font-display" style={{ background: "rgba(245,158,11,0.15)", color: "#F59E0B" }}>Popular</span>}
+                  {plan.popular && <span className="text-xs px-2 py-0.5 rounded-full font-display bg-primary/10 text-primary">Popular</span>}
                 </div>
                 <ul className="space-y-2 mb-5">
                   {plan.features.map(f => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-zinc-300">
-                      <Check size={12} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                    <li key={f} className="flex items-start gap-2 text-xs text-slate-600">
+                      <Check size={12} className="text-primary mt-0.5 flex-shrink-0" />
                       {f}
                     </li>
                   ))}
                 </ul>
                 {isActive ? (
-                  <div className="w-full text-center py-2 text-xs rounded-lg font-display text-emerald-400 border" style={{ borderColor: "rgba(16,185,129,0.3)", background: "rgba(16,185,129,0.08)" }}>
+                  <div className="w-full text-center py-2 text-xs rounded-lg font-display text-emerald-600 border border-emerald-500/30 bg-emerald-500/8">
                     ✓ Current Plan
                   </div>
                 ) : (
@@ -220,8 +220,7 @@ export default function Wallet() {
                     data-testid={`subscribe-${plan.id}-btn`}
                     onClick={() => handleSubscribe(plan.id)}
                     disabled={subscribing === plan.id}
-                    className="w-full font-display font-semibold gap-2"
-                    style={plan.popular ? { background: "#F59E0B", color: "#000" } : { background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "#fff" }}
+                    className={`w-full font-display font-semibold gap-2 rounded-full ${plan.popular ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-0"}`}
                   >
                     <CreditCard size={14} />
                     {subscribing === plan.id ? "Processing..." : isUpgrade ? "Upgrade" : "Subscribe"}
@@ -234,16 +233,16 @@ export default function Wallet() {
 
         {/* Transaction History */}
         {walletData?.transactions?.length > 0 && (
-          <div className="p-5 rounded-xl border" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }}>
-            <h3 className="text-sm font-semibold text-white font-display mb-4">Transaction History</h3>
+          <div className="bg-white border border-border rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5">
+            <h3 className="text-sm font-semibold text-foreground font-display mb-4">Transaction History</h3>
             <div className="space-y-2">
               {walletData.transactions.map(tx => (
-                <div key={tx.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0" data-testid={`transaction-${tx.id}`}>
+                <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0" data-testid={`transaction-${tx.id}`}>
                   <div>
-                    <p className="text-xs text-zinc-300 font-display">{tx.description}</p>
-                    <p className="text-[10px] text-zinc-600">{new Date(tx.created_at).toLocaleDateString("en-IN")}</p>
+                    <p className="text-xs text-slate-600 font-display">{tx.description}</p>
+                    <p className="text-[10px] text-muted-foreground">{new Date(tx.created_at).toLocaleDateString("en-IN")}</p>
                   </div>
-                  <span className={`text-sm font-bold font-mono ${tx.type === "credit" ? "text-emerald-400" : "text-red-400"}`}>
+                  <span className={`text-sm font-bold font-mono ${tx.type === "credit" ? "text-emerald-500" : "text-red-500"}`}>
                     {tx.type === "credit" ? "+" : "-"}₹{tx.amount?.toFixed(2)}
                   </span>
                 </div>
@@ -253,8 +252,8 @@ export default function Wallet() {
         )}
 
         {/* Split payment info */}
-        <div className="p-3 rounded-lg border text-xs text-zinc-500" style={{ borderColor: "rgba(245,158,11,0.1)", background: "rgba(245,158,11,0.04)" }}>
-          <span className="text-amber-500 font-display">Smart Billing:</span> Your wallet balance is automatically deducted first during renewals. You only pay the remaining amount via UPI/card.
+        <div className="p-3 rounded-lg border border-primary/10 bg-primary/4 text-xs text-muted-foreground">
+          <span className="text-primary font-display">Smart Billing:</span> Your wallet balance is automatically deducted first during renewals. You only pay the remaining amount via UPI/card.
         </div>
       </div>
     </Layout>

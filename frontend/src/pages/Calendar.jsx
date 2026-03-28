@@ -97,8 +97,8 @@ export default function CalendarPage() {
         {/* Header */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-2xl font-semibold text-white font-display">Calendar</h1>
-            <p className="text-zinc-500 text-sm mt-0.5">Your availability & scheduled gigs</p>
+            <h1 className="text-2xl font-semibold text-foreground font-display">Calendar</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">Your availability & scheduled gigs</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Google Calendar connect */}
@@ -108,7 +108,7 @@ export default function CalendarPage() {
               variant="outline"
               onClick={handleCalendarConnect}
               disabled={calendarLoading}
-              className={`text-xs gap-1.5 ${calendarConnected ? "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10" : "border-white/10 text-zinc-400 hover:border-blue-500/40 hover:text-blue-400"}`}
+              className={`text-xs gap-1.5 rounded-full ${calendarConnected ? "border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10" : "border-border text-slate-600 hover:border-blue-500/40 hover:text-blue-500"}`}
             >
               {calendarLoading
                 ? <RefreshCw size={12} className="animate-spin" />
@@ -119,9 +119,9 @@ export default function CalendarPage() {
             <button
               data-testid="standby-toggle"
               onClick={toggleStandby}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-display transition-all ${isStandby ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-white/10 text-zinc-400 hover:border-white/20"}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-display transition-all ${isStandby ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600" : "border-border text-slate-600 hover:border-slate-300"}`}
             >
-              <Zap size={14} className={isStandby ? "text-emerald-400" : ""} />
+              <Zap size={14} className={isStandby ? "text-emerald-500" : ""} />
               {isStandby ? "Standby: ON" : "Standby: OFF"}
             </button>
           </div>
@@ -129,22 +129,22 @@ export default function CalendarPage() {
 
         {/* Google Calendar preview banner */}
         {calendarConnected && (
-          <div className="p-3 rounded-lg border flex items-center gap-2 text-xs" style={{ background: "rgba(16,185,129,0.05)", borderColor: "rgba(16,185,129,0.2)" }}>
-            <Link size={12} className="text-emerald-400 flex-shrink-0" />
-            <span className="text-emerald-400 font-display font-medium">Google Calendar connected</span>
-            <span className="text-zinc-500">— Two-way sync is in preview mode. Your gig sessions will auto-sync once Google OAuth credentials are configured.</span>
+          <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 flex items-center gap-2 text-xs">
+            <Link size={12} className="text-emerald-500 flex-shrink-0" />
+            <span className="text-emerald-600 font-display font-medium">Google Calendar connected</span>
+            <span className="text-muted-foreground">— Two-way sync is in preview mode. Your gig sessions will auto-sync once Google OAuth credentials are configured.</span>
           </div>
         )}
 
         {/* Calendar */}
-        <div className="p-5 rounded-2xl border" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }}>
+        <div className="bg-white border border-border rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5">
           {/* Month nav */}
           <div className="flex items-center justify-between mb-5">
-            <button data-testid="prev-month-btn" onClick={prevMonth} className="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors">
+            <button data-testid="prev-month-btn" onClick={prevMonth} className="p-2 rounded-lg hover:bg-slate-100 text-muted-foreground hover:text-foreground transition-colors">
               <ChevronLeft size={18} />
             </button>
-            <h2 className="text-lg font-semibold text-white font-display">{MONTHS[month]} {year}</h2>
-            <button data-testid="next-month-btn" onClick={nextMonth} className="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors">
+            <h2 className="text-lg font-semibold text-foreground font-display">{MONTHS[month]} {year}</h2>
+            <button data-testid="next-month-btn" onClick={nextMonth} className="p-2 rounded-lg hover:bg-slate-100 text-muted-foreground hover:text-foreground transition-colors">
               <ChevronRight size={18} />
             </button>
           </div>
@@ -152,32 +152,29 @@ export default function CalendarPage() {
           {/* Day headers */}
           <div className="grid grid-cols-7 mb-2">
             {DAYS.map(d => (
-              <div key={d} className="text-center text-xs text-zinc-600 font-display py-1.5">{d}</div>
+              <div key={d} className="text-center text-xs text-muted-foreground font-display py-1.5">{d}</div>
             ))}
           </div>
 
           {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-px" style={{ background: "rgba(255,255,255,0.04)" }}>
+          <div className="grid grid-cols-7 gap-px bg-border">
             {cells.map((day, idx) => {
-              if (!day) return <div key={`empty-${idx}`} style={{ background: "#131315", minHeight: "72px" }} />;
+              if (!day) return <div key={`empty-${idx}`} className="bg-slate-50 min-h-[72px]" />;
               const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
               const isToday = dateStr === todayStr;
               const events = getEventsForDay(day);
               return (
-                <div key={day} data-testid={`calendar-day-${dateStr}`} className="p-2 min-h-[72px]" style={{ background: "#131315" }}>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-display mb-1 ${isToday ? "bg-amber-500 text-black font-bold" : "text-zinc-400"}`}>
+                <div key={day} data-testid={`calendar-day-${dateStr}`} className="bg-white p-2 min-h-[72px]">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-display mb-1 ${isToday ? "bg-primary text-white font-bold" : "text-foreground"}`}>
                     {day}
                   </div>
                   <div className="space-y-0.5">
                     {events.slice(0, 2).map((ev, i) => (
-                      <div key={i} className="text-[10px] px-1 py-0.5 rounded truncate font-display" style={{
-                        background: ev.type === "gig" ? "rgba(245,158,11,0.15)" : "rgba(59,130,246,0.15)",
-                        color: ev.type === "gig" ? "#F59E0B" : "#60A5FA"
-                      }}>
+                      <div key={i} className={`text-[10px] px-1 py-0.5 rounded truncate font-display ${ev.type === "gig" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
                         {ev.type === "gig" ? ev.event_type : ev.role}
                       </div>
                     ))}
-                    {events.length > 2 && <div className="text-[10px] text-zinc-600 px-1">+{events.length - 2} more</div>}
+                    {events.length > 2 && <div className="text-[10px] text-muted-foreground px-1">+{events.length - 2} more</div>}
                   </div>
                 </div>
               );
@@ -186,15 +183,15 @@ export default function CalendarPage() {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 text-xs text-zinc-500 font-display">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: "rgba(245,158,11,0.3)" }} />My Gigs</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: "rgba(59,130,246,0.3)" }} />Booked Sessions</span>
-          <span className="flex items-center gap-1.5"><Zap size={10} className="text-emerald-400" />Standby Active</span>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground font-display">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-200" />My Gigs</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-200" />Booked Sessions</span>
+          <span className="flex items-center gap-1.5"><Zap size={10} className="text-emerald-500" />Standby Active</span>
         </div>
 
         {/* Note about 90-min buffer */}
-        <div className="p-3 rounded-lg border text-xs text-zinc-500" style={{ borderColor: "rgba(245,158,11,0.1)", background: "rgba(245,158,11,0.04)" }}>
-          <span className="text-amber-500 font-display">90-min buffer rule:</span> The platform enforces a minimum 90-minute gap between back-to-back bookings on the same day to ensure gear pack-down and travel time.
+        <div className="p-3 rounded-lg border border-primary/10 bg-primary/4 text-xs text-muted-foreground">
+          <span className="text-primary font-display">90-min buffer rule:</span> The platform enforces a minimum 90-minute gap between back-to-back bookings on the same day to ensure gear pack-down and travel time.
         </div>
       </div>
     </Layout>
