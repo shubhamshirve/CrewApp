@@ -17,6 +17,7 @@ import CalendarPage from "@/pages/Calendar";
 import Wallet from "@/pages/Wallet";
 import Notifications from "@/pages/Notifications";
 import AdminDashboard from "@/pages/AdminDashboard";
+import GigBoard from "@/pages/GigBoard";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -53,6 +54,7 @@ function AppRoutes() {
       <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+      <Route path="/gig-board" element={<ProtectedRoute><GigBoard /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -119,6 +119,16 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - [ ] 90-minute buffer enforcement in API
 - [ ] Email notifications (Resend/SendGrid)
 
+### What's New — Public Gig Board (DONE)
+- ✅ `routers/public_gigs.py` — Full CRUD: post, browse, apply, accept/reject, cancel
+- ✅ `services/rewards_service.py` — Milestone rewards (5/10/25/50/100 gigs)
+- ✅ `GigBoard.jsx` — Browse + My Posts + My Applications tabs
+  - Browse: filter by city, role, event type, budget range; match score algorithm
+  - Apply: role selection, custom offer price, cover note
+  - My Posts: manage applicants (accept/reject), cancel listing
+  - Converted gigs create real invite + calendar entry on acceptance
+- ✅ `/gig-board` route added to App.js, "Gig Board" nav item in Layout.jsx
+
 ### P1 (Important)
 - [ ] Post-event rating flow trigger
 - [ ] Private lead notes on freelancer profiles

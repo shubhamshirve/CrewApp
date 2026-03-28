@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Search, Users, Briefcase, Calendar,
   Wallet, Bell, LogOut, Shield, User, ChevronLeft, ChevronRight,
-  Menu, X
+  Menu, X, Globe
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { path: "/search", icon: Search, label: "Discover" },
   { path: "/connections", icon: Users, label: "Network" },
   { path: "/gigs", icon: Briefcase, label: "Gigs" },
+  { path: "/gig-board", icon: Globe, label: "Gig Board" },
   { path: "/calendar", icon: Calendar, label: "Calendar" },
   { path: "/wallet", icon: Wallet, label: "Wallet" },
   { path: "/notifications", icon: Bell, label: "Alerts" },
