@@ -43,8 +43,8 @@ export default function AdminVerification() {
     <AdminLayout>
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
-          <h1 className="text-4xl font-bold text-white font-display">Verification Queue</h1>
-          <p className="text-zinc-500 text-sm mt-1">{queue.length} user{queue.length !== 1 ? "s" : ""} awaiting review</p>
+          <h1 className="text-4xl font-bold text-slate-900 font-display">Verification Queue</h1>
+          <p className="text-slate-500 text-sm mt-1">{queue.length} user{queue.length !== 1 ? "s" : ""} awaiting review</p>
         </div>
 
         {loading ? (
@@ -53,8 +53,8 @@ export default function AdminVerification() {
           </div>
         ) : queue.length === 0 ? (
           <div className="text-center py-20">
-            <Shield size={40} className="text-zinc-700 mx-auto mb-4" />
-            <p className="text-zinc-500 text-sm">Queue is empty — all users verified!</p>
+            <Shield size={40} className="text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500 text-sm">Queue is empty — all users verified!</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -62,29 +62,28 @@ export default function AdminVerification() {
               <div
                 key={u.id}
                 data-testid={`verify-card-${u.id}`}
-                className="p-5 rounded-2xl border"
-                style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.07)" }}
+                className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-base font-semibold text-white font-display">{u.full_name}</p>
+                      <p className="text-base font-semibold text-slate-900 font-display">{u.full_name}</p>
                       {u.id_type && (
-                        <span className="text-xs px-2 py-0.5 rounded text-amber-400 bg-amber-400/10">
+                        <span className="text-xs px-2 py-0.5 rounded text-amber-600 bg-amber-50 border border-amber-200">
                           {u.id_type}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-400">{u.email} · {u.phone} · {u.location}</p>
+                    <p className="text-xs text-slate-500">{u.email} · {u.phone} · {u.location}</p>
                     {u.primary_role && (
-                      <p className="text-xs text-blue-400 mt-0.5 font-display">{u.primary_role}</p>
+                      <p className="text-xs text-blue-600 mt-0.5 font-display">{u.primary_role}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       data-testid={`view-docs-${u.id}`}
                       onClick={() => setSelectedUser(u)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-zinc-300 border border-white/10 hover:bg-white/5 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors"
                     >
                       <Eye size={12} /> View Docs
                     </button>
@@ -99,7 +98,7 @@ export default function AdminVerification() {
                     <button
                       data-testid={`reject-${u.id}`}
                       onClick={() => setSelectedUser(u)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-red-500 border border-red-200 hover:bg-red-50 transition-colors"
                     >
                       <X size={12} /> Reject
                     </button>
@@ -115,11 +114,10 @@ export default function AdminVerification() {
       {selectedUser && (
         <Dialog open={!!selectedUser} onOpenChange={() => { setSelectedUser(null); setRejectReason(""); }}>
           <DialogContent
-            className="max-w-xl"
-            style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.1)" }}
+            className="max-w-xl bg-white border-slate-200"
           >
             <DialogHeader>
-              <DialogTitle className="text-white font-display">
+              <DialogTitle className="text-slate-900 font-display">
                 ID Documents — {selectedUser.full_name}
               </DialogTitle>
             </DialogHeader>
@@ -127,35 +125,34 @@ export default function AdminVerification() {
               <div className="grid grid-cols-2 gap-4">
                 {selectedUser.govt_id_url && (
                   <div>
-                    <p className="text-xs text-zinc-400 mb-2">Government ID ({selectedUser.id_type})</p>
+                    <p className="text-xs text-slate-500 mb-2">Government ID ({selectedUser.id_type})</p>
                     <img
                       src={selectedUser.govt_id_url}
                       alt="Govt ID"
-                      className="w-full rounded-xl border border-white/10 object-contain max-h-48"
+                      className="w-full rounded-xl border border-slate-200 object-contain max-h-48"
                     />
                   </div>
                 )}
                 {selectedUser.selfie_url && (
                   <div>
-                    <p className="text-xs text-zinc-400 mb-2">Selfie</p>
+                    <p className="text-xs text-slate-500 mb-2">Selfie</p>
                     <img
                       src={selectedUser.selfie_url}
                       alt="Selfie"
-                      className="w-full rounded-xl border border-white/10 object-contain max-h-48"
+                      className="w-full rounded-xl border border-slate-200 object-contain max-h-48"
                     />
                   </div>
                 )}
                 {!selectedUser.govt_id_url && !selectedUser.selfie_url && (
-                  <div className="col-span-2 text-center py-8 text-zinc-600 text-sm">
+                  <div className="col-span-2 text-center py-8 text-slate-400 text-sm">
                     No documents uploaded yet
                   </div>
                 )}
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Rejection Reason (if rejecting)</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Rejection Reason (if rejecting)</label>
                 <textarea
-                  className="w-full rounded-xl px-3 py-2.5 text-sm text-white border border-white/10 resize-none h-16 focus:outline-none focus:border-blue-500/50"
-                  style={{ background: "rgba(255,255,255,0.04)" }}
+                  className="w-full rounded-xl px-3 py-2.5 text-sm text-slate-900 border border-slate-200 resize-none h-16 focus:outline-none focus:border-blue-400 bg-slate-50"
                   placeholder="Optional — explain why..."
                   value={rejectReason}
                   onChange={e => setRejectReason(e.target.value)}
@@ -176,7 +173,7 @@ export default function AdminVerification() {
                   data-testid="dialog-reject-btn"
                   onClick={() => handleVerify(selectedUser.id, "rejected")}
                   disabled={actionLoading}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-red-400 border border-red-500/30 hover:bg-red-500/10 flex items-center justify-center gap-1.5 disabled:opacity-60 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-red-500 border border-red-200 hover:bg-red-50 flex items-center justify-center gap-1.5 disabled:opacity-60 transition-colors"
                 >
                   <X size={14} /> Reject
                 </button>

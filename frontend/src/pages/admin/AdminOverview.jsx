@@ -8,15 +8,14 @@ function StatCard({ label, value, icon: Icon, color = "#3B82F6", testId }) {
   return (
     <div
       data-testid={testId || `stat-${label}`}
-      className="p-5 rounded-2xl border flex items-center gap-4"
-      style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.07)" }}
+      className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm flex items-center gap-4"
     >
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}18` }}>
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}>
         <Icon size={20} style={{ color }} />
       </div>
       <div>
-        <p className="text-2xl font-bold text-white font-display">{value ?? "—"}</p>
-        <p className="text-xs text-zinc-500 font-display">{label}</p>
+        <p className="text-2xl font-bold text-slate-900 font-display">{value ?? "—"}</p>
+        <p className="text-xs text-slate-500 font-display">{label}</p>
       </div>
     </div>
   );
@@ -38,14 +37,14 @@ export default function AdminOverview() {
     <AdminLayout>
       <div className="max-w-5xl mx-auto space-y-6">
         <div>
-          <h1 className="text-4xl font-bold text-white font-display">Overview</h1>
-          <p className="text-zinc-500 text-sm mt-1">Platform health at a glance</p>
+          <h1 className="text-4xl font-bold text-slate-900 font-display">Overview</h1>
+          <p className="text-slate-500 text-sm mt-1">Platform health at a glance</p>
         </div>
 
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-20 rounded-2xl border border-white/5 animate-pulse" style={{ background: "#0D1220" }} />
+              <div key={i} className="h-20 rounded-2xl border border-slate-200 animate-pulse bg-slate-100" />
             ))}
           </div>
         ) : (
@@ -69,17 +68,16 @@ export default function AdminOverview() {
             <a
               key={item.href}
               href={item.href}
-              className="flex items-center justify-between p-4 rounded-2xl border border-white/8 hover:border-blue-500/30 transition-all group"
-              style={{ background: "#0D1220" }}
+              className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm transition-all group"
             >
-              <span className="text-sm text-zinc-300 group-hover:text-white transition-colors font-display">{item.label}</span>
+              <span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors font-display">{item.label}</span>
               <div className="flex items-center gap-2">
                 {item.count != null && (
-                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${item.color}20`, color: item.color }}>
+                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${item.color}18`, color: item.color }}>
                     {item.count}
                   </span>
                 )}
-                <TrendingUp size={14} className="text-zinc-600 group-hover:text-blue-400 transition-colors" />
+                <TrendingUp size={14} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
               </div>
             </a>
           ))}

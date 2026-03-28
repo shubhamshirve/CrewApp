@@ -22,17 +22,17 @@ const EVENT_TYPES = [
 ];
 
 const STATUS_COLORS = {
-  open: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-  partially_filled: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-  filled: "text-zinc-400 bg-zinc-400/10 border-zinc-400/20",
-  expired: "text-red-400 bg-red-400/10 border-red-400/20",
-  cancelled: "text-red-400 bg-red-400/10 border-red-400/20",
+  open: "text-emerald-600 bg-emerald-50 border-emerald-200",
+  partially_filled: "text-amber-600 bg-amber-50 border-amber-200",
+  filled: "text-slate-500 bg-slate-100 border-slate-200",
+  expired: "text-red-500 bg-red-50 border-red-200",
+  cancelled: "text-red-500 bg-red-50 border-red-200",
 };
 
 const APP_STATUS_COLORS = {
-  pending: "text-amber-400 bg-amber-400/10",
-  accepted: "text-emerald-400 bg-emerald-400/10",
-  rejected: "text-red-400 bg-red-400/10",
+  pending: "text-amber-600 bg-amber-50",
+  accepted: "text-emerald-600 bg-emerald-50",
+  rejected: "text-red-500 bg-red-50",
 };
 
 // ── Post Gig Modal ─────────────────────────────────────────────────────────────
@@ -75,14 +75,14 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 p-6" style={{ background: "#111114" }}>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 p-6 bg-white shadow-2xl">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-semibold text-white font-display">Post a Public Gig</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Step {step} of 2</p>
+            <h2 className="text-xl font-semibold text-slate-900 font-display">Post a Public Gig</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Step {step} of 2</p>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -91,93 +91,90 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="text-xs text-zinc-400 mb-1.5 block">Gig Title *</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Gig Title *</label>
                 <input
                   data-testid="post-gig-title"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
                   placeholder="e.g. Weekend Wedding Coverage — Delhi"
                   value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Event Type *</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Event Type *</label>
                 <select
                   data-testid="post-gig-event-type"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
                   value={form.event_type}
                   onChange={e => setForm(f => ({ ...f, event_type: e.target.value }))}
-                  style={{ background: "#1A1A1E" }}
                 >
                   {eventTypesList.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Date *</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Date *</label>
                 <input
                   data-testid="post-gig-date"
                   type="date"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
                   value={form.date}
                   onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                  style={{ colorScheme: "dark" }}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">City *</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">City *</label>
                 <input
                   data-testid="post-gig-city"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
                   placeholder="Mumbai"
                   value={form.city}
                   onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Location / Area *</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Location / Area *</label>
                 <input
                   data-testid="post-gig-location"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
                   placeholder="Bandra West"
                   value={form.location}
                   onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Venue Name</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Venue Name</label>
                 <input
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
                   placeholder="The Taj Mahal Palace"
                   value={form.venue_name}
                   onChange={e => setForm(f => ({ ...f, venue_name: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Style Preference</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Style Preference</label>
                 <input
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
                   placeholder="Dark & Moody"
                   value={form.style_preference}
                   onChange={e => setForm(f => ({ ...f, style_preference: e.target.value }))}
                 />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-zinc-400 mb-1.5 block">Description</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Description</label>
                 <textarea
                   rows={3}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/50 resize-none"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400 resize-none"
                   placeholder="Brief about the event, expectations, deliverables..."
                   value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">Listing Expires In</label>
+                <label className="text-xs text-slate-500 mb-1.5 block">Listing Expires In</label>
                 <select
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
                   value={form.expires_hours}
                   onChange={e => setForm(f => ({ ...f, expires_hours: Number(e.target.value) }))}
-                  style={{ background: "#1A1A1E" }}
                 >
                   <option value={24}>24 hours</option>
                   <option value={48}>48 hours</option>
@@ -196,8 +193,8 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
                   }
                   setStep(2);
                 }}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium text-black transition-colors"
-                style={{ background: "#F59E0B" }}
+                className="px-5 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{ background: "#E05D26" }}
               >
                 Next: Add Roles
               </button>
@@ -467,20 +464,20 @@ function ManageModal({ gig, onClose, onUpdate, api }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 p-6" style={{ background: "#111114" }}>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-slate-200 p-6 bg-white shadow-2xl">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-lg font-semibold text-white font-display">Applications</h2>
-            <p className="text-xs text-zinc-500 mt-0.5 truncate max-w-[320px]">{gig.title}</p>
+            <h2 className="text-lg font-semibold text-slate-900 font-display">Applications</h2>
+            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[320px]">{gig.title}</p>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors">
             <X size={18} />
           </button>
         </div>
 
         {applications.length === 0 && (
-          <div className="text-center py-12 text-zinc-600">
+          <div className="text-center py-12 text-slate-400">
             <Users size={32} className="mx-auto mb-3 opacity-40" />
             <p className="text-sm">No applications yet</p>
           </div>
@@ -488,19 +485,19 @@ function ManageModal({ gig, onClose, onUpdate, api }) {
 
         {pending.length > 0 && (
           <div className="mb-5">
-            <p className="text-xs font-medium text-amber-400 mb-3 uppercase tracking-wide">Pending Review ({pending.length})</p>
+            <p className="text-xs font-medium text-amber-600 mb-3 uppercase tracking-wide">Pending Review ({pending.length})</p>
             <div className="space-y-3">
               {pending.map(app => (
-                <div key={app.id} className="p-4 rounded-xl border border-white/8" style={{ background: "#0D0D10" }}>
+                <div key={app.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <p className="text-sm font-medium text-white">{app.applicant?.full_name || app.applicant_name}</p>
-                      <p className="text-xs text-zinc-500">{app.role_name}</p>
+                      <p className="text-sm font-medium text-slate-900">{app.applicant?.full_name || app.applicant_name}</p>
+                      <p className="text-xs text-slate-500">{app.role_name}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-amber-400">₹{app.offer_price?.toLocaleString()}</p>
+                      <p className="text-sm font-semibold text-orange-500">₹{app.offer_price?.toLocaleString()}</p>
                       {app.applicant?.avg_rating > 0 && (
-                        <p className="text-xs text-zinc-500 flex items-center gap-1 justify-end">
+                        <p className="text-xs text-slate-400 flex items-center gap-1 justify-end">
                           <Star size={10} fill="currentColor" className="text-amber-400" />
                           {app.applicant.avg_rating.toFixed(1)}
                         </p>
@@ -508,15 +505,15 @@ function ManageModal({ gig, onClose, onUpdate, api }) {
                     </div>
                   </div>
                   {app.cover_note && (
-                    <p className="text-xs text-zinc-400 italic mb-3 border-l-2 border-amber-500/30 pl-2">"{app.cover_note}"</p>
+                    <p className="text-xs text-slate-500 italic mb-3 border-l-2 border-orange-300 pl-2">"{app.cover_note}"</p>
                   )}
                   <div className="flex gap-2">
                     <button
                       data-testid={`accept-app-${app.id}`}
                       onClick={() => handle(app.id, "accept")}
                       disabled={loading[app.id]}
-                      className="flex-1 py-2 rounded-lg text-xs font-medium text-black flex items-center justify-center gap-1 disabled:opacity-60 transition-opacity"
-                      style={{ background: "#F59E0B" }}
+                      className="flex-1 py-2 rounded-lg text-xs font-medium text-white flex items-center justify-center gap-1 disabled:opacity-60 transition-opacity"
+                      style={{ background: "#E05D26" }}
                     >
                       {loading[app.id] ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
                       Accept
@@ -525,7 +522,7 @@ function ManageModal({ gig, onClose, onUpdate, api }) {
                       data-testid={`reject-app-${app.id}`}
                       onClick={() => handle(app.id, "reject")}
                       disabled={loading[app.id]}
-                      className="flex-1 py-2 rounded-lg text-xs font-medium text-zinc-400 border border-white/10 hover:border-red-500/30 hover:text-red-400 flex items-center justify-center gap-1 disabled:opacity-60 transition-all"
+                      className="flex-1 py-2 rounded-lg text-xs font-medium text-slate-400 border border-slate-200 hover:border-red-300 hover:text-red-500 flex items-center justify-center gap-1 disabled:opacity-60 transition-all"
                     >
                       <X size={12} /> Reject
                     </button>
@@ -538,16 +535,16 @@ function ManageModal({ gig, onClose, onUpdate, api }) {
 
         {processed.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-zinc-500 mb-3 uppercase tracking-wide">Processed ({processed.length})</p>
+            <p className="text-xs font-medium text-slate-400 mb-3 uppercase tracking-wide">Processed ({processed.length})</p>
             <div className="space-y-2">
               {processed.map(app => (
-                <div key={app.id} className="flex items-center justify-between p-3 rounded-lg border border-white/5">
+                <div key={app.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50">
                   <div>
-                    <p className="text-sm text-white">{app.applicant?.full_name || app.applicant_name}</p>
-                    <p className="text-xs text-zinc-600">{app.role_name}</p>
+                    <p className="text-sm text-slate-900">{app.applicant?.full_name || app.applicant_name}</p>
+                    <p className="text-xs text-slate-400">{app.role_name}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-zinc-400">₹{app.offer_price?.toLocaleString()}</span>
+                    <span className="text-sm text-slate-400">₹{app.offer_price?.toLocaleString()}</span>
                     <span className={`text-xs px-2 py-1 rounded-full ${APP_STATUS_COLORS[app.status]}`}>
                       {app.status}
                     </span>

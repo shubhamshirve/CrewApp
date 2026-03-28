@@ -34,8 +34,8 @@ import AdminTemplates from "@/pages/admin/AdminTemplates";
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0A0A0A" }}>
-      <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
     </div>
   );
   if (!user) return <Navigate to="/" replace />;
@@ -45,7 +45,7 @@ function ProtectedRoute({ children }) {
 function AdminGuard({ children }) {
   const { user, loading } = useAuth();
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#080B12" }}>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
@@ -110,7 +110,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <RootRouter />
-        <Toaster position="top-right" theme="dark" richColors />
+        <Toaster position="top-right" richColors />
       </BrowserRouter>
     </AuthProvider>
   );

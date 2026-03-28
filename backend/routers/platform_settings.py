@@ -1,12 +1,13 @@
 """
 Platform Settings Router
-Handles: pricing rules, event types, role categories
+Handles: pricing rules, event types, role categories, API keys
 All GET endpoints are public; POST/PUT/DELETE require admin auth.
 """
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
+import os
 
 from db import get_db
 from auth_utils import get_admin_user
@@ -226,3 +227,129 @@ async def remove_role(name: str, admin: dict = Depends(get_admin_user)):
         upsert=True
     )
     return {"roles": items}
+
+
+
+# ── API Keys / Integrations ───────────────────────────────────────────────────
+
+# Keys we manage (each has a group and a list of field keys)
+API_KEY_GROUPS = {
+    "razorpay": {
+        "label": "Razorpay Payments",
+        "description": "Accept UPI & card payments for subscriptions",
+        "fields": {
+            "key_id": {"label": "Key ID", "secret": False},
+            "key_secret": {"label": "Key Secret", "secret": True},
+        }
+    },
+    "resend": {
+        "label": "Resend Email",
+        "description": "Send transactional emails to crew members",
+        "fields": {
+            "api_key": {"label": "API Key", "secret": True},
+            "sender_email": {"label": "Sender Email", "secret": False},
+        }
+    },
+    "whatsapp": {
+        "label": "Meta WhatsApp Business",
+        "description": "Send actionable gig alerts via WhatsApp",
+        "fields": {
+            "access_token": {"label": "Access Token", "secret": True},
+            "phone_number_id": {"label": "Phone Number ID", "secret": False},
+            "business_account_id": {"label": "Business Account ID", "secret": False},
+        }
+    },
+    "google_calendar": {
+        "label": "Google Calendar",
+        "description": "Two-way sync for gig sessions & availability",
+        "fields": {
+            "client_id": {"label": "Client ID", "secret": False},
+            "client_secret": {"label": "Client Secret", "secret": True},
+        }
+    },
+    "ai": {
+        "label": "AI / LLM (Gemini)",
+        "description": "AI-powered crew suggestions & gig checklists",
+        "fields": {
+            "emergent_llm_key": {"label": "Emergent LLM Key", "secret": True},
+        }
+    },
+}
+
+
+def _mask_value(val: str) -> str:
+    """Mask secret string: show first 4 + **** + last 4."""
+    if not val:
+        return ""
+    if len(val) <= 8:
+        return "****"
+    return val[:4] + "****" + val[-4:]
+
+
+async def _get_api_keys(db) -> dict:
+    doc = await db.platform_secrets.find_one({"_id": "api_keys"}, {"_id": 0})
+    return doc or {}
+
+
+@router.get("/api-keys")
+async def get_api_keys(admin: dict = Depends(get_admin_user)):
+    """Admin — return masked API keys with configuration status."""
+    db = get_db()
+    stored = await _get_api_keys(db)
+
+    result = {}
+    for group_key, group_meta in API_KEY_GROUPS.items():
+        fields_out = {}
+        group_stored = stored.get(group_key, {})
+
+        # For the AI group, seed from env if not in DB
+        if group_key == "ai" and not group_stored.get("emergent_llm_key"):
+            env_key = os.environ.get("EMERGENT_LLM_KEY", "")
+            if env_key:
+                group_stored = {"emergent_llm_key": env_key}
+
+        for field_key, field_meta in group_meta["fields"].items():
+            raw = group_stored.get(field_key, "")
+            fields_out[field_key] = {
+                "label": field_meta["label"],
+                "value": _mask_value(raw) if (field_meta["secret"] and raw) else raw,
+                "is_configured": bool(raw),
+                "secret": field_meta["secret"],
+            }
+
+        all_configured = all(f["is_configured"] for f in fields_out.values())
+        result[group_key] = {
+            "label": group_meta["label"],
+            "description": group_meta["description"],
+            "fields": fields_out,
+            "is_active": all_configured,
+        }
+
+    return result
+
+
+class ApiKeyFieldUpdate(BaseModel):
+    group: str
+    field: str
+    value: str
+
+
+@router.put("/api-keys")
+async def update_api_key(
+    data: ApiKeyFieldUpdate,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin — update a single API key field."""
+    if data.group not in API_KEY_GROUPS:
+        raise HTTPException(status_code=400, detail=f"Unknown group: {data.group}")
+    if data.field not in API_KEY_GROUPS[data.group]["fields"]:
+        raise HTTPException(status_code=400, detail=f"Unknown field: {data.field}")
+
+    db = get_db()
+    await db.platform_secrets.update_one(
+        {"_id": "api_keys"},
+        {"$set": {f"{data.group}.{data.field}": data.value.strip(),
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"status": "ok", "group": data.group, "field": data.field, "is_configured": bool(data.value.strip())}

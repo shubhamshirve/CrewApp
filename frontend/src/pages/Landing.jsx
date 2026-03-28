@@ -1,175 +1,204 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Camera, Video, Star, Shield, Users, Zap, ChevronRight, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-
-const FEATURES = [
-  { icon: Shield, title: "Verified Professionals", desc: "Every crew member is ID-verified by our admin team. Trust, guaranteed." },
-  { icon: Users, title: "Multi-Day Booking Engine", desc: "Handle complex weddings with parent-child gig structure. Haldi, Reception, all in one place." },
-  { icon: Zap, title: "Negotiate in Real-Time", desc: "Quote → Counter → Accept flow locks in fees with a digital agreement." },
-  { icon: Star, title: "Anonymous Ratings", desc: "Honest feedback on Punctuality, Gear Handling & Teamwork. No bias, just merit." },
-  { icon: Camera, title: "Gear Vault", desc: "Showcase your camera bodies, lenses, drones. Let your gear do the talking." },
-  { icon: Video, title: "WhatsApp Alerts", desc: "Get gig invites with Accept/Reject buttons straight to WhatsApp. Never miss a booking." },
-];
-
-const PRICING = [
-  {
-    name: "Base Plan",
-    price: "₹69",
-    period: "/month",
-    features: ["Verified professional badge", "Unlimited gig bookings", "In-app & email notifications", "Digital wallet & referrals", "Calendar & availability sync", "Gear vault showcase"],
-    cta: "Get Started",
-    popular: false,
-  },
-  {
-    name: "Premium Plan",
-    price: "₹99",
-    period: "/month",
-    features: ["Everything in Base", "WhatsApp actionable alerts", "Accept/Reject from WhatsApp", "Sunday schedule dispatch", "Priority in search results"],
-    cta: "Go Premium",
-    popular: true,
-  },
-];
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { Camera, Video, Star, Shield, Wallet, Calendar, ChevronRight, CheckCircle, Zap, Users, Globe } from "lucide-react";
 
 export default function Landing() {
   const navigate = useNavigate();
 
+  const features = [
+    { icon: Shield, title: "Verified Professionals", desc: "ID-verified crew with rating history and verified badge.", color: "#2563EB" },
+    { icon: Calendar, title: "Smart Calendar", desc: "90-min buffer rule, standby mode, and gig scheduling.", color: "#E05D26" },
+    { icon: Wallet, title: "Digital Wallet", desc: "Earn referral credits, manage subscriptions and payouts.", color: "#10B981" },
+    { icon: Zap, title: "WhatsApp Alerts", desc: "Accept or reject gigs directly from WhatsApp messages.", color: "#8B5CF6" },
+    { icon: Globe, title: "Public Gig Board", desc: "Post roles and get bids from verified crew around India.", color: "#0EA5E9" },
+    { icon: Star, title: "Crew Ratings", desc: "Post-event ratings for punctuality, gear, and teamwork.", color: "#F59E0B" },
+  ];
+
+  const plans = [
+    {
+      name: "Base",
+      price: "₹69",
+      period: "/mo",
+      features: ["Verified professional badge", "Unlimited bookings", "In-app & email alerts", "Digital wallet & referrals", "Calendar sync"],
+      accent: "#64748B",
+    },
+    {
+      name: "Premium",
+      price: "₹99",
+      period: "/mo",
+      popular: true,
+      features: ["Everything in Base", "WhatsApp actionable alerts", "Accept/Reject from WhatsApp", "Sunday schedule dispatch"],
+      accent: "#E05D26",
+    },
+  ];
+
   return (
-    <div className="min-h-screen" style={{ background: "#0A0A0A", color: "#fff" }}>
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4" style={{ background: "rgba(10,10,10,0.8)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#F59E0B" }}>
-            <span className="text-black font-bold text-sm font-display">C</span>
+    <div className="min-h-screen bg-white font-display">
+      {/* Nav */}
+      <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-100">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#E05D26" }}>
+              <span className="text-white font-bold text-sm font-display">C</span>
+            </div>
+            <span className="text-slate-900 text-xl font-semibold font-display">CrewBook</span>
           </div>
-          <span className="text-white font-semibold font-display text-lg">CrewBook</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" className="text-zinc-400 hover:text-white text-sm" onClick={() => navigate("/auth")} data-testid="landing-login-btn">
-            Sign In
-          </Button>
-          <Button onClick={() => navigate("/auth")} data-testid="landing-cta-btn" className="text-sm font-medium" style={{ background: "#F59E0B", color: "#000" }}>
-            Join Free
-          </Button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/auth")}
+              className="text-sm text-slate-600 hover:text-slate-900 transition-colors font-medium"
+              data-testid="nav-login-btn"
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => navigate("/auth")}
+              data-testid="nav-signup-btn"
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ background: "#E05D26" }}
+            >
+              Get Started
+            </button>
+          </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-        <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.unsplash.com/photo-1554844453-7ea2a562a6c8?auto=format&fit=crop&w=1920&q=80"
-            alt="photographer"
-            className="w-full h-full object-cover opacity-20"
-          />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(10,10,10,0.6), rgba(10,10,10,0.95))" }} />
-        </div>
-
-        <div className="relative z-10 text-center max-w-4xl mx-auto px-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border mb-6 text-xs font-display" style={{ borderColor: "rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.1)", color: "#F59E0B" }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Built for Indian Wedding Professionals
+      <section className="max-w-6xl mx-auto px-6 pt-20 pb-16">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-orange-200 bg-orange-50 mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <span className="text-xs font-medium text-orange-700">For India's Film & Events Industry</span>
           </div>
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tight text-white mb-6" style={{ fontFamily: "Cormorant Garamond, serif", lineHeight: 1.1 }}>
-            Book Your Dream<br />
-            <span style={{ color: "#F59E0B" }}>Wedding Crew</span>
+          <h1 className="text-5xl sm:text-6xl font-bold text-slate-900 leading-tight tracking-tight mb-6">
+            Book verified crew.<br />
+            <span style={{ color: "#E05D26" }}>Get paid on time.</span>
           </h1>
-          <p className="text-lg text-zinc-400 mb-10 max-w-xl mx-auto font-body leading-relaxed">
-            The all-in-one platform to find, negotiate, and manage verified second shooters, videographers, and assistants for multi-day events.
+          <p className="text-xl text-slate-500 leading-relaxed max-w-xl mb-8">
+            CrewBook connects photographers, videographers, and event crew with verified leads across India. No middlemen, no chasing payments.
           </p>
-          <div className="flex items-center justify-center gap-4 flex-wrap">
-            <Button onClick={() => navigate("/auth")} data-testid="hero-get-started-btn" size="lg" className="gap-2 font-semibold" style={{ background: "#F59E0B", color: "#000", padding: "12px 28px" }}>
-              Get Started Free <ChevronRight size={16} />
-            </Button>
-            <Button variant="outline" size="lg" className="border-white/10 text-zinc-300 hover:text-white hover:border-white/30" onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}>
-              See How It Works
-            </Button>
+          <div className="flex flex-wrap items-center gap-4">
+            <button
+              onClick={() => navigate("/auth")}
+              data-testid="hero-cta-btn"
+              className="px-6 py-3.5 rounded-xl text-base font-semibold text-white flex items-center gap-2 transition-opacity hover:opacity-90"
+              style={{ background: "#E05D26" }}
+            >
+              Start for free <ChevronRight size={18} />
+            </button>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <CheckCircle size={16} className="text-emerald-500" />
+              No credit card required
+            </div>
           </div>
-          <div className="flex items-center justify-center gap-6 mt-12 text-sm text-zinc-500">
-            <span className="flex items-center gap-1.5"><Check size={14} className="text-amber-500" /> No setup fee</span>
-            <span className="flex items-center gap-1.5"><Check size={14} className="text-amber-500" /> Cancel anytime</span>
-            <span className="flex items-center gap-1.5"><Check size={14} className="text-amber-500" /> UPI + Card payments</span>
+
+          {/* Social proof */}
+          <div className="flex flex-wrap items-center gap-6 mt-10 pt-8 border-t border-slate-100">
+            {[
+              { icon: Users, value: "5,000+", label: "Active crew" },
+              { icon: Camera, value: "12,000+", label: "Gigs booked" },
+              { icon: Star, value: "4.8★", label: "Avg rating" },
+            ].map(({ icon: Icon, value, label }) => (
+              <div key={label} className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-slate-100">
+                  <Icon size={17} className="text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-base font-bold text-slate-900">{value}</p>
+                  <p className="text-xs text-slate-500">{label}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" className="py-24 px-6 max-w-6xl mx-auto">
-        <div className="text-center mb-14">
-          <p className="text-xs uppercase tracking-widest text-amber-500 mb-3 font-display">Platform Features</p>
-          <h2 className="text-4xl sm:text-5xl font-light text-white" style={{ fontFamily: "Cormorant Garamond, serif" }}>
-            Everything a Crew Leader Needs
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="p-6 rounded-xl border card-hover" style={{ background: "#131315", borderColor: "rgba(255,255,255,0.07)" }}>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: "rgba(245,158,11,0.12)" }}>
-                <Icon size={18} style={{ color: "#F59E0B" }} />
+      {/* Features */}
+      <section className="bg-slate-50 py-20">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-slate-900 mb-3">Everything a crew member needs</h2>
+            <p className="text-slate-500">Built for the way India's event industry actually works.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {features.map(({ icon: Icon, title, desc, color }) => (
+              <div key={title} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: `${color}18` }}>
+                  <Icon size={20} style={{ color }} />
+                </div>
+                <h3 className="text-base font-semibold text-slate-900 mb-1.5">{title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
               </div>
-              <h3 className="text-base font-semibold text-white mb-2 font-display">{title}</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed">{desc}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Pricing */}
-      <section className="py-24 px-6 max-w-4xl mx-auto">
-        <div className="text-center mb-14">
-          <p className="text-xs uppercase tracking-widest text-amber-500 mb-3 font-display">Simple Pricing</p>
-          <h2 className="text-4xl sm:text-5xl font-light text-white" style={{ fontFamily: "Cormorant Garamond, serif" }}>
-            Start at ₹69 / Month
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {PRICING.map((plan) => (
-            <div key={plan.name} className={`p-8 rounded-2xl border relative overflow-hidden ${plan.popular ? "border-amber-500/50" : "border-white/10"}`} style={{ background: "#131315" }}>
-              {plan.popular && (
-                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(90deg, transparent, #F59E0B, transparent)" }} />
-              )}
-              {plan.popular && (
-                <span className="absolute top-4 right-4 text-xs px-2 py-0.5 rounded-full font-display font-medium" style={{ background: "rgba(245,158,11,0.15)", color: "#F59E0B" }}>
-                  Most Popular
-                </span>
-              )}
-              <div className="mb-6">
-                <p className="text-sm text-zinc-400 font-display mb-1">{plan.name}</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-white font-display">{plan.price}</span>
-                  <span className="text-zinc-500 text-sm">{plan.period}</span>
-                </div>
-              </div>
-              <ul className="space-y-3 mb-8">
-                {plan.features.map(f => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-zinc-300">
-                    <Check size={14} className="text-amber-500 flex-shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Button
-                data-testid={`pricing-${plan.name.toLowerCase().replace(' ', '-')}-btn`}
-                onClick={() => navigate("/auth")}
-                className="w-full font-semibold"
-                style={plan.popular ? { background: "#F59E0B", color: "#000" } : { background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "#fff" }}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-slate-900 mb-3">Simple, transparent pricing</h2>
+            <p className="text-slate-500">Start free — upgrade when you're ready.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            {plans.map(plan => (
+              <div
+                key={plan.name}
+                className={`rounded-2xl border p-7 relative ${plan.popular ? "border-orange-300 shadow-lg" : "border-slate-200"}`}
+                style={{ background: plan.popular ? "rgba(224,93,38,0.02)" : "#fff" }}
               >
-                {plan.cta}
-              </Button>
-            </div>
-          ))}
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ background: "#E05D26" }}>
+                    Most popular
+                  </div>
+                )}
+                <div className="mb-5">
+                  <p className="text-sm font-medium text-slate-500 mb-1">{plan.name} Plan</p>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-4xl font-bold text-slate-900">{plan.price}</span>
+                    <span className="text-slate-400 text-sm">{plan.period}</span>
+                  </div>
+                </div>
+                <ul className="space-y-2.5 mb-7">
+                  {plan.features.map(f => (
+                    <li key={f} className="flex items-center gap-2.5 text-sm text-slate-600">
+                      <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => navigate("/auth")}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90"
+                  style={plan.popular
+                    ? { background: "#E05D26", color: "#fff" }
+                    : { background: "#F1F5F9", color: "#0F172A" }
+                  }
+                  data-testid={`plan-${plan.name.toLowerCase()}-cta`}
+                >
+                  Get started
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-sm text-slate-400 mt-6">
+            Also a free tier available — no card required to explore the platform.
+          </p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-10 px-6 border-t text-center" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <div className="w-6 h-6 rounded bg-amber-500 flex items-center justify-center">
-            <span className="text-black font-bold text-xs">C</span>
+      <footer className="border-t border-slate-100 py-10">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#E05D26" }}>
+              <span className="text-white font-bold text-xs">C</span>
+            </div>
+            <span className="text-slate-700 font-semibold">CrewBook</span>
           </div>
-          <span className="text-white font-semibold font-display">CrewBook</span>
+          <p className="text-sm text-slate-400">Freelance Crew Platform · India · 2025</p>
         </div>
-        <p className="text-xs text-zinc-600">© 2025 CrewBook. Built for Indian Wedding Professionals.</p>
       </footer>
     </div>
   );

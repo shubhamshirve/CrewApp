@@ -110,10 +110,10 @@ export default function AdminUserProfile() {
     finally { setPenaltyLoading(false); }
   };
 
-  const cardCls = "p-4 rounded-2xl border";
-  const cardStyle = { background: "#0D1220", borderColor: "rgba(255,255,255,0.07)" };
-  const inputCls = "w-full rounded-xl px-3 py-2.5 text-sm text-white border border-white/10 focus:outline-none focus:border-blue-500/50";
-  const inputStyle = { background: "rgba(255,255,255,0.04)" };
+  const cardCls = "p-4 rounded-2xl border border-slate-200 bg-white shadow-sm";
+  const cardStyle = {};
+  const inputCls = "w-full rounded-xl px-3 py-2.5 text-sm text-slate-900 border border-slate-200 focus:outline-none focus:border-blue-400 bg-white";
+  const inputStyle = {};
 
   if (loading) {
     return (
@@ -145,7 +145,7 @@ export default function AdminUserProfile() {
         <div>
           <button
             onClick={() => navigate("/admin/users")}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-4"
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors mb-4"
           >
             <ArrowLeft size={13} /> Back to Users
           </button>
@@ -154,7 +154,7 @@ export default function AdminUserProfile() {
             {/* Avatar */}
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold font-display flex-shrink-0"
-              style={{ background: "#1D4ED820", color: "#3B82F6" }}
+              style={{ background: "#1D4ED815", color: "#1D4ED8" }}
             >
               {user.full_name?.[0]?.toUpperCase()}
             </div>
@@ -162,14 +162,14 @@ export default function AdminUserProfile() {
             {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h1 className="text-xl font-bold text-white font-display">{user.full_name}</h1>
+                <h1 className="text-xl font-bold text-slate-900 font-display">{user.full_name}</h1>
                 {user.is_verified && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Verified</span>}
                 {user.is_suspended && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Suspended</span>}
                 {user.is_featured && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Featured</span>}
                 {user.is_high_risk && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400">High Risk</span>}
               </div>
-              <p className="text-xs text-zinc-400">{user.email} · {user.phone} · {user.location}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">{user.primary_role || "No role"} · {user.subscription_plan} plan</p>
+              <p className="text-xs text-slate-500">{user.email} · {user.phone} · {user.location}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{user.primary_role || "No role"} · {user.subscription_plan} plan</p>
             </div>
 
             {/* Actions */}
@@ -205,7 +205,7 @@ export default function AdminUserProfile() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview">
-          <TabsList className="border border-white/5" style={{ background: "#0D1220" }}>
+          <TabsList className="border border-slate-200 bg-slate-100" style={{}}>
             {[
               { value: "overview", label: "Overview", icon: UserCheck },
               { value: "gigs", label: `Gigs (${gigs.length})`, icon: Briefcase },
@@ -216,7 +216,7 @@ export default function AdminUserProfile() {
               <TabsTrigger
                 key={value}
                 value={value}
-                className="data-[state=active]:bg-blue-600/30 data-[state=active]:text-blue-300 font-display text-xs gap-1.5"
+                className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm font-display text-xs gap-1.5 text-slate-500"
               >
                 <Icon size={11} /> {label}
               </TabsTrigger>
@@ -226,7 +226,7 @@ export default function AdminUserProfile() {
           {/* Overview Tab */}
           <TabsContent value="overview" className="mt-4 space-y-4">
             <div className={cardCls} style={cardStyle}>
-              <h3 className="text-sm font-semibold text-white font-display mb-3">Profile Details</h3>
+              <h3 className="text-sm font-semibold text-slate-900 font-display mb-3">Profile Details</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
                   ["ID", user.id],
@@ -243,48 +243,48 @@ export default function AdminUserProfile() {
                   ["Referral Code", user.referral_code || "—"],
                 ].map(([label, val]) => (
                   <div key={label}>
-                    <p className="text-[10px] text-zinc-600 font-display uppercase tracking-wide">{label}</p>
-                    <p className="text-xs text-zinc-300 mt-0.5 truncate">{val}</p>
+                    <p className="text-[10px] text-slate-400 font-display uppercase tracking-wide">{label}</p>
+                    <p className="text-xs text-slate-700 mt-0.5 truncate">{val}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className={cardCls} style={cardStyle}>
-              <h3 className="text-sm font-semibold text-white font-display mb-3">Role Overrides</h3>
+              <h3 className="text-sm font-semibold text-slate-900 font-display mb-3">Role Overrides</h3>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <div
                     onClick={() => handleFlag("is_featured", !user.is_featured)}
                     className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
-                      user.is_featured ? "bg-amber-500" : "bg-zinc-700"
+                      user.is_featured ? "bg-amber-500" : "bg-slate-200"
                     }`}
                   >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${
                       user.is_featured ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </div>
-                  <span className="text-sm text-zinc-300 font-display">Featured</span>
+                  <span className="text-sm text-slate-700 font-display">Featured</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <div
                     onClick={() => handleFlag("is_high_risk", !user.is_high_risk)}
                     className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
-                      user.is_high_risk ? "bg-rose-500" : "bg-zinc-700"
+                      user.is_high_risk ? "bg-rose-500" : "bg-slate-200"
                     }`}
                   >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${
                       user.is_high_risk ? "translate-x-5" : "translate-x-0.5"
                     }`} />
                   </div>
-                  <span className="text-sm text-zinc-300 font-display">High Risk</span>
+                  <span className="text-sm text-slate-700 font-display">High Risk</span>
                 </label>
               </div>
             </div>
 
             <div className={cardCls} style={cardStyle}>
               <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-semibold text-white font-display">Wallet Balance</h3>
+                <h3 className="text-sm font-semibold text-slate-900 font-display">Wallet Balance</h3>
                 <button
                   onClick={() => setShowWallet(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
@@ -293,7 +293,7 @@ export default function AdminUserProfile() {
                   <Wallet size={11} /> Credit / Debit
                 </button>
               </div>
-              <p className="text-3xl font-bold text-white font-display">
+              <p className="text-3xl font-bold text-slate-900 font-display">
                 ₹{(user.wallet_balance || 0).toFixed(2)}
               </p>
             </div>
@@ -303,7 +303,7 @@ export default function AdminUserProfile() {
           <TabsContent value="gigs" className="mt-4">
             {gigs.length === 0 ? (
               <div className="text-center py-16 text-zinc-600">
-                <Briefcase size={32} className="mx-auto mb-3 opacity-40" />
+                <Briefcase size={32} className="mx-auto mb-3 text-slate-300 opacity-40" />
                 <p className="text-sm">No gigs created</p>
               </div>
             ) : (
@@ -311,8 +311,8 @@ export default function AdminUserProfile() {
                 {gigs.map(g => (
                   <div key={g.id} className={`${cardCls} flex items-center justify-between`} style={cardStyle}>
                     <div>
-                      <p className="text-sm text-white font-display font-medium">{g.title}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{fmt(g.created_at)}</p>
+                      <p className="text-sm text-slate-900 font-display font-medium">{g.title}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{fmt(g.created_at)}</p>
                     </div>
                     <span className="text-[10px] px-2 py-1 rounded-full bg-blue-500/15 text-blue-400">
                       {g.status || "draft"}
@@ -326,7 +326,7 @@ export default function AdminUserProfile() {
           {/* Wallet Tab */}
           <TabsContent value="wallet" className="mt-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-zinc-400">{walletTimeline.length} transactions</p>
+              <p className="text-sm text-slate-400">{walletTimeline.length} transactions</p>
               <button
                 onClick={() => setShowWallet(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
@@ -346,14 +346,14 @@ export default function AdminUserProfile() {
                   <div key={t.id || i} className={`${cardCls} flex items-center justify-between`} style={cardStyle}>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm text-white font-display font-medium">
+                        <p className="text-sm text-slate-900 font-display font-medium">
                           {t.description || t.reason || t.type}
                         </p>
                         {t._source === "adj" && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-display">Admin</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 font-display">Admin</span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-500 mt-0.5">{fmt(t.created_at)}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{fmt(t.created_at)}</p>
                     </div>
                     <p className={`text-sm font-semibold font-display ${
                       t.type === "credit" || t.type === "admin_credit" ? "text-emerald-400" : "text-red-400"
@@ -432,10 +432,10 @@ export default function AdminUserProfile() {
 
       {/* Wallet Adjust Modal */}
       <Dialog open={showWallet} onOpenChange={setShowWallet}>
-        <DialogContent style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.1)" }}>
+        <DialogContent className="bg-white border-slate-200">
           <DialogHeader>
-            <DialogTitle className="text-white font-display flex items-center gap-2">
-              <Wallet size={16} className="text-blue-400" /> Wallet Adjustment
+            <DialogTitle className="text-slate-900 font-display flex items-center gap-2">
+              <Wallet size={16} className="text-blue-500" /> Wallet Adjustment
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
@@ -457,7 +457,7 @@ export default function AdminUserProfile() {
                 <label className="text-xs text-zinc-400 mb-1.5 block">Type *</label>
                 <select
                   className={`${inputCls} appearance-none`}
-                  style={{ background: "#111827" }}
+                  style={{ background: "#ffffff" }}
                   value={walletForm.type}
                   onChange={e => setWalletForm(f => ({ ...f, type: e.target.value }))}
                 >
@@ -479,7 +479,7 @@ export default function AdminUserProfile() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowWallet(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm text-zinc-400 border border-white/10 hover:bg-white/5 transition-colors"
+                className="flex-1 py-2.5 rounded-xl text-sm text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
@@ -498,18 +498,17 @@ export default function AdminUserProfile() {
 
       {/* Penalty Modal */}
       <Dialog open={showPenalty} onOpenChange={setShowPenalty}>
-        <DialogContent style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.1)" }}>
+        <DialogContent className="bg-white border-slate-200">
           <DialogHeader>
-            <DialogTitle className="text-white font-display flex items-center gap-2">
-              <AlertTriangle size={16} className="text-orange-400" /> Apply Penalty
+            <DialogTitle className="text-slate-900 font-display flex items-center gap-2">
+              <AlertTriangle size={16} className="text-orange-500" /> Apply Penalty
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Stars to deduct</label>
+              <label className="text-xs text-slate-500 mb-1.5 block">Stars to deduct</label>
               <select
-                className="w-full rounded-xl px-3 py-2.5 text-sm text-white border border-white/10 focus:outline-none"
-                style={{ background: "#111827" }}
+                className="w-full rounded-xl px-3 py-2.5 text-sm text-slate-900 border border-slate-200 focus:outline-none bg-white"
                 value={penaltyForm.stars}
                 onChange={e => setPenaltyForm(f => ({ ...f, stars: parseInt(e.target.value) }))}
               >
@@ -519,10 +518,9 @@ export default function AdminUserProfile() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Reason *</label>
+              <label className="text-xs text-slate-500 mb-1.5 block">Reason *</label>
               <textarea
                 className={`${inputCls} resize-none h-20`}
-                style={inputStyle}
                 placeholder="Explain the penalty reason…"
                 value={penaltyForm.reason}
                 onChange={e => setPenaltyForm(f => ({ ...f, reason: e.target.value }))}
@@ -531,7 +529,7 @@ export default function AdminUserProfile() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowPenalty(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm text-zinc-400 border border-white/10 hover:bg-white/5 transition-colors"
+                className="flex-1 py-2.5 rounded-xl text-sm text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
