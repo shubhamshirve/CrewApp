@@ -7,6 +7,7 @@ import uuid
 from db import get_db
 from auth_utils import get_admin_user, _clean_user, create_impersonation_token
 from services.notifications_service import send_notification
+from services.log_service import log_admin_action
 
 router = APIRouter(prefix="/admin")
 
@@ -68,6 +69,12 @@ async def verify_user(user_id: str, data: VerifyRequest, admin: dict = Depends(g
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
         }
+    )
+    await log_admin_action(
+        db, admin, "verify_user" if is_approved else "reject_user",
+        "user", user_id,
+        {"verification_status": user.get("verification_status")},
+        {"verification_status": data.action},
     )
     title = "ID Verification Approved!" if is_approved else "ID Verification Rejected"
     message = (
@@ -212,6 +219,12 @@ async def bulk_action(data: BulkActionRequest, admin: dict = Depends(get_admin_u
             await send_notification(db, uid, "admin_broadcast", data.title, data.message, {})
         updated = len(data.user_ids)
 
+    await log_admin_action(
+        db, admin, f"bulk_{data.action}",
+        "users", ",".join(data.user_ids[:10]),
+        {},
+        {"action": data.action, "count": updated},
+    )
     return {"updated": updated}
 
 
@@ -268,6 +281,12 @@ async def adjust_wallet(user_id: str, data: WalletAdjustRequest, admin: dict = D
         "description": data.reason,
         "created_at": now,
     })
+    await log_admin_action(
+        db, admin, f"wallet_{data.type}",
+        "user", user_id,
+        {"wallet_balance": current_balance},
+        {"wallet_balance": new_balance, "amount": data.amount, "reason": data.reason},
+    )
     await send_notification(
         db, user_id, "wallet",
         f"Wallet {'Credited' if data.type == 'credit' else 'Debited'}",
@@ -291,6 +310,16 @@ async def update_user_flags(user_id: str, data: UserFlagsRequest, admin: dict = 
         updates["is_high_risk"] = data.is_high_risk
 
     await db.users.update_one({"_id": user_id}, {"$set": updates})
+    before_flags = {
+        "is_featured": user.get("is_featured", False),
+        "is_high_risk": user.get("is_high_risk", False),
+    }
+    await log_admin_action(
+        db, admin, "set_flags",
+        "user", user_id,
+        before_flags,
+        {k: v for k, v in updates.items() if k != "updated_at"},
+    )
     updated = await db.users.find_one({"_id": user_id})
     return {
         "is_featured": updated.get("is_featured", False),
@@ -335,6 +364,12 @@ async def add_penalty(user_id: str, data: PenaltyRequest, admin: dict = Depends(
             }
         }
     )
+    await log_admin_action(
+        db, admin, "add_penalty",
+        "user", user_id,
+        {"negative_stars": user.get("negative_stars", 0), "is_suspended": user.get("is_suspended", False)},
+        {"negative_stars": new_stars, "is_suspended": is_suspended, "reason": data.reason},
+    )
     title = "Account Suspended" if is_suspended else f"Penalty Applied ({new_stars}/5)"
     message = (
         "Your account has been suspended due to accumulated penalties."
@@ -353,6 +388,12 @@ async def toggle_suspend(user_id: str, admin: dict = Depends(get_admin_user)):
         raise HTTPException(status_code=404, detail="User not found")
     new_state = not user.get("is_suspended", False)
     await db.users.update_one({"_id": user_id}, {"$set": {"is_suspended": new_state}})
+    await log_admin_action(
+        db, admin, "toggle_suspend",
+        "user", user_id,
+        {"is_suspended": not new_state},
+        {"is_suspended": new_state},
+    )
     return {"is_suspended": new_state}
 
 
