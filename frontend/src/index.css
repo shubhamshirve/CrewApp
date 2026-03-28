@@ -1,36 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Outfit:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 5%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 38 92% 50%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 240 5% 14%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 14%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 38 92% 50%;
-    --accent-foreground: 0 0% 9%;
+    --background: 60 10% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 20 82% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 24 5% 96%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 24 5% 96%;
+    --muted-foreground: 24 5% 46%;
+    --accent: 20 82% 51%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 17%;
-    --input: 240 5% 14%;
-    --ring: 38 92% 50%;
-    --radius: 0.75rem;
-    --brand-gold: #F59E0B;
-    --brand-gold-hover: #D97706;
-    --brand-gold-muted: rgba(245, 158, 11, 0.12);
-    --surface-base: #0A0A0A;
-    --surface-card: #131315;
-    --surface-elevated: #1C1C1F;
+    --border: 24 5% 90%;
+    --input: 24 5% 93%;
+    --ring: 20 82% 51%;
+    --radius: 1rem;
+
+    --brand-primary: #E05D26;
+    --brand-primary-hover: #C2410C;
+    --brand-primary-muted: rgba(224, 93, 38, 0.08);
+    --surface-base: #F9F9F8;
+    --surface-card: #FFFFFF;
+    --surface-elevated: #F5F5F3;
   }
 }
 
@@ -39,53 +40,46 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Manrope', sans-serif;
-    background-color: #0A0A0A;
+    background-color: #F9F9F8;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2 { font-family: 'Cormorant Garamond', serif; }
-  h3, h4, h5, h6, .font-display { font-family: 'Outfit', sans-serif; }
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Outfit', sans-serif;
+  }
   .font-mono { font-family: 'JetBrains Mono', monospace; }
 }
 
-.gold-border { border-color: var(--brand-gold); }
-.gold-text { color: var(--brand-gold); }
-.gold-bg { background-color: var(--brand-gold); }
+/* Legacy utility aliases */
 .surface-card { background-color: var(--surface-card); }
 .surface-elevated { background-color: var(--surface-elevated); }
 
-/* Glow effect */
-.gold-glow {
-  box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
-}
-.gold-glow:hover {
-  box-shadow: 0 0 30px rgba(245, 158, 11, 0.25);
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0A0A0A; }
-::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #F59E0B44; }
-
 /* Card hover */
 .card-hover {
-  transition: transform 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+  transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, border-color 0.18s ease-out;
 }
 .card-hover:hover {
   transform: translateY(-2px);
-  border-color: rgba(245, 158, 11, 0.4);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.08);
+  border-color: rgba(224, 93, 38, 0.3);
 }
 
-/* Verified badge glow */
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #F5F5F3; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(224, 93, 38, 0.4); }
+
+/* Verified badge */
 .verified-glow { filter: drop-shadow(0 0 4px #3B82F6); }
 
-/* Tracing beam animation for pricing cards */
+/* Trace border animation for pricing */
 @keyframes trace {
   0% { background-position: 0% 0%; }
   100% { background-position: 200% 0%; }
 }
 .trace-border {
-  background: linear-gradient(90deg, transparent, rgba(245,158,11,0.5), transparent);
+  background: linear-gradient(90deg, transparent, rgba(224, 93, 38, 0.4), transparent);
   background-size: 200% 100%;
   animation: trace 2s linear infinite;
 }

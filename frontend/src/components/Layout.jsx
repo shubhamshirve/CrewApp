@@ -4,9 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Search, Users, Briefcase, Calendar,
   Wallet, Bell, LogOut, User, ChevronLeft, ChevronRight,
-  Menu, X, Globe
+  Menu, Globe
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 
 const NAV_ITEMS = [
@@ -37,24 +36,24 @@ export default function Layout({ children }) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/5 ${collapsed ? "justify-center" : ""}`}>
+      <div className={`flex items-center gap-3 px-4 py-5 border-b border-slate-100 ${collapsed ? "justify-center" : ""}`}>
         {!collapsed && (
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#F59E0B" }}>
-              <span className="text-black font-bold text-sm font-display">C</span>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#E05D26" }}>
+              <span className="text-white font-bold text-sm font-display">C</span>
             </div>
-            <span className="text-white font-semibold font-display text-lg">CrewBook</span>
+            <span className="text-slate-900 font-semibold font-display text-lg">CrewBook</span>
           </Link>
         )}
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#F59E0B" }}>
-            <span className="text-black font-bold text-sm">C</span>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#E05D26" }}>
+            <span className="text-white font-bold text-sm">C</span>
           </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
           const active = location.pathname === path;
           return (
@@ -63,79 +62,74 @@ export default function Layout({ children }) {
               to={path}
               data-testid={`nav-${label.toLowerCase()}`}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group ${
                 active
-                  ? "bg-amber-500/15 text-amber-400"
-                  : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  ? "bg-orange-50 text-orange-600 font-medium"
+                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
               } ${collapsed ? "justify-center" : ""}`}
             >
               <div className="relative">
                 <Icon size={18} />
                 {label === "Alerts" && unread > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-500 rounded-full text-[10px] text-black font-bold flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-[10px] text-white font-bold flex items-center justify-center" style={{ background: "#E05D26" }}>
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
               </div>
-              {!collapsed && <span className="text-sm font-medium font-display">{label}</span>}
+              {!collapsed && <span className="text-sm font-display">{label}</span>}
             </Link>
           );
         })}
-        {/* Admin panel is separate — accessible at /admin/login */}
       </nav>
 
       {/* User */}
-      <div className={`border-t border-white/5 p-3 space-y-1`}>
+      <div className="border-t border-slate-100 p-3 space-y-0.5">
         <Link
           to={`/profile/${user?.id}`}
           data-testid="nav-profile"
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-all ${collapsed ? "justify-center" : ""}`}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all ${collapsed ? "justify-center" : ""}`}
         >
-          <div className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold" style={{ background: "#E05D26" }}>
             {user?.profile_image ? (
               <img src={user.profile_image} className="w-7 h-7 rounded-full object-cover" alt="" />
             ) : (
-              <User size={14} className="text-amber-400" />
+              user?.full_name?.[0]?.toUpperCase() || <User size={14} className="text-white" />
             )}
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-xs font-medium text-white truncate font-display">{user?.full_name}</p>
-              <p className="text-[10px] text-zinc-500 truncate">{user?.primary_role || "Set your role"}</p>
+              <p className="text-xs font-medium text-slate-900 truncate font-display">{user?.full_name}</p>
+              <p className="text-[10px] text-slate-400 truncate">{user?.primary_role || "Set your role"}</p>
             </div>
           )}
         </Link>
         <button
           onClick={handleLogout}
           data-testid="logout-button"
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all w-full ${collapsed ? "justify-center" : ""}`}
+          className={`flex items-center gap-3 px-3 py-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all w-full ${collapsed ? "justify-center" : ""}`}
         >
           <LogOut size={16} />
           {!collapsed && <span className="text-xs font-display">Sign Out</span>}
         </button>
       </div>
 
-      {/* Collapse toggle - desktop only */}
+      {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full items-center justify-center bg-zinc-800 border border-white/10 hover:border-amber-500/50 transition-all z-10"
+        className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full items-center justify-center bg-white border border-slate-200 hover:border-orange-300 shadow-sm transition-all z-10"
       >
-        {collapsed ? <ChevronRight size={12} className="text-zinc-400" /> : <ChevronLeft size={12} className="text-zinc-400" />}
+        {collapsed ? <ChevronRight size={12} className="text-slate-500" /> : <ChevronLeft size={12} className="text-slate-500" />}
       </button>
     </div>
   );
 
   return (
-    <div className="min-h-screen flex" style={{ background: "#0A0A0A" }}>
+    <div className="min-h-screen flex bg-background">
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden lg:flex flex-col relative border-r border-white/5 transition-all duration-300 flex-shrink-0`}
-        style={{
-          width: collapsed ? "68px" : "220px",
-          background: "#0D0D0F",
-          minHeight: "100vh",
-        }}
+        className="hidden lg:flex flex-col relative border-r border-slate-100 transition-all duration-300 flex-shrink-0 bg-white"
+        style={{ width: collapsed ? "68px" : "220px", minHeight: "100vh" }}
       >
         <SidebarContent />
       </aside>
@@ -143,8 +137,8 @@ export default function Layout({ children }) {
       {/* Mobile sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/70" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 flex flex-col border-r border-white/5" style={{ background: "#0D0D0F" }}>
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-64 flex flex-col bg-white border-r border-slate-100">
             <SidebarContent />
           </aside>
         </div>
@@ -153,15 +147,15 @@ export default function Layout({ children }) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile topbar */}
-        <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-white/5" style={{ background: "#0D0D0F" }}>
+        <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-white">
           <button onClick={() => setMobileOpen(true)} data-testid="mobile-menu-btn">
-            <Menu size={20} className="text-zinc-400" />
+            <Menu size={20} className="text-slate-500" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-amber-500 flex items-center justify-center">
-              <span className="text-black font-bold text-xs">C</span>
+            <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "#E05D26" }}>
+              <span className="text-white font-bold text-xs">C</span>
             </div>
-            <span className="text-white font-semibold font-display">CrewBook</span>
+            <span className="text-slate-900 font-semibold font-display">CrewBook</span>
           </div>
           <div className="w-6" />
         </div>
