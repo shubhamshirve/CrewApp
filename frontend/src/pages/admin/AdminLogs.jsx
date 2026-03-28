@@ -92,11 +92,11 @@ function LogTable({ columns, rows, loading, total, skip, onSkipChange }) {
           <span className="text-[11px] text-zinc-500 font-display">{from}–{to} of {total}</span>
           <div className="flex gap-1.5">
             <Button variant="outline" size="sm" className="h-7 w-7 p-0 border-white/10 text-zinc-400"
-              onClick={() => onSkipChange(skip - PAGE_SIZE)} disabled={skip === 0}>
+              onClick={() => onSkipChange(skip - PAGE_SIZE)} disabled={skip === 0} aria-label="Previous page">
               <ChevronLeft size={12} />
             </Button>
             <Button variant="outline" size="sm" className="h-7 w-7 p-0 border-white/10 text-zinc-400"
-              onClick={() => onSkipChange(skip + PAGE_SIZE)} disabled={to >= total}>
+              onClick={() => onSkipChange(skip + PAGE_SIZE)} disabled={to >= total} aria-label="Next page">
               <ChevronRight size={12} />
             </Button>
           </div>
@@ -187,7 +187,7 @@ function ApiErrorsTab({ api }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <select className={selectClass} value={filters.status_code || ""} onChange={e => handleFilter("status_code", e.target.value)}>
+        <select className={selectClass} value={filters.status_code || ""} onChange={e => handleFilter("status_code", e.target.value ? Number(e.target.value) : "")}>
           <option value="">All codes</option>
           {["400","401","403","404","422","500"].map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -289,7 +289,7 @@ function WhatsAppTab({ api }) {
 function LoginAuditTab({ api }) {
   const { items, total, loading, skip, filters, handleSkip, handleFilter, refresh } =
     useLogFetch(api, "/admin/logs/logins");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(filters.user_id || "");
   const columns = [
     { key: "created_at",  label: "Time",       render: r => <span className="font-mono text-zinc-400 text-[10px]">{fmt(r.created_at)}</span> },
     { key: "user_id",     label: "User ID",    render: r => <span className="font-mono text-zinc-300 text-[10px]">{trunc(r.user_id, 20)}</span> },
