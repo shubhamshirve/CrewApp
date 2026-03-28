@@ -206,3 +206,28 @@ class TestLoginTracking:
         """After login, admin profile endpoint shows a login log entry"""
         user_id = registered_user["user"]["id"]
         assert registered_user["token"] is not None
+
+
+class TestAdminUsersFilters:
+    """GET /admin/users supports search + filters"""
+
+    def test_search_by_name(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/users?search=Test")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "users" in data
+        assert "total" in data
+
+    def test_filter_by_plan(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/users?plan=free")
+        assert resp.status_code == 200
+        users = resp.json()["users"]
+        for u in users:
+            assert u["subscription_plan"] == "free"
+
+    def test_filter_by_status_suspended(self, admin_client):
+        resp = admin_client.get(f"{BASE_URL}/api/admin/users?status=suspended")
+        assert resp.status_code == 200
+        users = resp.json()["users"]
+        for u in users:
+            assert u["is_suspended"] is True

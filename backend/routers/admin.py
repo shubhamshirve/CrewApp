@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timezone
+import uuid
 
 from db import get_db
 from auth_utils import get_admin_user, _clean_user
@@ -64,13 +65,38 @@ async def verify_user(user_id: str, data: VerifyRequest, admin: dict = Depends(g
 async def list_users(
     page: int = 1,
     limit: int = 20,
+    search: Optional[str] = None,
+    role: Optional[str] = None,
+    city: Optional[str] = None,
+    plan: Optional[str] = None,
     status: Optional[str] = None,
-    admin: dict = Depends(get_admin_user)
+    min_rating: Optional[float] = None,
+    max_rating: Optional[float] = None,
+    admin: dict = Depends(get_admin_user),
 ):
     db = get_db()
     query = {}
-    if status:
+
+    if search:
+        query["$or"] = [
+            {"full_name": {"$regex": search, "$options": "i"}},
+            {"email": {"$regex": search, "$options": "i"}},
+        ]
+    if role:
+        query["primary_role"] = role
+    if city:
+        query["location"] = {"$regex": city, "$options": "i"}
+    if plan:
+        query["subscription_plan"] = plan
+    if status == "suspended":
+        query["is_suspended"] = True
+    elif status:
         query["verification_status"] = status
+    if min_rating is not None:
+        query.setdefault("avg_rating", {})["$gte"] = min_rating
+    if max_rating is not None:
+        query.setdefault("avg_rating", {})["$lte"] = max_rating
+
     skip = (page - 1) * limit
     users = await db.users.find(query, {"password_hash": 0}).skip(skip).limit(limit).to_list(limit)
     total = await db.users.count_documents(query)
