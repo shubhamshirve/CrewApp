@@ -3,9 +3,15 @@ from pydantic import BaseModel
 from typing import Optional, List
 import os
 import uuid
+import logging
+from datetime import datetime, timezone
 
 from db import get_db
 from auth_utils import get_current_user
+
+logger = logging.getLogger(__name__)
+
+_AI_COST_PER_1K_CHARS_INR = 0.001  # adjust as Gemini pricing updates
 
 router = APIRouter(prefix="/ai")
 
@@ -22,6 +28,7 @@ class CrewSuggestionRequest(BaseModel):
 
 @router.post("/crew-suggestions")
 async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict = Depends(get_current_user)):
+    db = get_db()
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         session_id = f"crew_suggestion_{current_user['id']}_{uuid.uuid4().hex[:8]}"
@@ -51,6 +58,21 @@ async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict =
         prompt += "\nWhat should I look for when selecting crew for this event? Any specific tips?"
 
         response = await chat.send_message(UserMessage(text=prompt))
+        try:
+            total_chars = len(prompt) + len(response)
+            await db.ai_usage_logs.insert_one({
+                "_id": str(uuid.uuid4()),
+                "user_id": current_user["id"],
+                "endpoint": "crew-suggestions",
+                "session_id": session_id,
+                "model": "gemini-2.5-flash",
+                "prompt_chars": len(prompt),
+                "response_chars": len(response),
+                "cost_estimate_inr": round(total_chars / 1000 * _AI_COST_PER_1K_CHARS_INR, 6),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as e:
+            logger.error("ai_usage_log write failed: %s", e)
         return {"suggestion": response, "session_id": session_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
@@ -58,11 +80,13 @@ async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict =
 
 @router.post("/gig-checklist")
 async def get_gig_checklist(data: CrewSuggestionRequest, current_user: dict = Depends(get_current_user)):
+    db = get_db()
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
+        checklist_session = f"checklist_{uuid.uuid4().hex[:12]}"
         chat = LlmChat(
             api_key=os.environ.get("EMERGENT_LLM_KEY"),
-            session_id=f"checklist_{uuid.uuid4().hex[:12]}",
+            session_id=checklist_session,
             system_message="You are an expert wedding photography coordinator in India. Generate concise, practical checklists."
         ).with_model("gemini", "gemini-2.5-flash")
 
@@ -73,6 +97,21 @@ async def get_gig_checklist(data: CrewSuggestionRequest, current_user: dict = De
             "Format as a bullet list with max 10 items. Be specific to Indian weddings."
         )
         response = await chat.send_message(UserMessage(text=prompt))
+        try:
+            total_chars = len(prompt) + len(response)
+            await db.ai_usage_logs.insert_one({
+                "_id": str(uuid.uuid4()),
+                "user_id": current_user["id"],
+                "endpoint": "gig-checklist",
+                "session_id": checklist_session,
+                "model": "gemini-2.5-flash",
+                "prompt_chars": len(prompt),
+                "response_chars": len(response),
+                "cost_estimate_inr": round(total_chars / 1000 * _AI_COST_PER_1K_CHARS_INR, 6),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as e:
+            logger.error("ai_usage_log write failed: %s", e)
         return {"checklist": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
