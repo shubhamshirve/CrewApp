@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 const DEFAULT_ROLES = ["Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician"];
 const STATUS_BADGE = {
-  pending: { bg: "rgba(245,158,11,0.15)", color: "#F59E0B", label: "Pending" },
+  pending: { bg: "rgba(245,158,11,0.15)", color: "var(--primary)", label: "Pending" },
   accepted: { bg: "rgba(16,185,129,0.15)", color: "#10B981", label: "Accepted" },
   rejected: { bg: "rgba(239,68,68,0.15)", color: "#EF4444", label: "Rejected" },
   counter_offered: { bg: "rgba(139,92,246,0.15)", color: "#8B5CF6", label: "Counter Offer" },
@@ -183,7 +183,7 @@ export default function GigDetail() {
             {gig.sessions?.map((s, i) => (
               <div key={s.id || i} className="p-4 rounded-xl bg-white border border-border shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs px-2 py-0.5 rounded font-display" style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>{s.event_type}</span>
+                  <span className="text-xs px-2 py-0.5 rounded font-display bg-primary/10 text-primary">{s.event_type}</span>
                 </div>
                 <div className="flex items-center gap-4 text-sm text-slate-600 flex-wrap">
                   <span className="flex items-center gap-1.5"><Calendar size={13} className="text-muted-foreground" />{s.date}</span>

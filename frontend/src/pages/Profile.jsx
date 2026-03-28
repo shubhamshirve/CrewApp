@@ -149,7 +149,7 @@ export default function Profile() {
                 <div className="mb-3">
                   <p className="text-xs text-muted-foreground mb-1.5 font-display uppercase tracking-wide">Shooting Style</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {profile.style_tags.map(t => <span key={t} className="text-xs px-2.5 py-1 rounded-full border font-display" style={{ borderColor: "rgba(245,158,11,0.3)", color: "#F59E0B", background: "rgba(245,158,11,0.08)" }}>{t}</span>)}
+                    {profile.style_tags.map(t => <span key={t} className="text-xs px-2.5 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary font-display">{t}</span>)}
                   </div>
                 </div>
               )}
@@ -205,11 +205,11 @@ export default function Profile() {
 
         {/* Private Lead Notes — only shown when viewing someone else's profile */}
         {!isOwn && (
-          <div data-testid="lead-notes-section" className="p-5 rounded-xl bg-white border border-border shadow-[0_8px_30px_rgb(0,0,0,0.04)]" style={{ borderColor: "rgba(245,158,11,0.2)" }}>
+          <div data-testid="lead-notes-section" className="p-5 rounded-xl bg-white border border-border shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
             <div className="flex items-center gap-2 mb-3">
               <StickyNote size={14} className="text-primary" />
               <h3 className="text-sm font-semibold text-foreground font-display">Private Notes</h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-display ml-auto" style={{ background: "rgba(245,158,11,0.1)", color: "#F59E0B" }}>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-display ml-auto bg-primary/10 text-primary">
                 Only visible to you
               </span>
             </div>
