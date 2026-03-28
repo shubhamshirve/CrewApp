@@ -70,6 +70,8 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 
 ## What's Been Implemented
 
+## What's Been Implemented
+
 ### Backend (FastAPI)
 - ✅ `server.py` — Main app with all routers
 - ✅ `db.py` — MongoDB connection
@@ -77,14 +79,19 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ `routers/auth.py` — Register, login, /me
 - ✅ `routers/users.py` — Profiles, gear vault, ID upload, search, settings
 - ✅ `routers/admin.py` — Verification queue, approve/reject, stats, penalties
-- ✅ `routers/gigs.py` — Gig CRUD, sessions, invites, negotiation, workspace, handover
+- ✅ `routers/gigs.py` — Gig CRUD, sessions, invites, negotiation, workspace, handover + **90-min buffer enforcement** + **PDF contract download**
 - ✅ `routers/connections.py` — Send/accept/reject connections
 - ✅ `routers/wallet.py` — Wallet balance, Razorpay subscriptions, split-payment
 - ✅ `routers/notifications.py` — Get/mark-read notifications
 - ✅ `routers/ratings.py` — Submit ratings, aggregation, appeals
 - ✅ `routers/ai_routes.py` — Gemini Flash crew suggestions & checklist
+- ✅ `routers/templates.py` — **NEW** CRUD for notification templates (all channels)
+- ✅ `routers/calendar_sync.py` — **NEW** Google Calendar connect/disconnect/status (MOCKED)
 - ✅ `services/whatsapp_mock.py` — Mock WhatsApp sender with DB logs
 - ✅ `services/notifications_service.py` — Notification helper
+- ✅ `services/email_service.py` — **NEW** Resend email service (MOCKED until API key provided)
+- ✅ `services/pdf_service.py` — **NEW** reportlab PDF contract generation (REAL)
+- ✅ `services/calendar_service.py` — **NEW** Google Calendar mock service
 
 ### Frontend (React)
 - ✅ Dark theme (Jewel & Luxury) — #0A0A0A base, #F59E0B gold accents
@@ -96,11 +103,12 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ `Search.jsx` — User search with filters
 - ✅ `Connections.jsx` — Network management
 - ✅ `Gigs.jsx` — Gig list + create dialog
-- ✅ `GigDetail.jsx` — Sessions, team assembly, negotiation, workspace, AI suggest
-- ✅ `Calendar.jsx` — Month view with gig markers, standby toggle
+- ✅ `GigDetail.jsx` — Sessions, team assembly, negotiation, workspace, AI suggest + **Download Contract button** (PDF)
+- ✅ `Calendar.jsx` — Month view with gig markers, standby toggle + **Google Calendar connect/disconnect UI** (MOCKED)
 - ✅ `Wallet.jsx` — Balance, Razorpay subscriptions, transaction history
 - ✅ `Notifications.jsx` — Grouped notification list
 - ✅ `AdminDashboard.jsx` — Verification queue, user management, penalties
+- ✅ `AdminTemplates.jsx` — **NEW** Notification template management (In-App + WhatsApp + Email tabs)
 - ✅ `Layout.jsx` — Collapsible sidebar, mobile menu
 
 ## Docker Setup (Added)
@@ -113,11 +121,12 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ `README.docker.md` — Complete setup guide with commands, architecture diagram, troubleshooting
 
 ### P0 (Critical - Next Sprint)
-- [ ] Google Calendar two-way sync (currently mocked)
-- [ ] Real Meta WhatsApp Business API integration
-- [ ] PDF contract auto-generation on booking acceptance
-- [ ] 90-minute buffer enforcement in API
-- [ ] Email notifications (Resend/SendGrid)
+- [x] **PDF contract auto-generation** on booking acceptance ✅ DONE (reportlab)
+- [x] **90-minute buffer enforcement** in API ✅ DONE
+- [x] **Email notifications (Resend)** — Built & MOCKED, needs RESEND_API_KEY
+- [x] **Google Calendar two-way sync** — UI built & MOCKED, needs Google OAuth credentials
+- [x] **WhatsApp template management** — Admin Templates page built, needs Meta credentials
+- [ ] Real Meta WhatsApp Business API integration (needs credentials)
 
 ### What's New — Separated Admin Panel (DONE)
 - ✅ `AdminLogin.jsx` — Separate admin login at `/admin/login` (blue navy theme, shield branding)
@@ -157,3 +166,5 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - Razorpay: Test keys configured
 - Gemini: Emergent LLM Key (sk-emergent-4710cB2646aF63eC14)
 - WhatsApp: MOCKED — logs stored in `whatsapp_logs` collection
+- Email: MOCKED — logs stored in `email_logs` collection (add RESEND_API_KEY to .env to activate)
+- Google Calendar: MOCKED — connect/disconnect stored in DB (add Google OAuth to activate)
