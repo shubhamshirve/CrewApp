@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const inputClass = "bg-zinc-900 border border-white/10 text-white placeholder:text-zinc-600 focus:border-blue-500/60 rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-blue-500/30 transition-all";
+const inputClass = "bg-slate-50 border border-border text-foreground placeholder:text-muted-foreground focus:border-blue-500/60 rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-blue-500/30 transition-all";
 
 export default function AdminSettings() {
   const { api } = useAuth();
@@ -159,11 +159,11 @@ export default function AdminSettings() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const SectionCard = ({ children, title, icon: Icon }) => (
-    <div className="rounded-xl border p-5" style={{ background: "#0F1628", borderColor: "rgba(255,255,255,0.07)" }}>
+    <div className="rounded-xl border border-border bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
       {title && (
         <div className="flex items-center gap-2 mb-4">
-          {Icon && <Icon size={15} className="text-blue-400" />}
-          <h3 className="text-sm font-semibold text-white font-display">{title}</h3>
+          {Icon && <Icon size={15} className="text-blue-500" />}
+          <h3 className="text-sm font-semibold text-foreground font-display">{title}</h3>
         </div>
       )}
       {children}
@@ -171,8 +171,7 @@ export default function AdminSettings() {
   );
 
   const TagChip = ({ label, onRemove }) => (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-display"
-      style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)", color: "#93C5FD" }}>
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-display bg-blue-50 border border-blue-200 text-blue-700">
       <span>{label}</span>
       <button
         onClick={() => onRemove(label)}
@@ -191,28 +190,28 @@ export default function AdminSettings() {
         <div className="flex items-center gap-3">
           <Settings size={20} className="text-blue-400" />
           <div>
-            <h1 className="text-xl font-semibold text-white font-display">Platform Settings</h1>
-            <p className="text-xs text-zinc-500 mt-0.5">Manage pricing, event types, and professional roles</p>
+            <h1 className="text-xl font-semibold text-foreground font-display">Platform Settings</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Manage pricing, event types, and professional roles</p>
           </div>
         </div>
 
         <Tabs defaultValue="pricing">
-          <TabsList className="border border-white/5" style={{ background: "#0D1220" }}>
+          <TabsList className="border border-border bg-slate-100">
             <TabsTrigger
               value="pricing"
-              className="data-[state=active]:bg-blue-600/30 data-[state=active]:text-blue-300 font-display text-xs gap-1.5"
+              className="data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm font-display text-xs gap-1.5"
             >
               <DollarSign size={12} /> Pricing
             </TabsTrigger>
             <TabsTrigger
               value="event-types"
-              className="data-[state=active]:bg-blue-600/30 data-[state=active]:text-blue-300 font-display text-xs gap-1.5"
+              className="data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm font-display text-xs gap-1.5"
             >
               <Tag size={12} /> Event Types
             </TabsTrigger>
             <TabsTrigger
               value="roles"
-              className="data-[state=active]:bg-blue-600/30 data-[state=active]:text-blue-300 font-display text-xs gap-1.5"
+              className="data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm font-display text-xs gap-1.5"
             >
               <Briefcase size={12} /> Role Categories
             </TabsTrigger>
@@ -229,7 +228,7 @@ export default function AdminSettings() {
                 <SectionCard title="Subscription Plans" icon={DollarSign}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs text-zinc-400 font-display mb-1 block">Base Plan Name</label>
+                      <label className="text-xs text-muted-foreground font-display mb-1 block">Base Plan Name</label>
                       <input
                         className={inputClass}
                         value={pricing.base_plan_name}
@@ -238,7 +237,7 @@ export default function AdminSettings() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-zinc-400 font-display mb-1 block">Base Plan Price (₹/month)</label>
+                      <label className="text-xs text-muted-foreground font-display mb-1 block">Base Plan Price (₹/month)</label>
                       <input
                         type="number"
                         min="1"
@@ -248,7 +247,7 @@ export default function AdminSettings() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-zinc-400 font-display mb-1 block">Premium Plan Name</label>
+                      <label className="text-xs text-muted-foreground font-display mb-1 block">Premium Plan Name</label>
                       <input
                         className={inputClass}
                         value={pricing.premium_plan_name}
@@ -257,7 +256,7 @@ export default function AdminSettings() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-zinc-400 font-display mb-1 block">Premium Plan Price (₹/month)</label>
+                      <label className="text-xs text-muted-foreground font-display mb-1 block">Premium Plan Price (₹/month)</label>
                       <input
                         type="number"
                         min="1"
@@ -281,14 +280,14 @@ export default function AdminSettings() {
                       value={pricing.referral_reward}
                       onChange={e => setPricing(p => ({ ...p, referral_reward: e.target.value }))}
                     />
-                    <p className="text-xs text-zinc-600 mt-1.5 font-display">
+                    <p className="text-xs text-muted-foreground mt-1.5 font-display">
                       Credited to referrer's wallet when their referral makes first subscription
                     </p>
                   </div>
                 </SectionCard>
 
                 <div className="flex items-center justify-between pt-1">
-                  <p className="text-xs text-zinc-600">
+                  <p className="text-xs text-muted-foreground">
                     {pricing.updated_at
                       ? `Last updated: ${new Date(pricing.updated_at).toLocaleString("en-IN")}`
                       : ""}
@@ -298,7 +297,7 @@ export default function AdminSettings() {
                       variant="outline"
                       size="sm"
                       onClick={loadPricing}
-                      className="border-white/10 text-zinc-400 text-xs gap-1"
+                      className="border-border text-slate-600 text-xs gap-1"
                     >
                       <RefreshCw size={12} /> Refresh
                     </Button>
@@ -323,8 +322,8 @@ export default function AdminSettings() {
             <SectionCard>
               <div className="flex items-center gap-2 mb-4">
                 <Tag size={15} className="text-blue-400" />
-                <h3 className="text-sm font-semibold text-white font-display">Wedding Event Types</h3>
-                <span className="ml-auto text-xs text-zinc-500 font-display">{eventTypes.length} types</span>
+                <h3 className="text-sm font-semibold text-foreground font-display">Wedding Event Types</h3>
+                <span className="ml-auto text-xs text-muted-foreground font-display">{eventTypes.length} types</span>
               </div>
 
               {/* Add new */}
@@ -358,12 +357,12 @@ export default function AdminSettings() {
                     <TagChip key={name} label={name} onRemove={removeEventType} />
                   ))}
                   {eventTypes.length === 0 && (
-                    <p className="text-xs text-zinc-600 py-4 font-display">No event types defined yet.</p>
+                    <p className="text-xs text-muted-foreground py-4 font-display">No event types defined yet.</p>
                   )}
                 </div>
               )}
 
-              <p className="text-xs text-zinc-600 mt-4 font-display">
+              <p className="text-xs text-muted-foreground mt-4 font-display">
                 These appear in gig creation forms and the Gig Board filters.
               </p>
             </SectionCard>
@@ -374,8 +373,8 @@ export default function AdminSettings() {
             <SectionCard>
               <div className="flex items-center gap-2 mb-4">
                 <Briefcase size={15} className="text-blue-400" />
-                <h3 className="text-sm font-semibold text-white font-display">Professional Role Categories</h3>
-                <span className="ml-auto text-xs text-zinc-500 font-display">{roles.length} roles</span>
+                <h3 className="text-sm font-semibold text-foreground font-display">Professional Role Categories</h3>
+                <span className="ml-auto text-xs text-muted-foreground font-display">{roles.length} roles</span>
               </div>
 
               {/* Add new */}
@@ -409,12 +408,12 @@ export default function AdminSettings() {
                     <TagChip key={name} label={name} onRemove={removeRole} />
                   ))}
                   {roles.length === 0 && (
-                    <p className="text-xs text-zinc-600 py-4 font-display">No roles defined yet.</p>
+                    <p className="text-xs text-muted-foreground py-4 font-display">No roles defined yet.</p>
                   )}
                 </div>
               )}
 
-              <p className="text-xs text-zinc-600 mt-4 font-display">
+              <p className="text-xs text-muted-foreground mt-4 font-display">
                 These appear in user onboarding, profile settings, and search filters.
               </p>
             </SectionCard>

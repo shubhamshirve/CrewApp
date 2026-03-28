@@ -39,19 +39,19 @@ export default function AdminGigBoard() {
   };
 
   const STATUS_COLORS = {
-    open: "text-emerald-400 bg-emerald-400/10",
-    partially_filled: "text-amber-400 bg-amber-400/10",
-    filled: "text-zinc-400 bg-zinc-400/10",
-    expired: "text-red-400 bg-red-400/10",
-    cancelled: "text-red-400 bg-red-400/10",
+    open: "text-emerald-600 bg-emerald-500/15",
+    partially_filled: "text-amber-700 bg-amber-500/15",
+    filled: "text-slate-500 bg-slate-100",
+    expired: "text-red-600 bg-red-500/15",
+    cancelled: "text-red-600 bg-red-500/15",
   };
 
   return (
     <AdminLayout>
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
-          <h1 className="text-4xl font-bold text-white font-display">Gig Board</h1>
-          <p className="text-zinc-500 text-sm mt-1">All public gig listings on the platform</p>
+          <h1 className="text-4xl font-bold text-foreground font-display">Gig Board</h1>
+          <p className="text-muted-foreground text-sm mt-1">All public gig listings on the platform</p>
         </div>
 
         {loading ? (
@@ -60,8 +60,8 @@ export default function AdminGigBoard() {
           </div>
         ) : gigs.length === 0 ? (
           <div className="text-center py-20">
-            <Globe size={40} className="text-zinc-700 mx-auto mb-4" />
-            <p className="text-zinc-500 text-sm">No public gigs yet</p>
+            <Globe size={40} className="text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground text-sm">No public gigs yet</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -69,8 +69,7 @@ export default function AdminGigBoard() {
               <div
                 key={g.id}
                 data-testid={`admin-gig-row-${g.id}`}
-                className="p-5 rounded-2xl border"
-                style={{ background: "#0D1220", borderColor: "rgba(255,255,255,0.07)" }}
+                className="p-5 rounded-2xl border border-border bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
@@ -79,9 +78,9 @@ export default function AdminGigBoard() {
                         {g.status}
                       </span>
                     </div>
-                    <p className="text-sm font-semibold text-white font-display">{g.title}</p>
-                    <p className="text-xs text-zinc-500">by {g.lead_name} · {g.event_type}</p>
-                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-zinc-400">
+                    <p className="text-sm font-semibold text-foreground font-display">{g.title}</p>
+                    <p className="text-xs text-muted-foreground">by {g.lead_name} · {g.event_type}</p>
+                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-600">
                       <span className="flex items-center gap-1"><Calendar size={11} /> {g.date}</span>
                       <span className="flex items-center gap-1"><MapPin size={11} /> {g.city}</span>
                       <span className="flex items-center gap-1"><Users size={11} /> {g.application_count} apps</span>

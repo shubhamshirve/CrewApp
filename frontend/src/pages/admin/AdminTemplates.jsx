@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const inputClass = "bg-zinc-900 border border-white/10 text-white placeholder:text-zinc-600 focus:border-blue-500/60 rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-blue-500/30 transition-all";
+const inputClass = "bg-slate-50 border border-border text-foreground placeholder:text-muted-foreground focus:border-blue-500/60 rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-blue-500/30 transition-all";
 const textareaClass = `${inputClass} resize-none leading-relaxed`;
 
 const CHANNEL_TABS = [
@@ -21,8 +21,7 @@ const CHANNEL_TABS = [
 function VariablePill({ variable }) {
   return (
     <code
-      className="text-[10px] px-1.5 py-0.5 rounded font-mono cursor-pointer select-all"
-      style={{ background: "rgba(59,130,246,0.12)", color: "#93C5FD", border: "1px solid rgba(59,130,246,0.2)" }}
+      className="text-[10px] px-1.5 py-0.5 rounded font-mono cursor-pointer select-all bg-blue-50 text-blue-700 border border-blue-200"
       title="Click to copy"
       onClick={() => { navigator.clipboard.writeText(`{{${variable}}}`); toast.success(`Copied {{${variable}}}`); }}
     >
@@ -66,8 +65,7 @@ function TemplateCard({ template, onSave }) {
   return (
     <div
       data-testid={`template-card-${template.event_type}`}
-      className="rounded-xl border transition-all"
-      style={{ background: "#0F1628", borderColor: open ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.07)" }}
+      className={`rounded-xl border transition-all bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ${open ? "border-blue-300" : "border-border"}`}
     >
       {/* Header row */}
       <button
@@ -75,44 +73,44 @@ function TemplateCard({ template, onSave }) {
         className="w-full flex items-center justify-between px-4 py-3.5 text-left"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${hasContent ? "bg-emerald-400" : "bg-zinc-600"}`} />
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${hasContent ? "bg-emerald-500" : "bg-slate-300"}`} />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-white font-display truncate">{template.label}</p>
-            <p className="text-[11px] text-zinc-500 truncate mt-0.5">{template.description}</p>
+            <p className="text-sm font-semibold text-foreground font-display truncate">{template.label}</p>
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{template.description}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0 ml-3">
           <div className="hidden sm:flex gap-1.5">
             {template.platform_message && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded font-display" style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>In-App</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-display bg-amber-500/15 text-amber-700">In-App</span>
             )}
             {template.whatsapp_template_name && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded font-display" style={{ background: "rgba(34,197,94,0.12)", color: "#4ADE80" }}>WhatsApp</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-display bg-emerald-500/15 text-emerald-700">WhatsApp</span>
             )}
             {template.email_subject && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded font-display" style={{ background: "rgba(139,92,246,0.12)", color: "#A78BFA" }}>Email</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-display bg-violet-500/15 text-violet-700">Email</span>
             )}
           </div>
-          {open ? <ChevronUp size={15} className="text-zinc-400" /> : <ChevronDown size={15} className="text-zinc-400" />}
+          {open ? <ChevronUp size={15} className="text-muted-foreground" /> : <ChevronDown size={15} className="text-muted-foreground" />}
         </div>
       </button>
 
       {/* Expanded editor */}
       {open && (
-        <div className="px-4 pb-4 border-t border-white/5 pt-4">
+        <div className="px-4 pb-4 border-t border-border pt-4">
           {/* Variables hint */}
-          <div className="flex flex-wrap gap-1.5 mb-4 p-2.5 rounded-lg" style={{ background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.1)" }}>
-            <span className="text-[10px] text-zinc-500 font-display mr-1 self-center">Variables:</span>
+          <div className="flex flex-wrap gap-1.5 mb-4 p-2.5 rounded-lg bg-blue-50 border border-blue-100">
+            <span className="text-[10px] text-muted-foreground font-display mr-1 self-center">Variables:</span>
             {template.variables?.map(v => <VariablePill key={v} variable={v} />)}
           </div>
 
           <Tabs value={channel} onValueChange={setChannel}>
-            <TabsList className="border border-white/5 mb-4" style={{ background: "#0D1220" }}>
+            <TabsList className="border border-border bg-slate-100 mb-4">
               {CHANNEL_TABS.map(({ id, icon: Icon, label }) => (
                 <TabsTrigger
                   key={id}
                   value={id}
-                  className="data-[state=active]:bg-blue-600/30 data-[state=active]:text-blue-300 font-display text-xs gap-1.5"
+                  className="data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm font-display text-xs gap-1.5"
                 >
                   <Icon size={11} /> {label}
                 </TabsTrigger>
@@ -122,7 +120,7 @@ function TemplateCard({ template, onSave }) {
             {/* In-App */}
             <TabsContent value="platform">
               <div>
-                <label className="text-xs text-zinc-400 font-display mb-1.5 block">In-App Notification Message</label>
+                <label className="text-xs text-muted-foreground font-display mb-1.5 block">In-App Notification Message</label>
                 <textarea
                   data-testid={`platform-msg-${template.event_type}`}
                   className={`${textareaClass} h-20`}
@@ -130,21 +128,21 @@ function TemplateCard({ template, onSave }) {
                   value={form.platform_message}
                   onChange={e => setForm(p => ({ ...p, platform_message: e.target.value }))}
                 />
-                <p className="text-[10px] text-zinc-600 mt-1 font-display">Use {`{{variable}}`} for dynamic values. Click a variable pill above to copy.</p>
+                <p className="text-[10px] text-muted-foreground mt-1 font-display">Use {`{{variable}}`} for dynamic values. Click a variable pill above to copy.</p>
               </div>
             </TabsContent>
 
             {/* WhatsApp */}
             <TabsContent value="whatsapp">
               <div className="space-y-3">
-                <div className="p-3 rounded-lg flex items-start gap-2" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)" }}>
-                  <Info size={13} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-[11px] text-zinc-400 font-display">
+                <div className="p-3 rounded-lg flex items-start gap-2 bg-emerald-50 border border-emerald-200">
+                  <Info size={13} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-[11px] text-slate-600 font-display">
                     Enter the exact template name from your Meta WhatsApp Business Manager. These are pre-approved message templates. Credentials needed to activate.
                   </p>
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 font-display mb-1.5 block">WhatsApp Approved Template Name</label>
+                  <label className="text-xs text-muted-foreground font-display mb-1.5 block">WhatsApp Approved Template Name</label>
                   <input
                     data-testid={`wa-template-${template.event_type}`}
                     className={inputClass}
@@ -154,7 +152,7 @@ function TemplateCard({ template, onSave }) {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 font-display mb-1.5 block">Language Code</label>
+                  <label className="text-xs text-muted-foreground font-display mb-1.5 block">Language Code</label>
                   <select
                     className={inputClass}
                     value={form.whatsapp_language_code}
@@ -175,14 +173,14 @@ function TemplateCard({ template, onSave }) {
             {/* Email */}
             <TabsContent value="email">
               <div className="space-y-3">
-                <div className="p-3 rounded-lg flex items-start gap-2" style={{ background: "rgba(139,92,246,0.05)", border: "1px solid rgba(139,92,246,0.15)" }}>
-                  <Info size={13} className="text-purple-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-[11px] text-zinc-400 font-display">
+                <div className="p-3 rounded-lg flex items-start gap-2 bg-violet-50 border border-violet-200">
+                  <Info size={13} className="text-violet-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-[11px] text-slate-600 font-display">
                     Email templates use inline HTML. Add your Resend API key to activate live email sending.
                   </p>
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 font-display mb-1.5 block">Email Subject Line</label>
+                  <label className="text-xs text-muted-foreground font-display mb-1.5 block">Email Subject Line</label>
                   <input
                     data-testid={`email-subject-${template.event_type}`}
                     className={inputClass}
@@ -192,7 +190,7 @@ function TemplateCard({ template, onSave }) {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 font-display mb-1.5 block">Email Body (HTML supported)</label>
+                  <label className="text-xs text-muted-foreground font-display mb-1.5 block">Email Body (HTML supported)</label>
                   <textarea
                     data-testid={`email-body-${template.event_type}`}
                     className={`${textareaClass} h-32`}
@@ -206,15 +204,15 @@ function TemplateCard({ template, onSave }) {
           </Tabs>
 
           {/* Active toggle + save */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
             <label className="flex items-center gap-2 cursor-pointer">
               <div
                 onClick={() => setForm(p => ({ ...p, is_active: !p.is_active }))}
-                className={`w-9 h-5 rounded-full transition-colors relative ${form.is_active ? "bg-blue-600" : "bg-zinc-700"}`}
+                className={`w-9 h-5 rounded-full transition-colors relative ${form.is_active ? "bg-blue-600" : "bg-slate-200"}`}
               >
                 <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${form.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
               </div>
-              <span className="text-xs text-zinc-400 font-display">{form.is_active ? "Active" : "Inactive"}</span>
+              <span className="text-xs text-muted-foreground font-display">{form.is_active ? "Active" : "Inactive"}</span>
             </label>
             <Button
               size="sm"
@@ -281,15 +279,15 @@ export default function AdminTemplates() {
           <div className="flex items-center gap-3">
             <MessageSquare size={20} className="text-blue-400" />
             <div>
-              <h1 className="text-xl font-semibold text-white font-display">Notification Templates</h1>
-              <p className="text-xs text-zinc-500 mt-0.5">Manage platform, WhatsApp, and email templates for each event</p>
+              <h1 className="text-xl font-semibold text-foreground font-display">Notification Templates</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">Manage platform, WhatsApp, and email templates for each event</p>
             </div>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={load}
-            className="border-white/10 text-zinc-400 text-xs gap-1 flex-shrink-0"
+            className="border-border text-slate-600 text-xs gap-1 flex-shrink-0"
           >
             <RefreshCw size={12} /> Refresh
           </Button>
@@ -302,22 +300,22 @@ export default function AdminTemplates() {
             { label: "Configured", value: configured, icon: CheckCircle, color: "#10B981" },
             { label: "Pending Setup", value: templates.length - configured, icon: AlertCircle, color: "#F59E0B" },
           ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="rounded-xl p-3 border" style={{ background: "#0F1628", borderColor: "rgba(255,255,255,0.07)" }}>
+            <div key={label} className="rounded-xl p-3 border border-border bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <div className="flex items-center gap-2 mb-1">
                 <Icon size={13} style={{ color }} />
-                <span className="text-[10px] text-zinc-500 font-display">{label}</span>
+                <span className="text-[10px] text-muted-foreground font-display">{label}</span>
               </div>
-              <p className="text-xl font-bold text-white font-display">{value}</p>
+              <p className="text-xl font-bold text-foreground font-display">{value}</p>
             </div>
           ))}
         </div>
 
         {/* Channel legend */}
-        <div className="flex flex-wrap gap-2 p-3 rounded-lg border" style={{ background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.06)" }}>
-          <span className="text-[10px] text-zinc-500 font-display self-center mr-1">Channels:</span>
-          <span className="text-[10px] px-2 py-0.5 rounded font-display" style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>In-App Notification</span>
-          <span className="text-[10px] px-2 py-0.5 rounded font-display" style={{ background: "rgba(34,197,94,0.12)", color: "#4ADE80" }}>WhatsApp (requires Meta credentials)</span>
-          <span className="text-[10px] px-2 py-0.5 rounded font-display" style={{ background: "rgba(139,92,246,0.12)", color: "#A78BFA" }}>Email (requires Resend API key)</span>
+        <div className="flex flex-wrap gap-2 p-3 rounded-lg border border-border bg-slate-50">
+          <span className="text-[10px] text-muted-foreground font-display self-center mr-1">Channels:</span>
+          <span className="text-[10px] px-2 py-0.5 rounded font-display bg-amber-500/15 text-amber-700">In-App Notification</span>
+          <span className="text-[10px] px-2 py-0.5 rounded font-display bg-emerald-500/15 text-emerald-700">WhatsApp (requires Meta credentials)</span>
+          <span className="text-[10px] px-2 py-0.5 rounded font-display bg-violet-500/15 text-violet-700">Email (requires Resend API key)</span>
         </div>
 
         {/* Search */}
@@ -341,8 +339,8 @@ export default function AdminTemplates() {
             ))}
             {filtered.length === 0 && (
               <div className="text-center py-12">
-                <MessageSquare size={28} className="text-zinc-700 mx-auto mb-2" />
-                <p className="text-sm text-zinc-500 font-display">No templates found</p>
+                <MessageSquare size={28} className="text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground font-display">No templates found</p>
               </div>
             )}
           </div>
