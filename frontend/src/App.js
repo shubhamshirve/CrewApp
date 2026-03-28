@@ -39,12 +39,14 @@ function ProtectedRoute({ children }) {
     </div>
   );
   if (!user) return <Navigate to="/" replace />;
+  if (user.is_admin) return <Navigate to="/admin/dashboard" replace />;
   return children;
 }
 
 function AdminGuard({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return (
+  const hasToken = !!(localStorage.getItem("crewbook_token") || sessionStorage.getItem("crewbook_token"));
+  if (loading || (!user && hasToken)) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
     </div>
@@ -80,8 +82,8 @@ function UserRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
-      <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
-      <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
+      <Route path="/" element={!user ? <Landing /> : user.is_admin ? <Navigate to="/admin/dashboard" replace /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/auth" element={!user ? <Auth /> : user.is_admin ? <Navigate to="/admin/dashboard" replace /> : <Navigate to="/dashboard" replace />} />
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

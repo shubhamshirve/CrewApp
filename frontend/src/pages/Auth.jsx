@@ -23,7 +23,7 @@ export default function Auth() {
     try {
       const user = await login(loginData.email, loginData.password);
       toast.success(`Welcome back, ${user.full_name}!`);
-      navigate(user.is_admin ? "/admin" : user.onboarding_complete ? "/dashboard" : "/onboarding");
+      navigate(user.is_admin ? "/admin/dashboard" : user.onboarding_complete ? "/dashboard" : "/onboarding");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Login failed");
     } finally {
