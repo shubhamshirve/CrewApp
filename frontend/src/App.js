@@ -5,7 +5,6 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import "@/App.css";
 
 // User app pages
-import Landing from "@/pages/Landing";
 import Auth from "@/pages/Auth";
 import Onboarding from "@/pages/Onboarding";
 import Dashboard from "@/pages/Dashboard";
@@ -82,8 +81,7 @@ function UserRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
-      <Route path="/" element={!user ? <Landing /> : user.is_admin ? <Navigate to="/admin/dashboard" replace /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/auth" element={!user ? <Auth /> : user.is_admin ? <Navigate to="/admin/dashboard" replace /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/" element={!user ? <Auth /> : user.is_admin ? <Navigate to="/admin/dashboard" replace /> : <Navigate to="/dashboard" replace />} />
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
