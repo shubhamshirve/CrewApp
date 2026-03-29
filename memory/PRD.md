@@ -169,7 +169,10 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ **Profile.jsx**: UPI Pay Now button — non-owners see green "Pay Now" UPI deeplink button; owners see their UPI ID text
 - ✅ **Onboarding.jsx**: Gear section updated with category select → filtered gear dropdown → custom gear name fallback
 
-### Reports, Ledger CRUD & Password Management (Done — March 2026)
+### Read Receipts, Snooze & Buffer Override (Done — March 2026)
+- ✅ **Read Receipts on Invites**: `PUT /api/gigs/invites/{id}/mark-viewed` — auto-called when freelancer opens GigDetail; `invite_viewed_at` stored (idempotent); lead's Team tab shows "Seen [date/time]" (green Eye badge) or "Not seen yet" (grey EyeOff badge) on each pending invite
+- ✅ **Snooze Invite**: `PUT /api/gigs/invites/{id}/snooze` body `{hours: 1-48, default 4}` — stores `snoozed_until` timestamp; asyncio background task sends push notification reminder when snooze expires (re-checks if still pending); freelancer sees "Snooze 4h" button + amber "Reminder set for..." indicator
+- ✅ **Buffer Enforcer Override**: `POST /api/gigs/{gig_id}/invites?force=true` — skips 90-min buffer check; frontend catches HTTP 409, shows amber conflict dialog with conflict details, "Go Back" to edit, "Send Anyway" to force-create the invite
 - ✅ **Password Reset via Email OTP**: `POST /api/auth/forgot-password` + `POST /api/auth/reset-password` — same OTP infrastructure, mock mode returns `otp_dev`; "Forgot password?" link on login inline reveals OTP + new password form
 - ✅ **Password Change in Profile**: `POST /api/auth/change-password` (requires current password) — dialog accessible via "Change Password" link inside profile edit panel
 - ✅ **Gig Ledger Full CRUD**: `PUT /api/gigs/invites/{id}/payment` (edit amount/notes) + `DELETE /api/gigs/invites/{id}/payment/{type}` (undo/unmark) — Edit ✏️ and Undo ✕ buttons on all paid ledger entries in GigDetail.jsx

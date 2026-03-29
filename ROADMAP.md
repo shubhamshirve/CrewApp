@@ -13,11 +13,11 @@
 
 ---
 
-## Currently Being Built (This Sprint)
+## Recently Completed (March 2026)
 
-- [-] **Read Receipts on Invites** — Freelancers' "Seen" timestamp visible to leads on invite cards
-- [-] **Snooze Invite ("Remind me in 4h")** — Freelancers can defer an invite; push notification fires when snooze expires
-- [-] **Buffer Enforcer Override** — 90-min conflict shows warning dialog with "Send Anyway (Force)" option for lead
+- [x] **Read Receipts on Invites** — `PUT /api/gigs/invites/{id}/mark-viewed`; auto-fires when freelancer opens gig; lead sees "Seen [date]" or "Not seen yet" badge on Team tab
+- [x] **Snooze Invite ("Remind me in 4h")** — `PUT /api/gigs/invites/{id}/snooze`; stores `snoozed_until`; asyncio background task sends push reminder on expiry; "Reminder set for..." shown to freelancer
+- [x] **Buffer Enforcer Override** — `POST /api/gigs/{id}/invites?force=true` bypasses 90-min check; frontend catches HTTP 409 and shows conflict dialog with "Go Back" / "Send Anyway" options
 
 ---
 
