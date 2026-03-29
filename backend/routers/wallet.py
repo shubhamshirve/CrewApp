@@ -74,6 +74,25 @@ async def get_wallet(current_user: dict = Depends(get_current_user)):
     }
 
 
+@router.get("/referral-stats")
+async def get_referral_stats(current_user: dict = Depends(get_current_user)):
+    """Return how many users were referred and total wallet credits earned from referrals."""
+    db = get_db()
+    referred_count = await db.users.count_documents({"referred_by": current_user["id"]})
+    referral_txns = await db.wallet_transactions.find(
+        {"user_id": current_user["id"], "type": "credit", "description": {"$regex": "referral", "$options": "i"}}
+    ).to_list(100)
+    total_earned = sum(t.get("amount", 0) for t in referral_txns)
+    cfg = await _get_platform_settings(db)
+    reward_per_referral = cfg.get("referral_reward", _DEFAULT_REFERRAL_REWARD)
+    return {
+        "referral_code": current_user.get("referral_code", ""),
+        "referred_count": referred_count,
+        "total_earned": total_earned,
+        "reward_per_referral": reward_per_referral,
+    }
+
+
 @router.post("/subscribe/create-order")
 async def create_subscription_order(data: SubscribeRequest, current_user: dict = Depends(get_current_user)):
     if data.plan not in ("base", "premium"):
