@@ -146,7 +146,17 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
   - Converted gigs create real invite + calendar entry on acceptance
 - ✅ `/gig-board` route added to App.js, "Gig Board" nav item in Layout.jsx
 
-### Admin Gear Catalogue + Custom Gear Submissions (March 2026)
+### Admin Plans Management + Plan-Based Feature Gating (March 2026)
+- ✅ **Backend**: New `plans` collection + `/api/plans` CRUD router (admin create/edit/delete/migrate, public list endpoint)
+- ✅ **Plan features**: `public_gig_enabled` and `whatsapp_enabled` flags per plan
+- ✅ **Auto-migration**: When plan with `legacy_tier="base"/"premium"` is created, existing users auto-migrated to new plan
+- ✅ **Wallet subscription**: Now uses `plan_id` (UUID from DB), sets `active_plan_id` + `active_plan_features` on user
+- ✅ **Public Gig Board gating**: Access gated by `active_plan_features.public_gig_enabled`; shows upgrade wall with CTA
+- ✅ **WhatsApp gating**: `send_gig_invite_whatsapp` and `send_sunday_dispatch` skip if plan doesn't have `whatsapp_enabled`
+- ✅ **AdminPlans.jsx**: Full CRUD UI with feature toggles, legacy tier selector, migration button, subscriber count, active toggle
+- ✅ **Wallet.jsx**: Dynamic plans loaded from DB; empty state if no plans exist; plan feature indicators shown
+
+
 - ✅ **Backend**: 4 new endpoints (`gear-submissions` CRUD) in `platform_settings.py`
 - ✅ **AdminSettings.jsx**: New "Gear" tab — Master Catalogue (add/filter/delete) + Custom Gear Requests (approve/edit/reject submissions from users)
 - ✅ **Profile.jsx**: Gear dialog redesigned to 2-step category-first flow (7 color-coded category cards → filtered catalogue list → "Other" for custom gear with admin review)
