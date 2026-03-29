@@ -100,10 +100,10 @@ export default function GigDetail() {
       setGig(gigRes.data);
       setConnections(connRes.data);
 
-      // Auto mark-viewed: if current user has a pending invite, record seen timestamp
-      const myInv = gigRes.data?.invites?.find(i => i.freelancer_id === user?.id && i.status === "pending");
-      if (myInv && !myInv.invite_viewed_at) {
-        api.put(`/gigs/invites/${myInv.id}/mark-viewed`).catch(() => {});
+      // Auto mark-viewed: mark ALL pending invites for this user as seen
+      const pendingInvites = gigRes.data?.invites?.filter(i => i.freelancer_id === user?.id && i.status === "pending" && !i.invite_viewed_at) ?? [];
+      for (const inv of pendingInvites) {
+        api.put(`/gigs/invites/${inv.id}/mark-viewed`).catch(() => {});
       }
     } catch { toast.error("Failed to load gig"); } finally { setLoading(false); }
   };
@@ -193,7 +193,7 @@ export default function GigDetail() {
     } catch (err) { toast.error(err.response?.data?.detail || "Cannot remove session"); }
   };
 
-  const myInvite = gig?.invites?.find(i => i.freelancer_id === user?.id);
+  const myInvites = gig?.invites?.filter(i => i.freelancer_id === user?.id) ?? [];
 
   const handleInvite = async (force = false) => {
     if (!inviteForm.freelancer_id || !inviteForm.session_id || !inviteForm.proposed_fee) {
@@ -494,69 +494,93 @@ export default function GigDetail() {
               </div>
             ))}
 
-            {/* Freelancer: my invite */}
-            {!isLead && myInvite && (
-              <div
-                className="p-4 rounded-xl border mt-4"
-                style={{
-                  background: myInvite.status === "pending" ? "rgba(249,115,22,0.04)" : "#FFFFFF",
-                  borderColor: myInvite.status === "pending" ? "rgba(249,115,22,0.2)" : "#E2E8F0",
-                }}
-              >
-                <p className="text-sm font-semibold text-slate-900 font-display mb-1">Your Invite</p>
-                <p className="text-xs text-slate-500 mb-2">
-                  {myInvite.role} · Proposed fee: ₹{myInvite.proposed_fee?.toLocaleString("en-IN")}
-                </p>
-                {myInvite.status === "pending" && (
-                  <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" data-testid="accept-invite-btn" onClick={() => handleRespond(myInvite.id, "accept")} style={{ background: "#10B981", color: "#fff" }} className="font-display text-xs gap-1">
-                      <Check size={13} /> Accept
-                    </Button>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        data-testid="counter-fee-input"
-                        className={`w-28 h-8 text-xs ${inputClass}`}
-                        type="number"
-                        placeholder="Counter ₹"
-                        value={counterFee[myInvite.id] || ""}
-                        onChange={e => setCounterFee(p => ({ ...p, [myInvite.id]: e.target.value }))}
-                      />
-                      <Button size="sm" data-testid="counter-offer-btn" onClick={() => handleRespond(myInvite.id, "counter", parseFloat(counterFee[myInvite.id]))} variant="outline" className="h-8 border-purple-200 text-purple-600 text-xs gap-1 hover:bg-purple-50">
-                        <ArrowRightLeft size={12} /> Counter
-                      </Button>
-                    </div>
-                    <Button size="sm" data-testid="reject-invite-btn" onClick={() => handleRespond(myInvite.id, "reject")} variant="outline" className="border-red-200 text-red-500 text-xs hover:bg-red-50 gap-1">
-                      <X size={12} /> Reject
-                    </Button>
-                    <Button
-                      size="sm"
-                      data-testid="snooze-invite-btn"
-                      onClick={() => handleSnooze(myInvite.id, 4)}
-                      disabled={snoozing}
-                      variant="outline"
-                      className="border-amber-200 text-amber-600 text-xs hover:bg-amber-50 gap-1"
+            {/* Freelancer: all my invites for this gig */}
+            {!isLead && myInvites.length > 0 && (
+              <div className="space-y-3 mt-4">
+                {myInvites.map(inv => {
+                  const sess = gig.sessions?.find(s => s.id === inv.session_id);
+                  const sessionLabel = sess
+                    ? `${sess.date} · ${sess.start_time}–${sess.end_time} · ${sess.location}`
+                    : inv.session_date || "Session";
+                  return (
+                    <div
+                      key={inv.id}
+                      data-testid={`my-invite-card-${inv.id}`}
+                      className="p-4 rounded-xl border"
+                      style={{
+                        background: inv.status === "pending" ? "rgba(249,115,22,0.04)" : "#FFFFFF",
+                        borderColor: inv.status === "pending" ? "rgba(249,115,22,0.2)" : "#E2E8F0",
+                      }}
                     >
-                      <BellOff size={12} /> {snoozing ? "Snoozing…" : "Snooze 4h"}
-                    </Button>
-                  </div>
-                )}
-                {/* Snoozed indicator */}
-                {myInvite.snoozed_until && myInvite.status === "pending" && (
-                  <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 w-fit" data-testid="snoozed-indicator">
-                    <Bell size={11} />
-                    Reminder set for {new Date(myInvite.snoozed_until).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                )}
-                {myInvite.status === "accepted" && !gig.data_delivered && (
-                  <Button size="sm" data-testid="handover-btn" onClick={handleHandover} variant="outline" className="border-emerald-200 text-emerald-600 text-xs hover:bg-emerald-50 gap-1 mt-2">
-                    <PackageCheck size={13} /> Mark Data Delivered
-                  </Button>
-                )}
-                {myInvite.status === "accepted" && (
-                  <Button size="sm" data-testid="download-contract-btn" onClick={() => handleDownloadContract(myInvite.id)} variant="outline" className="border-blue-200 text-blue-600 text-xs hover:bg-blue-50 gap-1 mt-2 ml-2">
-                    <FileText size={13} /> Download Contract
-                  </Button>
-                )}
+                      <div className="flex items-start justify-between mb-1">
+                        <p className="text-sm font-semibold text-slate-900 font-display">Your Invite</p>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-display ${
+                          inv.status === "accepted" ? "bg-emerald-50 text-emerald-600"
+                          : inv.status === "rejected" ? "bg-red-50 text-red-500"
+                          : inv.status === "counter_offered" ? "bg-purple-50 text-purple-600"
+                          : "bg-orange-50 text-orange-500"
+                        }`}>{inv.status.replace("_", " ")}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-1">{inv.role} · ₹{inv.proposed_fee?.toLocaleString("en-IN")}</p>
+                      <p className="text-[11px] text-slate-400 mb-2 flex items-center gap-1">
+                        <Calendar size={10} /> {sessionLabel}
+                      </p>
+                      {inv.status === "pending" && (
+                        <div className="flex gap-2 flex-wrap">
+                          <Button size="sm" data-testid={`accept-invite-btn-${inv.id}`} onClick={() => handleRespond(inv.id, "accept")} style={{ background: "#10B981", color: "#fff" }} className="font-display text-xs gap-1">
+                            <Check size={13} /> Accept
+                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              data-testid={`counter-fee-input-${inv.id}`}
+                              className={`w-28 h-8 text-xs ${inputClass}`}
+                              type="number"
+                              placeholder="Counter ₹"
+                              value={counterFee[inv.id] || ""}
+                              onChange={e => setCounterFee(p => ({ ...p, [inv.id]: e.target.value }))}
+                            />
+                            <Button size="sm" data-testid={`counter-offer-btn-${inv.id}`} onClick={() => handleRespond(inv.id, "counter", parseFloat(counterFee[inv.id]))} variant="outline" className="h-8 border-purple-200 text-purple-600 text-xs gap-1 hover:bg-purple-50">
+                              <ArrowRightLeft size={12} /> Counter
+                            </Button>
+                          </div>
+                          <Button size="sm" data-testid={`reject-invite-btn-${inv.id}`} onClick={() => handleRespond(inv.id, "reject")} variant="outline" className="border-red-200 text-red-500 text-xs hover:bg-red-50 gap-1">
+                            <X size={12} /> Reject
+                          </Button>
+                          <Button
+                            size="sm"
+                            data-testid={`snooze-invite-btn-${inv.id}`}
+                            onClick={() => handleSnooze(inv.id, 4)}
+                            disabled={snoozing}
+                            variant="outline"
+                            className="border-amber-200 text-amber-600 text-xs hover:bg-amber-50 gap-1"
+                          >
+                            <BellOff size={12} /> {snoozing ? "Snoozing…" : "Snooze 4h"}
+                          </Button>
+                        </div>
+                      )}
+                      {/* Snoozed indicator */}
+                      {inv.snoozed_until && inv.status === "pending" && (
+                        <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 w-fit" data-testid={`snoozed-indicator-${inv.id}`}>
+                          <Bell size={11} />
+                          Reminder set for {new Date(inv.snoozed_until).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      )}
+                      {inv.status === "counter_offered" && (
+                        <p className="text-xs text-purple-600 mt-1">Counter offer: ₹{inv.counter_fee?.toLocaleString("en-IN")}</p>
+                      )}
+                      {inv.status === "accepted" && !gig.data_delivered && (
+                        <Button size="sm" data-testid={`handover-btn-${inv.id}`} onClick={handleHandover} variant="outline" className="border-emerald-200 text-emerald-600 text-xs hover:bg-emerald-50 gap-1 mt-2">
+                          <PackageCheck size={13} /> Mark Data Delivered
+                        </Button>
+                      )}
+                      {inv.status === "accepted" && (
+                        <Button size="sm" data-testid={`download-contract-btn-${inv.id}`} onClick={() => handleDownloadContract(inv.id)} variant="outline" className="border-blue-200 text-blue-600 text-xs hover:bg-blue-50 gap-1 mt-2 ml-2">
+                          <FileText size={13} /> Download Contract
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
