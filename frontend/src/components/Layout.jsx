@@ -6,7 +6,7 @@ import {
   Wallet, Bell, LogOut, User, ChevronLeft, ChevronRight,
   Menu, Globe, Download, X, ShieldAlert, ArrowLeft
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import NotificationPrompt from "@/components/NotificationPrompt";
 
 const NAV_ITEMS = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -218,6 +218,9 @@ export default function Layout({ children }) {
               </button>
             </div>
           )}
+
+          {/* Notification Permission Prompt */}
+          {!isImpersonating && <NotificationPrompt />}
 
           {/* PWA Install Banner */}
           {showInstallBanner && (
