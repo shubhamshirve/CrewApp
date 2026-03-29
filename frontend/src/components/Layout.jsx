@@ -20,7 +20,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Layout({ children }) {
-  const { user, logout, api, isImpersonating } = useAuth();
+  const { user, logout, api, isImpersonating, exitImpersonation } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -29,9 +29,9 @@ export default function Layout({ children }) {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
-  const handleBackToAdmin = () => {
-    sessionStorage.removeItem("crewbook_token");
-    window.location.href = "/admin/dashboard";
+  const handleBackToAdmin = async () => {
+    await exitImpersonation();
+    navigate("/admin/dashboard");
   };
 
   useEffect(() => {

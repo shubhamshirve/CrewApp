@@ -9,24 +9,8 @@ export const API = BACKEND_URL ? `${BACKEND_URL}/api` : "/api";
 const api = axios.create({ baseURL: API });
 
 function getToken() {
-  // sessionStorage token (used for impersonation) takes priority over localStorage
-  return sessionStorage.getItem("crewbook_token") || localStorage.getItem("crewbook_token") || null;
+  return localStorage.getItem("crewbook_token") || null;
 }
-
-// On page load, check for impersonation token in URL (passed by admin for cross-tab impersonation)
-function bootstrapImpersonationToken() {
-  const params = new URLSearchParams(window.location.search);
-  const tok = params.get("impersonate_token");
-  if (tok) {
-    sessionStorage.setItem("crewbook_token", tok);
-    // Remove token from URL without page reload
-    params.delete("impersonate_token");
-    const newSearch = params.toString();
-    const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "") + window.location.hash;
-    window.history.replaceState({}, "", newUrl);
-  }
-}
-bootstrapImpersonationToken();
 
 api.interceptors.request.use((config) => {
   const token = getToken();
@@ -39,6 +23,9 @@ export const useApi = () => api;
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isImpersonating, setIsImpersonating] = useState(
+    !!localStorage.getItem("crewbook_admin_token")
+  );
 
   const fetchMe = useCallback(async () => {
     const token = getToken();
@@ -48,7 +35,8 @@ export function AuthProvider({ children }) {
       setUser(res.data);
     } catch {
       localStorage.removeItem("crewbook_token");
-      sessionStorage.removeItem("crewbook_token");
+      localStorage.removeItem("crewbook_admin_token");
+      setIsImpersonating(false);
     } finally {
       setLoading(false);
     }
@@ -72,7 +60,8 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem("crewbook_token");
-    sessionStorage.removeItem("crewbook_token");
+    localStorage.removeItem("crewbook_admin_token");
+    setIsImpersonating(false);
     setUser(null);
   };
 
@@ -82,8 +71,34 @@ export function AuthProvider({ children }) {
     return res.data;
   };
 
+  // Same-page impersonation: swap tokens in localStorage, update React state
+  const startImpersonation = async (impersonateToken) => {
+    const adminToken = localStorage.getItem("crewbook_token");
+    localStorage.setItem("crewbook_admin_token", adminToken);
+    localStorage.setItem("crewbook_token", impersonateToken);
+    setIsImpersonating(true);
+    const res = await api.get("/auth/me");
+    setUser(res.data);
+    return res.data;  // return so caller can read the impersonated user's name
+  };
+
+  // Restore admin session from saved token
+  const exitImpersonation = async () => {
+    const adminToken = localStorage.getItem("crewbook_admin_token");
+    if (adminToken) {
+      localStorage.setItem("crewbook_token", adminToken);
+      localStorage.removeItem("crewbook_admin_token");
+    }
+    setIsImpersonating(false);
+    const res = await api.get("/auth/me");
+    setUser(res.data);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, refreshUser, api, isImpersonating: !!sessionStorage.getItem("crewbook_token") }}>
+    <AuthContext.Provider value={{
+      user, setUser, loading, login, register, logout, refreshUser, api,
+      isImpersonating, startImpersonation, exitImpersonation,
+    }}>
       {children}
     </AuthContext.Provider>
   );

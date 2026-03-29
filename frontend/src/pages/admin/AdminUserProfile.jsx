@@ -13,7 +13,7 @@ import { toast } from "sonner";
 export default function AdminUserProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { api } = useAuth();
+  const { api, startImpersonation } = useAuth();
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -47,9 +47,9 @@ export default function AdminUserProfile() {
   const handleImpersonate = async () => {
     try {
       const r = await api.post(`/admin/impersonate/${id}`);
-      const baseUrl = window.location.origin;
-      window.open(`${baseUrl}/dashboard?impersonate_token=${r.data.token}`, "_blank");
-      toast.success("Opened user session in new tab (1-hour token)");
+      const impersonatedUser = await startImpersonation(r.data.token);
+      navigate("/dashboard");
+      toast.success(`Now viewing as ${impersonatedUser?.full_name}`);
     } catch {
       toast.error("Impersonation failed");
     }
