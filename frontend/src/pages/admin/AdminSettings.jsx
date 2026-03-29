@@ -4,13 +4,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Settings, DollarSign, Tag, Briefcase,
+  Settings, DollarSign, Tag, Briefcase, Camera, Inbox,
   Plus, Trash2, Save, RefreshCw, Key, Eye, EyeOff,
-  CheckCircle2, AlertCircle, Loader2
+  CheckCircle2, AlertCircle, Loader2, X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 const inputClass = "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-400 rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-blue-400/20 transition-all";
+
+const GEAR_CATS = ["Camera", "Lens", "Lighting", "Drone", "Audio", "Accessories", "Other"];
 
 export default function AdminSettings() {
   const { api } = useAuth();
@@ -44,6 +46,19 @@ export default function AdminSettings() {
   const [editValues, setEditValues] = useState({});
   const [showValues, setShowValues] = useState({});
   const [savingKey, setSavingKey] = useState({});
+
+  // Gear catalogue state
+  const [gear, setGear] = useState([]);
+  const [gearLoading, setGearLoading] = useState(false);
+  const [gearLoaded, setGearLoaded] = useState(false);
+  const [newGear, setNewGear] = useState({ name: "", category: "Camera", brand: "" });
+  const [gearAdding, setGearAdding] = useState(false);
+  const [gearCatFilter, setGearCatFilter] = useState("All");
+
+  // Gear submissions state
+  const [submissions, setSubmissions] = useState([]);
+  const [submissionEdits, setSubmissionEdits] = useState({});
+  const [processingId, setProcessingId] = useState(null);
 
   useEffect(() => {
     loadPricing();
@@ -164,6 +179,86 @@ export default function AdminSettings() {
     }
   };
 
+  // ── Gear Catalogue ─────────────────────────────────────────────────────────
+
+  const loadGear = async () => {
+    setGearLoading(true);
+    try {
+      const [gearRes, subRes] = await Promise.all([
+        api.get("/platform/gear-catalogue"),
+        api.get("/platform/gear-submissions"),
+      ]);
+      setGear(gearRes.data?.items || []);
+      setSubmissions(subRes.data?.items || []);
+      setGearLoaded(true);
+    } catch {
+      toast.error("Failed to load gear data");
+    } finally {
+      setGearLoading(false);
+    }
+  };
+
+  const addGearItem = async () => {
+    const name = newGear.name.trim();
+    if (!name) { toast.error("Enter gear name"); return; }
+    setGearAdding(true);
+    try {
+      const res = await api.post("/platform/gear-catalogue", { name, category: newGear.category, brand: newGear.brand?.trim() || null });
+      setGear(res.data?.items || []);
+      setNewGear(p => ({ name: "", category: p.category, brand: "" }));
+      toast.success(`"${name}" added to catalogue`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to add gear");
+    } finally {
+      setGearAdding(false);
+    }
+  };
+
+  const removeGearItem = async (itemId, name) => {
+    try {
+      const res = await api.delete(`/platform/gear-catalogue/${itemId}`);
+      setGear(res.data?.items || []);
+      toast.success(`"${name}" removed`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to remove");
+    }
+  };
+
+  // ── Gear Submissions ───────────────────────────────────────────────────────
+
+  const approveSubmission = async (sub) => {
+    const edits = submissionEdits[sub.id] || {};
+    setProcessingId(sub.id);
+    try {
+      await api.put(`/platform/gear-submissions/${sub.id}/approve`, {
+        name: edits.name !== undefined ? edits.name : sub.name,
+        category: edits.category !== undefined ? edits.category : sub.category,
+        brand: edits.brand !== undefined ? edits.brand : (sub.brand || null),
+      });
+      setSubmissions(s => s.filter(x => x.id !== sub.id));
+      const gearRes = await api.get("/platform/gear-catalogue");
+      setGear(gearRes.data?.items || []);
+      toast.success(`"${edits.name || sub.name}" approved and added to catalogue!`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to approve");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const rejectSubmission = async (subId, name) => {
+    setProcessingId(subId);
+    try {
+      await api.delete(`/platform/gear-submissions/${subId}`);
+      setSubmissions(s => s.filter(x => x.id !== subId));
+      toast.success(`"${name}" submission rejected`);
+    } catch {
+      toast.error("Failed to reject");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   // ── API Keys ───────────────────────────────────────────────────────────────
 
   const loadApiKeys = async () => {
@@ -184,7 +279,6 @@ export default function AdminSettings() {
     try {
       await api.put("/platform/api-keys", { group, field, value });
       toast.success("Key saved!");
-      // Refresh to get new masked value
       await loadApiKeys();
       setEditValues(v => { const n = { ...v }; delete n[keyId]; return n; });
     } catch (err) {
@@ -229,6 +323,8 @@ export default function AdminSettings() {
     ai: { bg: "bg-violet-50", border: "border-violet-200", dot: "bg-violet-500", text: "text-violet-700" },
   };
 
+  const filteredGear = gearCatFilter === "All" ? gear : gear.filter(g => g.category === gearCatFilter);
+
   return (
     <AdminLayout>
       <div className="max-w-3xl mx-auto space-y-5">
@@ -239,12 +335,12 @@ export default function AdminSettings() {
           </div>
           <div>
             <h1 className="text-xl font-semibold text-slate-900 font-display">Platform Settings</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Manage pricing, event types, roles, and integrations</p>
+            <p className="text-xs text-slate-500 mt-0.5">Manage pricing, event types, roles, gear, and integrations</p>
           </div>
         </div>
 
         <Tabs defaultValue="pricing">
-          <TabsList className="bg-slate-100 border border-slate-200">
+          <TabsList className="bg-slate-100 border border-slate-200 flex-wrap h-auto gap-1">
             <TabsTrigger value="pricing" className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm font-display text-xs gap-1.5 text-slate-500">
               <DollarSign size={12} /> Pricing
             </TabsTrigger>
@@ -254,7 +350,23 @@ export default function AdminSettings() {
             <TabsTrigger value="roles" className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm font-display text-xs gap-1.5 text-slate-500">
               <Briefcase size={12} /> Roles
             </TabsTrigger>
-            <TabsTrigger value="api-keys" className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm font-display text-xs gap-1.5 text-slate-500" onClick={() => { if (Object.keys(apiKeys).length === 0) loadApiKeys(); }}>
+            <TabsTrigger
+              value="gear"
+              className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm font-display text-xs gap-1.5 text-slate-500"
+              onClick={() => { if (!gearLoaded && !gearLoading) loadGear(); }}
+            >
+              <Camera size={12} /> Gear
+              {submissions.length > 0 && (
+                <span className="ml-1 bg-amber-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                  {submissions.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="api-keys"
+              className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm font-display text-xs gap-1.5 text-slate-500"
+              onClick={() => { if (Object.keys(apiKeys).length === 0) loadApiKeys(); }}
+            >
               <Key size={12} /> API Keys
             </TabsTrigger>
           </TabsList>
@@ -372,6 +484,212 @@ export default function AdminSettings() {
             </SectionCard>
           </TabsContent>
 
+          {/* ── Gear Tab ── */}
+          <TabsContent value="gear" className="mt-4 space-y-4">
+            {gearLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 size={28} className="animate-spin text-blue-500" />
+              </div>
+            ) : !gearLoaded ? (
+              <div className="text-center py-12">
+                <Camera size={32} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 mb-3">Click to load gear catalogue</p>
+                <Button size="sm" onClick={loadGear} className="text-xs text-white" style={{ background: "#1D4ED8" }}>
+                  Load Gear Data
+                </Button>
+              </div>
+            ) : (
+              <>
+                {/* Master Catalogue */}
+                <SectionCard title="Master Gear Catalogue" icon={Camera}>
+                  {/* Add form */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <input
+                      data-testid="new-gear-name"
+                      className={`${inputClass} flex-1 min-w-32`}
+                      placeholder="Gear name…"
+                      value={newGear.name}
+                      onChange={e => setNewGear(p => ({ ...p, name: e.target.value }))}
+                      onKeyDown={e => e.key === "Enter" && addGearItem()}
+                    />
+                    <select
+                      data-testid="new-gear-category"
+                      className={`${inputClass} w-32 flex-shrink-0`}
+                      value={newGear.category}
+                      onChange={e => setNewGear(p => ({ ...p, category: e.target.value }))}
+                    >
+                      {GEAR_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <input
+                      data-testid="new-gear-brand"
+                      className={`${inputClass} w-24 flex-shrink-0`}
+                      placeholder="Brand"
+                      value={newGear.brand}
+                      onChange={e => setNewGear(p => ({ ...p, brand: e.target.value }))}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={addGearItem}
+                      disabled={gearAdding}
+                      className="gap-1 flex-shrink-0 text-xs text-white"
+                      style={{ background: "#1D4ED8" }}
+                    >
+                      {gearAdding ? <RefreshCw size={12} className="animate-spin" /> : <Plus size={12} />} Add
+                    </Button>
+                  </div>
+
+                  {/* Category filter */}
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {["All", ...GEAR_CATS].map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setGearCatFilter(cat)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-display transition-all ${
+                          gearCatFilter === cat
+                            ? "bg-blue-600 text-white"
+                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                    <span className="ml-auto text-xs text-slate-400 font-display self-center">
+                      {filteredGear.length} item{filteredGear.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  {/* Items list */}
+                  <div className="space-y-1 max-h-72 overflow-y-auto">
+                    {filteredGear.length === 0 ? (
+                      <p className="text-xs text-slate-400 py-6 text-center">No gear items found.</p>
+                    ) : (
+                      filteredGear.map(item => (
+                        <div
+                          key={item.id}
+                          data-testid={`gear-catalogue-item-${item.id}`}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100 group hover:border-slate-200 transition-all"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-display text-slate-800">{item.name}</span>
+                            {item.brand && <span className="text-xs text-slate-400 ml-2">· {item.brand}</span>}
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 font-display flex-shrink-0">
+                            {item.category}
+                          </span>
+                          <button
+                            onClick={() => removeGearItem(item.id, item.name)}
+                            className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                            title={`Remove "${item.name}"`}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-3 font-display">
+                    Users see this catalogue when adding gear to their profile.
+                  </p>
+                </SectionCard>
+
+                {/* Custom Gear Requests */}
+                <SectionCard title="Custom Gear Requests" icon={Inbox}>
+                  {submissions.length === 0 ? (
+                    <div className="text-center py-8">
+                      <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500 font-display">No pending requests</p>
+                      <p className="text-xs text-slate-400 mt-1">When users add custom gear not in the catalogue, it appears here for review.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-slate-500 mb-3">
+                        {submissions.length} pending submission{submissions.length !== 1 ? "s" : ""} — review and add to master catalogue or reject.
+                      </p>
+                      {submissions.map(sub => {
+                        const edit = submissionEdits[sub.id] || {};
+                        const isProcessing = processingId === sub.id;
+                        return (
+                          <div
+                            key={sub.id}
+                            data-testid={`submission-${sub.id}`}
+                            className="p-3 rounded-xl border border-amber-200 bg-amber-50 space-y-2"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-display font-semibold text-slate-800">{sub.name}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  {sub.category}{sub.brand ? ` · ${sub.brand}` : ""} — submitted by{" "}
+                                  <span className="font-medium">{sub.submitted_by_name}</span>
+                                </p>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 font-display flex-shrink-0">
+                                Pending
+                              </span>
+                            </div>
+
+                            {/* Editable fields */}
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <div>
+                                <label className="text-[10px] text-slate-500 font-display mb-0.5 block">Name</label>
+                                <input
+                                  className={`${inputClass} text-xs py-1.5`}
+                                  placeholder="Name"
+                                  value={edit.name !== undefined ? edit.name : sub.name}
+                                  onChange={e => setSubmissionEdits(s => ({ ...s, [sub.id]: { ...s[sub.id], name: e.target.value } }))}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-slate-500 font-display mb-0.5 block">Category</label>
+                                <select
+                                  className={`${inputClass} text-xs py-1.5`}
+                                  value={edit.category !== undefined ? edit.category : sub.category}
+                                  onChange={e => setSubmissionEdits(s => ({ ...s, [sub.id]: { ...s[sub.id], category: e.target.value } }))}
+                                >
+                                  {GEAR_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-slate-500 font-display mb-0.5 block">Brand</label>
+                                <input
+                                  className={`${inputClass} text-xs py-1.5`}
+                                  placeholder="Brand"
+                                  value={edit.brand !== undefined ? edit.brand : (sub.brand || "")}
+                                  onChange={e => setSubmissionEdits(s => ({ ...s, [sub.id]: { ...s[sub.id], brand: e.target.value } }))}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-1">
+                              <Button
+                                size="sm"
+                                onClick={() => approveSubmission(sub)}
+                                disabled={isProcessing}
+                                className="flex-1 text-xs text-white gap-1"
+                                style={{ background: "#059669" }}
+                              >
+                                {isProcessing ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                                Approve & Add
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => rejectSubmission(sub.id, sub.name)}
+                                disabled={isProcessing}
+                                className="text-xs border-red-200 text-red-500 hover:bg-red-50 gap-1"
+                              >
+                                <X size={11} /> Reject
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </SectionCard>
+              </>
+            )}
+          </TabsContent>
+
           {/* ── API Keys Tab ── */}
           <TabsContent value="api-keys" className="mt-4 space-y-4">
             <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 flex items-start gap-2">
@@ -398,7 +716,6 @@ export default function AdminSettings() {
                 const colors = GROUP_COLORS[groupKey] || { bg: "bg-slate-50", border: "border-slate-200", dot: "bg-slate-400", text: "text-slate-700" };
                 return (
                   <div key={groupKey} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    {/* Group header */}
                     <div className={`px-5 py-3.5 flex items-center justify-between border-b border-slate-100 ${colors.bg}`}>
                       <div className="flex items-center gap-2.5">
                         <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
@@ -413,7 +730,6 @@ export default function AdminSettings() {
                       </div>
                     </div>
 
-                    {/* Fields */}
                     <div className="p-5 space-y-3">
                       {Object.entries(group.fields).map(([fieldKey, field]) => {
                         const keyId = `${groupKey}.${fieldKey}`;

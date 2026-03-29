@@ -10,7 +10,7 @@ import { Check, ChevronRight, Plus, X, Upload } from "lucide-react";
 
 const STYLES = ["Cinematic","Candid","Traditional","Documentary","Fine Art","Dark & Moody","Bright & Airy"];
 const EDITING = ["Lightroom","Photoshop","Final Cut Pro","Premiere Pro","DaVinci Resolve","Capture One"];
-const GEAR_CATS = ["Camera","Lens","Lighting","Drone","Audio","Other"];
+const GEAR_CATS = ["Camera","Lens","Lighting","Drone","Audio","Accessories","Other"];
 const ID_TYPES = ["Aadhar","PAN","Driving License","Passport"];
 
 const STEPS = ["Your Role & Rates", "Style & Gear", "Verify Identity", "Complete"];
@@ -28,6 +28,9 @@ export default function Onboarding() {
     api.get("/platform/roles").then(r => {
       if (r.data?.roles?.length) setRolesList(r.data.roles);
     }).catch(() => {});
+    api.get("/platform/gear-catalogue").then(r => {
+      setMasterGear(r.data?.items || []);
+    }).catch(() => {});
   }, []);
 
   const [profileData, setProfileData] = useState({
@@ -40,7 +43,12 @@ export default function Onboarding() {
     editing_ecosystem: user?.editing_ecosystem || [],
   });
 
-  const [gear, setGear] = useState({ name: "", category: "Camera", brand: "" });
+  const [masterGear, setMasterGear] = useState([]);
+  const [gearCategory, setGearCategory] = useState("Camera");
+  const [selectedGearName, setSelectedGearName] = useState("");
+  const [customGearName, setCustomGearName] = useState("");
+  const [isCustomGear, setIsCustomGear] = useState(false);
+  const [gearBrand, setGearBrand] = useState("");
   const [gearList, setGearList] = useState(user?.gear_vault || []);
 
   const [idData, setIdData] = useState({ id_type: "Aadhar", govt_id_base64: "", selfie_base64: "" });
@@ -81,10 +89,16 @@ export default function Onboarding() {
     try {
       await api.put("/users/profile", { style_tags: profileData.style_tags, editing_ecosystem: profileData.editing_ecosystem });
       if (gearList.length !== (user?.gear_vault?.length || 0)) {
-        // Save each new gear item
         for (const g of gearList) {
           if (!user?.gear_vault?.find(x => x.id === g.id)) {
-            await api.post("/users/gear", { name: g.name, category: g.category, brand: g.brand });
+            await api.post("/users/gear", { name: g.name, category: g.category, brand: g.brand || null });
+            if (g.is_custom) {
+              try {
+                await api.post("/platform/gear-submissions", {
+                  name: g.name, category: g.category, brand: g.brand || null,
+                });
+              } catch { /* ignore submission errors */ }
+            }
           }
         }
       }
@@ -186,19 +200,100 @@ export default function Onboarding() {
               </div>
               <div>
                 <Label className="text-slate-700 text-sm font-display mb-2 block">Gear Vault</Label>
-                <div className="flex gap-2 mb-2">
-                  <Input data-testid="gear-name-input" className={`flex-1 ${inputClass} text-xs`} placeholder="Gear name (e.g. Sony A7IV)" value={gear.name} onChange={e => setGear(p => ({ ...p, name: e.target.value }))} />
-                  <select data-testid="gear-category-select" value={gear.category} onChange={e => setGear(p => ({ ...p, category: e.target.value }))} className={`px-2 py-1.5 rounded-lg text-xs ${inputClass} border`}>
-                    {GEAR_CATS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <button data-testid="add-gear-btn" onClick={() => { if (gear.name) { setGearList(p => [...p, { ...gear, id: Date.now().toString() }]); setGear({ name: "", category: "Camera", brand: "" }); }}} className="p-2 rounded-lg border border-orange-300 text-orange-500 hover:bg-orange-50">
-                    <Plus size={16} />
-                  </button>
+                <div className="space-y-2 mb-3">
+                  <div className="flex gap-2">
+                    {/* Category */}
+                    <select
+                      data-testid="gear-category-select"
+                      value={gearCategory}
+                      onChange={e => {
+                        setGearCategory(e.target.value);
+                        setSelectedGearName("");
+                        setCustomGearName("");
+                        setIsCustomGear(false);
+                        setGearBrand("");
+                      }}
+                      className={`px-2 py-1.5 rounded-lg text-xs ${inputClass} border w-28 flex-shrink-0`}
+                    >
+                      {GEAR_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    {/* Gear name select or custom input */}
+                    {!isCustomGear ? (
+                      <select
+                        data-testid="gear-name-select"
+                        value={selectedGearName}
+                        onChange={e => {
+                          if (e.target.value === "__custom__") {
+                            setIsCustomGear(true);
+                            setSelectedGearName("");
+                          } else {
+                            setSelectedGearName(e.target.value);
+                            const found = masterGear.find(g => g.name === e.target.value);
+                            if (found?.brand) setGearBrand(found.brand);
+                          }
+                        }}
+                        className={`flex-1 px-2 py-1.5 rounded-lg text-xs ${inputClass} border`}
+                      >
+                        <option value="">Select gear…</option>
+                        {masterGear.filter(g => g.category === gearCategory).map(g => (
+                          <option key={g.id || g.name} value={g.name}>{g.name}</option>
+                        ))}
+                        <option value="__custom__">+ Other (custom)</option>
+                      </select>
+                    ) : (
+                      <Input
+                        data-testid="gear-name-input"
+                        className={`flex-1 ${inputClass} text-xs`}
+                        placeholder={`Custom ${gearCategory} name…`}
+                        value={customGearName}
+                        onChange={e => setCustomGearName(e.target.value)}
+                      />
+                    )}
+
+                    <button
+                      data-testid="add-gear-btn"
+                      onClick={() => {
+                        const name = isCustomGear ? customGearName.trim() : selectedGearName;
+                        if (!name) return;
+                        setGearList(p => [...p, {
+                          name, category: gearCategory, brand: gearBrand, id: Date.now().toString(), is_custom: isCustomGear,
+                        }]);
+                        setSelectedGearName("");
+                        setCustomGearName("");
+                        setIsCustomGear(false);
+                        setGearBrand("");
+                      }}
+                      className="p-2 rounded-lg border border-orange-300 text-orange-500 hover:bg-orange-50 flex-shrink-0"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+
+                  {(selectedGearName || isCustomGear) && (
+                    <Input
+                      placeholder="Brand (optional, e.g. Sony)"
+                      className={`${inputClass} text-xs`}
+                      value={gearBrand}
+                      onChange={e => setGearBrand(e.target.value)}
+                    />
+                  )}
+
+                  {isCustomGear && (
+                    <button
+                      onClick={() => { setIsCustomGear(false); setCustomGearName(""); setGearBrand(""); }}
+                      className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      Back to catalogue
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {gearList.map(g => (
-                    <span key={g.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 text-xs bg-slate-50 text-slate-600">
-                      {g.name} <button onClick={() => setGearList(p => p.filter(x => x.id !== g.id))}><X size={10} /></button>
+                    <span key={g.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 text-xs bg-slate-50 text-slate-600 font-display">
+                      {g.name}
+                      {g.is_custom && <span className="text-[9px] text-amber-500 font-bold">custom</span>}
+                      <button onClick={() => setGearList(p => p.filter(x => x.id !== g.id))}><X size={10} /></button>
                     </span>
                   ))}
                 </div>

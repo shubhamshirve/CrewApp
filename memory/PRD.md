@@ -146,6 +146,13 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
   - Converted gigs create real invite + calendar entry on acceptance
 - ✅ `/gig-board` route added to App.js, "Gig Board" nav item in Layout.jsx
 
+### Admin Gear Catalogue + Custom Gear Submissions (March 2026)
+- ✅ **Backend**: 4 new endpoints (`gear-submissions` CRUD) in `platform_settings.py`
+- ✅ **AdminSettings.jsx**: New "Gear" tab — Master Catalogue (add/filter/delete) + Custom Gear Requests (approve/edit/reject submissions from users)
+- ✅ **Profile.jsx**: Gear dialog redesigned to 2-step category-first flow (7 color-coded category cards → filtered catalogue list → "Other" for custom gear with admin review)
+- ✅ **Profile.jsx**: UPI Pay Now button — non-owners see green "Pay Now" UPI deeplink button; owners see their UPI ID text
+- ✅ **Onboarding.jsx**: Gear section updated with category select → filtered gear dropdown → custom gear name fallback
+
 ### P1 (Important)
 - [x] **Post-event rating flow trigger** ✅ DONE — Dashboard banner + rating modal with sliders
 - [x] **Private lead notes on freelancer profiles** ✅ DONE — Profile page section, only visible to note author

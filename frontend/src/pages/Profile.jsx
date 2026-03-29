@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Shield, MapPin, Star, Camera, User, UserPlus, UserCheck,
   StickyNote, Save, Trash2, Pencil, Plus, X, Upload,
-  Instagram, Globe, Wallet, Link2, ChevronDown,
+  Instagram, Globe, Wallet, Link2, ChevronDown, ChevronLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -107,7 +107,8 @@ export default function Profile() {
 
   // Gear
   const [gearDialog, setGearDialog] = useState(null); // null | { mode:'add'|'edit', item? }
-  const [gearForm, setGearForm] = useState({ name: "", category: "Camera", brand: "", model_number: "" });
+  const [gearStep, setGearStep] = useState(0); // 0=category, 1=select or custom
+  const [gearForm, setGearForm] = useState({ name: "", category: "Camera", brand: "", model_number: "", is_custom: false });
   const [gearSaving, setGearSaving] = useState(false);
   const [masterGear, setMasterGear] = useState([]);
 
@@ -137,11 +138,10 @@ export default function Profile() {
           setNoteLoading(false);
         }
         setRatings(ratingsRes.data);
-        // Load master gear catalogue
         try {
           const metaRes = await api.get("/platform/gear-catalogue");
           setMasterGear(metaRes.data?.items || []);
-        } catch { /* fallback to manual entry */ }
+        } catch { /* fallback */ }
       } catch { toast.error("Failed to load profile"); } finally { setLoading(false); }
     };
     load();
@@ -179,7 +179,6 @@ export default function Profile() {
     try {
       const payload = { ...editForm };
       if (payload.whatsapp_same_as_mobile) payload.whatsapp_number = payload.phone;
-      // Remove empty strings to avoid overwriting with empty
       Object.keys(payload).forEach(k => { if (payload[k] === "") delete payload[k]; });
       if (payload.primary_rate) payload.primary_rate = parseFloat(payload.primary_rate);
       if (payload.secondary_rate) payload.secondary_rate = parseFloat(payload.secondary_rate);
@@ -220,32 +219,56 @@ export default function Profile() {
   };
 
   const openGearAdd = () => {
-    setGearForm({ name: "", category: "Camera", brand: "", model_number: "" });
+    setGearStep(0);
+    setGearForm({ name: "", category: "Camera", brand: "", model_number: "", is_custom: false });
     setGearDialog({ mode: "add" });
   };
 
   const openGearEdit = (item) => {
-    setGearForm({ name: item.name, category: item.category, brand: item.brand || "", model_number: item.model_number || "" });
+    setGearForm({ name: item.name, category: item.category, brand: item.brand || "", model_number: item.model_number || "", is_custom: false });
     setGearDialog({ mode: "edit", item });
   };
 
   const handleGearSave = async () => {
-    if (!gearForm.name.trim()) { toast.error("Gear name required"); return; }
+    const gearName = gearForm.name.trim();
+    if (!gearName) { toast.error("Gear name required"); return; }
+    if (!gearForm.category) { toast.error("Category required"); return; }
     setGearSaving(true);
     try {
+      const payload = {
+        name: gearName,
+        category: gearForm.category,
+        brand: gearForm.brand?.trim() || null,
+        model_number: gearForm.model_number?.trim() || null,
+      };
+
       if (gearDialog.mode === "add") {
-        const res = await api.post("/users/gear", gearForm);
+        const res = await api.post("/users/gear", payload);
         setProfile(p => ({ ...p, gear_vault: [...(p.gear_vault || []), res.data] }));
-        toast.success("Gear added");
+        if (gearForm.is_custom) {
+          try {
+            await api.post("/platform/gear-submissions", {
+              name: gearName,
+              category: gearForm.category,
+              brand: gearForm.brand?.trim() || null,
+            });
+            toast.success("Gear added! Submitted for admin review to include in master catalogue.");
+          } catch {
+            toast.success("Gear added to your vault!");
+          }
+        } else {
+          toast.success("Gear added!");
+        }
       } else {
-        await api.put(`/users/gear/${gearDialog.item.id}`, gearForm);
+        await api.put(`/users/gear/${gearDialog.item.id}`, payload);
         setProfile(p => ({
           ...p,
-          gear_vault: p.gear_vault.map(g => g.id === gearDialog.item.id ? { ...g, ...gearForm } : g),
+          gear_vault: p.gear_vault.map(g => g.id === gearDialog.item.id ? { ...g, ...payload } : g),
         }));
         toast.success("Gear updated");
       }
       setGearDialog(null);
+      setGearStep(0);
     } catch { toast.error("Failed to save gear"); } finally { setGearSaving(false); }
   };
 
@@ -369,10 +392,21 @@ export default function Profile() {
                     <Link2 size={12} /> LinkedIn
                   </a>
                 )}
-                {isOwn && profile.upi_id && (
-                  <span className="flex items-center gap-1 text-xs text-green-600">
-                    <Wallet size={12} /> UPI: {profile.upi_id}
-                  </span>
+                {/* UPI: show Pay Now button to others, own UPI ID to self */}
+                {profile.upi_id && (
+                  isOwn ? (
+                    <span className="flex items-center gap-1 text-xs text-green-600">
+                      <Wallet size={12} /> {profile.upi_id}
+                    </span>
+                  ) : (
+                    <a
+                      href={`upi://pay?pa=${encodeURIComponent(profile.upi_id)}&pn=${encodeURIComponent(profile.full_name)}&cu=INR`}
+                      data-testid="upi-pay-btn"
+                      className="flex items-center gap-1.5 text-xs text-green-700 border border-green-200 bg-green-50 px-2.5 py-1 rounded-lg hover:bg-green-100 transition-colors font-display"
+                    >
+                      <Wallet size={12} /> Pay Now
+                    </a>
+                  )
                 )}
               </div>
             </div>
@@ -391,7 +425,6 @@ export default function Profile() {
                 >
                   <Pencil size={13} /> Edit Profile
                 </Button>
-                {/* Verification status */}
                 {profile.verification_status !== "approved" && (
                   <Button
                     size="sm"
@@ -624,6 +657,7 @@ export default function Profile() {
               <div className="mt-3">
                 <label className={labelClass}>UPI ID</label>
                 <input data-testid="edit-upi" className={inputClass} placeholder="yourname@upi" value={editForm.upi_id || ""} onChange={e => setEditForm(p => ({ ...p, upi_id: e.target.value }))} />
+                <p className="text-xs text-slate-400 mt-1">Others can send payments directly to you via UPI apps</p>
               </div>
             </section>
 
@@ -712,59 +746,222 @@ export default function Profile() {
       </Dialog>
 
       {/* ── Gear Dialog ─────────────────────────────────────────────────── */}
-      <Dialog open={!!gearDialog} onOpenChange={() => setGearDialog(null)}>
+      <Dialog open={!!gearDialog} onOpenChange={() => { setGearDialog(null); setGearStep(0); }}>
         <DialogContent className="bg-white border-slate-200 max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 font-display">
-              {gearDialog?.mode === "add" ? "Add Gear" : "Edit Gear"}
-            </DialogTitle>
+            <div className="flex items-center gap-2">
+              {gearDialog?.mode === "add" && gearStep === 1 && (
+                <button
+                  onClick={() => {
+                    setGearStep(0);
+                    setGearForm(p => ({ ...p, name: "", brand: "", model_number: "", is_custom: false }));
+                  }}
+                  className="text-slate-400 hover:text-slate-600 transition-colors -ml-1 flex-shrink-0"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              )}
+              <DialogTitle className="text-slate-900 font-display">
+                {gearDialog?.mode === "edit" ? "Edit Gear" :
+                 gearStep === 0 ? "Select Category" :
+                 gearForm.is_custom ? "Add Custom Gear" :
+                 `Select ${gearForm.category}`}
+              </DialogTitle>
+            </div>
           </DialogHeader>
-          <div className="space-y-3 mt-2">
-            <div>
-              <label className={labelClass}>Gear Name *</label>
-              {masterGear.length > 0 ? (
-                <select data-testid="gear-name-select" className={inputClass} value={gearForm.name} onChange={e => {
-                  const sel = masterGear.find(g => g.name === e.target.value);
-                  setGearForm(p => ({ ...p, name: e.target.value, category: sel?.category || p.category, brand: sel?.brand || p.brand }));
-                }}>
-                  <option value="">Select from catalogue…</option>
-                  {masterGear.map(g => <option key={g.id || g.name} value={g.name}>{g.name} ({g.category})</option>)}
-                  <option value="__custom__">Other (custom entry)</option>
-                </select>
-              ) : null}
-              {(gearForm.name === "__custom__" || masterGear.length === 0) && (
-                <input data-testid="gear-name-input" className={`${inputClass} mt-2`} placeholder="e.g. Sony A7 IV" value={gearForm.name === "__custom__" ? "" : gearForm.name} onChange={e => setGearForm(p => ({ ...p, name: e.target.value }))} />
+
+          {/* ADD — Step 0: Category grid */}
+          {gearDialog?.mode === "add" && gearStep === 0 && (
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {GEAR_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  data-testid={`cat-select-${cat}`}
+                  onClick={() => {
+                    setGearForm(p => ({ ...p, category: cat, name: "", brand: "", model_number: "", is_custom: false }));
+                    setGearStep(1);
+                  }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  style={{
+                    borderColor: `${CAT_COLORS[cat] || "#6B7280"}30`,
+                    background: `${CAT_COLORS[cat] || "#6B7280"}0A`,
+                  }}
+                >
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold font-display"
+                    style={{ background: `${CAT_COLORS[cat] || "#6B7280"}20`, color: CAT_COLORS[cat] || "#6B7280" }}
+                  >
+                    {cat.slice(0, 3)}
+                  </div>
+                  <span className="text-xs font-display font-medium leading-tight text-center" style={{ color: CAT_COLORS[cat] || "#6B7280" }}>
+                    {cat}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ADD — Step 1: Gear list (not custom) */}
+          {gearDialog?.mode === "add" && gearStep === 1 && !gearForm.is_custom && (
+            <div className="mt-2 space-y-2">
+              <div className="max-h-56 overflow-y-auto space-y-1 pr-0.5">
+                {masterGear.filter(g => g.category === gearForm.category).map(g => (
+                  <button
+                    key={g.id || g.name}
+                    data-testid={`gear-option-${(g.name || "").replace(/\s+/g, "-")}`}
+                    onClick={() => setGearForm(p => ({ ...p, name: g.name, brand: g.brand || "", model_number: "" }))}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${
+                      gearForm.name === g.name
+                        ? "border-orange-400 bg-orange-50"
+                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className={`text-sm font-display font-medium ${gearForm.name === g.name ? "text-orange-700" : "text-slate-800"}`}>
+                      {g.name}
+                    </span>
+                    {g.brand && <span className="text-xs text-slate-400 ml-2">· {g.brand}</span>}
+                  </button>
+                ))}
+                {masterGear.filter(g => g.category === gearForm.category).length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-4">No catalogue items for {gearForm.category}</p>
+                )}
+                <button
+                  data-testid="gear-other-option"
+                  onClick={() => setGearForm(p => ({ ...p, name: "", brand: "", model_number: "", is_custom: true }))}
+                  className="w-full text-left px-3 py-2.5 rounded-lg border border-dashed border-slate-300 text-sm text-slate-500 hover:border-orange-300 hover:text-orange-500 transition-all"
+                >
+                  + Other — add custom gear
+                </button>
+              </div>
+              {gearForm.name && (
+                <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <div>
+                    <label className={labelClass}>Model / Serial (optional)</label>
+                    <input
+                      data-testid="gear-model"
+                      className={inputClass}
+                      placeholder="e.g. SN123"
+                      value={gearForm.model_number}
+                      onChange={e => setGearForm(p => ({ ...p, model_number: e.target.value }))}
+                    />
+                  </div>
+                  <Button
+                    data-testid="save-gear-btn"
+                    onClick={handleGearSave}
+                    disabled={gearSaving}
+                    className="w-full font-display text-white"
+                    style={{ background: "#F97316" }}
+                  >
+                    {gearSaving ? "Adding…" : "Add to Vault"}
+                  </Button>
+                </div>
               )}
             </div>
-            <div>
-              <label className={labelClass}>Category *</label>
-              <select data-testid="gear-category" className={inputClass} value={gearForm.category} onChange={e => setGearForm(p => ({ ...p, category: e.target.value }))}>
-                {GEAR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>Brand</label>
-                <input data-testid="gear-brand" className={inputClass} placeholder="Sony, Canon…" value={gearForm.brand} onChange={e => setGearForm(p => ({ ...p, brand: e.target.value }))} />
+          )}
+
+          {/* ADD — Step 1: Custom gear form */}
+          {gearDialog?.mode === "add" && gearStep === 1 && gearForm.is_custom && (
+            <div className="space-y-3 mt-2">
+              <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 leading-relaxed">
+                Custom gear will be added to your vault and submitted for admin review to be included in the master catalogue.
               </div>
               <div>
-                <label className={labelClass}>Model</label>
-                <input data-testid="gear-model" className={inputClass} placeholder="A7 IV" value={gearForm.model_number} onChange={e => setGearForm(p => ({ ...p, model_number: e.target.value }))} />
+                <label className={labelClass}>Gear Name *</label>
+                <input
+                  data-testid="gear-custom-name"
+                  className={inputClass}
+                  placeholder={`Custom ${gearForm.category} name…`}
+                  value={gearForm.name}
+                  onChange={e => setGearForm(p => ({ ...p, name: e.target.value }))}
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Brand</label>
+                  <input
+                    data-testid="gear-brand"
+                    className={inputClass}
+                    placeholder="e.g. Sony"
+                    value={gearForm.brand}
+                    onChange={e => setGearForm(p => ({ ...p, brand: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Model</label>
+                  <input
+                    data-testid="gear-model"
+                    className={inputClass}
+                    placeholder="Model no."
+                    value={gearForm.model_number}
+                    onChange={e => setGearForm(p => ({ ...p, model_number: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => setGearForm(p => ({ ...p, is_custom: false, name: "" }))}
+                  className="flex-1 border-slate-200 text-slate-500 text-sm"
+                >
+                  Back to List
+                </Button>
+                <Button
+                  data-testid="save-gear-btn"
+                  onClick={handleGearSave}
+                  disabled={gearSaving}
+                  className="flex-1 font-display text-white text-sm"
+                  style={{ background: "#F97316" }}
+                >
+                  {gearSaving ? "Saving…" : "Add Gear"}
+                </Button>
               </div>
             </div>
-            <div className="flex gap-3 pt-1">
-              <Button variant="outline" onClick={() => setGearDialog(null)} className="flex-1 border-slate-200 text-slate-500">Cancel</Button>
-              <Button
-                data-testid="save-gear-btn"
-                onClick={handleGearSave}
-                disabled={gearSaving}
-                className="flex-1 font-display text-white"
-                style={{ background: "#F97316" }}
-              >
-                {gearSaving ? "Saving…" : gearDialog?.mode === "add" ? "Add Gear" : "Save Changes"}
-              </Button>
+          )}
+
+          {/* EDIT MODE */}
+          {gearDialog?.mode === "edit" && (
+            <div className="space-y-3 mt-2">
+              <div>
+                <label className={labelClass}>Category *</label>
+                <select data-testid="gear-category" className={inputClass} value={gearForm.category} onChange={e => setGearForm(p => ({ ...p, category: e.target.value }))}>
+                  {GEAR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Gear Name *</label>
+                <input
+                  data-testid="gear-name-input"
+                  className={inputClass}
+                  placeholder="e.g. Sony A7 IV"
+                  value={gearForm.name}
+                  onChange={e => setGearForm(p => ({ ...p, name: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Brand</label>
+                  <input data-testid="gear-brand" className={inputClass} placeholder="Sony, Canon…" value={gearForm.brand} onChange={e => setGearForm(p => ({ ...p, brand: e.target.value }))} />
+                </div>
+                <div>
+                  <label className={labelClass}>Model</label>
+                  <input data-testid="gear-model" className={inputClass} placeholder="A7 IV" value={gearForm.model_number} onChange={e => setGearForm(p => ({ ...p, model_number: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <Button variant="outline" onClick={() => setGearDialog(null)} className="flex-1 border-slate-200 text-slate-500">Cancel</Button>
+                <Button
+                  data-testid="save-gear-btn"
+                  onClick={handleGearSave}
+                  disabled={gearSaving}
+                  className="flex-1 font-display text-white"
+                  style={{ background: "#F97316" }}
+                >
+                  {gearSaving ? "Saving…" : "Save Changes"}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 

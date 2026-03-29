@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import os
 
 from db import get_db
-from auth_utils import get_admin_user
+from auth_utils import get_admin_user, get_current_user
 
 router = APIRouter(prefix="/platform")
 
@@ -304,6 +304,96 @@ async def remove_gear_catalogue_item(item_id: str, admin: dict = Depends(get_adm
     await db.platform_meta.update_one({"_id": "gear_catalogue"}, {"$set": {"items": items}}, upsert=True)
     return {"items": items}
 
+
+
+
+# ── Custom Gear Submissions ───────────────────────────────────────────────────
+
+class CustomGearSubmission(BaseModel):
+    name: str
+    category: str
+    brand: Optional[str] = None
+
+
+class ApproveGearSubmission(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    brand: Optional[str] = None
+
+
+@router.post("/gear-submissions")
+async def submit_custom_gear(
+    data: CustomGearSubmission,
+    current_user: dict = Depends(get_current_user),
+):
+    """Authenticated user — submit a custom gear for admin review."""
+    import uuid as _uuid
+    db = get_db()
+    submission = {
+        "id": str(_uuid.uuid4()),
+        "name": data.name.strip(),
+        "category": data.category,
+        "brand": data.brand,
+        "submitted_by": current_user["id"],
+        "submitted_by_name": current_user.get("full_name", "Unknown User"),
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.custom_gear_submissions.insert_one({**submission, "_id": submission["id"]})
+    return {k: v for k, v in submission.items()}
+
+
+@router.get("/gear-submissions")
+async def get_gear_submissions(admin: dict = Depends(get_admin_user)):
+    """Admin — get all pending gear submissions."""
+    db = get_db()
+    cursor = db.custom_gear_submissions.find({"status": "pending"}, {"_id": 0})
+    items = await cursor.to_list(length=200)
+    return {"items": items}
+
+
+@router.put("/gear-submissions/{submission_id}/approve")
+async def approve_gear_submission(
+    submission_id: str,
+    data: ApproveGearSubmission,
+    admin: dict = Depends(get_admin_user),
+):
+    """Admin — approve submission and add to master catalogue with optional field overrides."""
+    import uuid as _uuid
+    db = get_db()
+    submission = await db.custom_gear_submissions.find_one({"id": submission_id}, {"_id": 0})
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    name = (data.name or submission["name"]).strip()
+    category = data.category or submission["category"]
+    brand = data.brand if data.brand is not None else submission.get("brand")
+
+    items = await _get_gear_catalogue(db)
+    if any(i["name"].lower() == name.lower() for i in items):
+        raise HTTPException(status_code=409, detail=f'"{name}" already exists in the catalogue')
+
+    new_item = {"id": str(_uuid.uuid4()), "name": name, "category": category, "brand": brand}
+    items.append(new_item)
+    await db.platform_meta.update_one(
+        {"_id": "gear_catalogue"}, {"$set": {"items": items}}, upsert=True
+    )
+    await db.custom_gear_submissions.update_one(
+        {"id": submission_id}, {"$set": {"status": "approved"}}
+    )
+    return {"status": "approved", "added_item": new_item}
+
+
+@router.delete("/gear-submissions/{submission_id}")
+async def reject_gear_submission(submission_id: str, admin: dict = Depends(get_admin_user)):
+    """Admin — reject a gear submission."""
+    db = get_db()
+    result = await db.custom_gear_submissions.update_one(
+        {"id": submission_id}, {"$set": {"status": "rejected"}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    return {"status": "rejected"}
 
 
 # ── API Keys / Integrations ───────────────────────────────────────────────────
