@@ -18,11 +18,12 @@ router = APIRouter(prefix="/platform")
 
 DEFAULT_SETTINGS = {
     "_id": "platform_settings",
-    "referral_reward": 50,          # ₹ credited when referral subscribes
-    "base_plan_price": 69,          # ₹/month
-    "premium_plan_price": 99,       # ₹/month
+    "referral_reward": 50,
+    "base_plan_price": 69,
+    "premium_plan_price": 99,
     "base_plan_name": "Base Plan",
     "premium_plan_name": "Premium Plan",
+    "ai_features_enabled": True,        # Toggle AI crew suggestions & smart matching
     "updated_at": datetime.now(timezone.utc).isoformat(),
 }
 
@@ -105,6 +106,7 @@ async def get_platform_settings():
         "premium_plan_price": doc.get("premium_plan_price", DEFAULT_SETTINGS["premium_plan_price"]),
         "base_plan_name": doc.get("base_plan_name", DEFAULT_SETTINGS["base_plan_name"]),
         "premium_plan_name": doc.get("premium_plan_name", DEFAULT_SETTINGS["premium_plan_name"]),
+        "ai_features_enabled": doc.get("ai_features_enabled", True),
         "updated_at": doc.get("updated_at"),
     }
 
@@ -115,6 +117,7 @@ class PricingUpdateRequest(BaseModel):
     premium_plan_price: Optional[int] = None
     base_plan_name: Optional[str] = None
     premium_plan_name: Optional[str] = None
+    ai_features_enabled: Optional[bool] = None
 
 
 @router.put("/settings")
@@ -146,6 +149,9 @@ async def update_platform_settings(
 
     if data.premium_plan_name is not None:
         update_fields["premium_plan_name"] = data.premium_plan_name.strip()
+
+    if data.ai_features_enabled is not None:
+        update_fields["ai_features_enabled"] = data.ai_features_enabled
 
     await db.platform_settings.update_one(
         {"_id": "platform_settings"},

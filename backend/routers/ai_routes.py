@@ -29,6 +29,10 @@ class CrewSuggestionRequest(BaseModel):
 @router.post("/crew-suggestions")
 async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict = Depends(get_current_user)):
     db = get_db()
+    # Check if AI features are enabled in platform settings
+    cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
+    if not cfg.get("ai_features_enabled", True):
+        return {"suggestion": "AI features are currently disabled by the platform admin.", "ai_disabled": True}
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         session_id = f"crew_suggestion_{current_user['id']}_{uuid.uuid4().hex[:8]}"
@@ -81,6 +85,9 @@ async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict =
 @router.post("/gig-checklist")
 async def get_gig_checklist(data: CrewSuggestionRequest, current_user: dict = Depends(get_current_user)):
     db = get_db()
+    cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
+    if not cfg.get("ai_features_enabled", True):
+        return {"checklist": "AI features are currently disabled by the platform admin.", "ai_disabled": True}
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         checklist_session = f"checklist_{uuid.uuid4().hex[:12]}"

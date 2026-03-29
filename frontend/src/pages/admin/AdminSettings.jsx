@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Settings, DollarSign, Tag, Briefcase, Camera, Inbox,
   Plus, Trash2, Save, RefreshCw, Key, Eye, EyeOff,
-  CheckCircle2, AlertCircle, Loader2, X,
+  CheckCircle2, AlertCircle, Loader2, X, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ export default function AdminSettings() {
     premium_plan_price: 99,
     base_plan_name: "Base Plan",
     premium_plan_name: "Premium Plan",
+    ai_features_enabled: true,
   });
   const [pricingLoading, setPricingLoading] = useState(false);
   const [pricingSaving, setPricingSaving] = useState(false);
@@ -89,6 +90,7 @@ export default function AdminSettings() {
         premium_plan_price: parseInt(pricing.premium_plan_price) || 1,
         base_plan_name: pricing.base_plan_name,
         premium_plan_name: pricing.premium_plan_name,
+        ai_features_enabled: pricing.ai_features_enabled,
       });
       setPricing(res.data);
       toast.success("Pricing rules saved!");
@@ -379,6 +381,33 @@ export default function AdminSettings() {
               </div>
             ) : (
               <>
+                <SectionCard title="Platform Features" icon={Zap}>
+                  {/* AI Features Toggle */}
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Zap size={14} className="text-violet-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900 font-display">AI-Powered Features</p>
+                        <p className="text-xs text-slate-500 mt-0.5">Crew suggestions, smart gig checklists, and AI-assisted matching. Disable to reduce LLM API usage.</p>
+                      </div>
+                    </div>
+                    <button
+                      data-testid="ai-features-toggle"
+                      type="button"
+                      onClick={() => setPricing(p => ({ ...p, ai_features_enabled: !p.ai_features_enabled }))}
+                      className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${pricing.ai_features_enabled ? "bg-violet-500" : "bg-slate-300"}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${pricing.ai_features_enabled ? "translate-x-5" : "translate-x-0"}`} />
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-400 flex items-center gap-1">
+                    Status: <span className={`font-semibold ${pricing.ai_features_enabled ? "text-violet-600" : "text-slate-500"}`}>{pricing.ai_features_enabled ? "Enabled" : "Disabled"}</span>
+                    {!pricing.ai_features_enabled && <span className="text-amber-500 ml-1">— Users will see a friendly "AI unavailable" message</span>}
+                  </p>
+                </SectionCard>
+
                 <SectionCard title="Referral Program" icon={DollarSign}>
                   <div className="max-w-xs">
                     <label className="text-xs text-slate-500 font-display mb-1 block">Referral Reward Amount (₹)</label>
