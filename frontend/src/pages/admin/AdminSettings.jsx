@@ -379,27 +379,6 @@ export default function AdminSettings() {
               </div>
             ) : (
               <>
-                <SectionCard title="Subscription Plans" icon={DollarSign}>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs text-slate-500 font-display mb-1 block">Base Plan Name</label>
-                      <input className={inputClass} value={pricing.base_plan_name} onChange={e => setPricing(p => ({ ...p, base_plan_name: e.target.value }))} placeholder="Base Plan" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 font-display mb-1 block">Base Plan Price (₹/month)</label>
-                      <input type="number" min="1" className={inputClass} value={pricing.base_plan_price} onChange={e => setPricing(p => ({ ...p, base_plan_price: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 font-display mb-1 block">Premium Plan Name</label>
-                      <input className={inputClass} value={pricing.premium_plan_name} onChange={e => setPricing(p => ({ ...p, premium_plan_name: e.target.value }))} placeholder="Premium Plan" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 font-display mb-1 block">Premium Plan Price (₹/month)</label>
-                      <input type="number" min="1" className={inputClass} value={pricing.premium_plan_price} onChange={e => setPricing(p => ({ ...p, premium_plan_price: e.target.value }))} />
-                    </div>
-                  </div>
-                </SectionCard>
-
                 <SectionCard title="Referral Program" icon={DollarSign}>
                   <div className="max-w-xs">
                     <label className="text-xs text-slate-500 font-display mb-1 block">Referral Reward Amount (₹)</label>
