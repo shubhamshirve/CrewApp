@@ -154,8 +154,8 @@ export default function AdminDashboard() {
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-display ${u.is_verified ? "bg-emerald-500/15 text-emerald-400" : "bg-zinc-700/50 text-zinc-400"}`}>
                       {u.is_verified ? "Verified" : u.verification_status}
                     </span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-display ${u.subscription_plan !== "free" ? "bg-amber-500/15 text-amber-400" : "bg-zinc-700/30 text-zinc-600"}`}>
-                      {u.subscription_plan}
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-display ${u.subscription_plan && u.subscription_plan !== "free" ? "bg-amber-500/15 text-amber-400" : "bg-zinc-700/30 text-zinc-600"}`}>
+                      {u.active_plan_name || (u.subscription_plan !== "free" ? u.subscription_plan : "Free")}
                     </span>
                     <Button size="sm" data-testid={`penalty-btn-${u.id}`} onClick={() => { setPenaltyData(p => ({ ...p, userId: u.id })); setShowPenalty(true); }} variant="outline" className="border-orange-500/20 text-orange-400 text-xs hover:bg-orange-500/5 gap-1">
                       <AlertTriangle size={11} /> Penalty

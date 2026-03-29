@@ -193,7 +193,7 @@ export default function Dashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard icon={Wallet} label="Wallet Balance" value={`₹${user?.wallet_balance?.toFixed(0) || "0"}`} sub={user?.subscription_plan !== "free" ? `${user?.subscription_plan} plan` : "Free plan"} to="/wallet" />
+          <StatCard icon={Wallet} label="Wallet Balance" value={`₹${user?.wallet_balance?.toFixed(0) || "0"}`} sub={user?.subscription_plan && user?.subscription_plan !== "free" ? `${user?.active_plan_name || user?.subscription_plan}` : "Free plan"} to="/wallet" />
           <StatCard icon={Briefcase} label="Active Gigs" value={gigs.length} to="/gigs" />
           <StatCard icon={Bell} label="Pending Invites" value={invites.length} to="/gigs" color="#3B82F6" />
           <StatCard icon={Star} label="Rating" value={user?.avg_rating ? `${user.avg_rating.toFixed(1)}★` : "—"} sub={user?.total_ratings ? `${user.total_ratings} reviews` : "No reviews yet"} to={`/profile/${user?.id}`} color="#10B981" />

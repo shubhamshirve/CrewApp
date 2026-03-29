@@ -408,9 +408,9 @@ export default function AdminUsers() {
                       {u.is_verified ? "Verified" : u.verification_status}
                     </span>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-display ${
-                      u.subscription_plan !== "free" ? "bg-blue-50 text-blue-600 border border-blue-200" : "bg-slate-100 text-slate-400"
+                      u.subscription_plan && u.subscription_plan !== "free" ? "bg-blue-50 text-blue-600 border border-blue-200" : "bg-slate-100 text-slate-400"
                     }`}>
-                      {u.subscription_plan}
+                      {u.active_plan_name || (u.subscription_plan !== "free" ? u.subscription_plan : "Free")}
                     </span>
                     {u.is_suspended && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-200 font-display">

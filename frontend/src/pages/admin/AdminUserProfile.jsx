@@ -169,7 +169,7 @@ export default function AdminUserProfile() {
                 {user.is_high_risk && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400">High Risk</span>}
               </div>
               <p className="text-xs text-slate-500">{user.email} · {user.phone} · {user.location}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{user.primary_role || "No role"} · {user.subscription_plan} plan</p>
+              <p className="text-xs text-slate-400 mt-0.5">{user.primary_role || "No role"} · {user.active_plan_name || user.subscription_plan || "Free"} plan</p>
             </div>
 
             {/* Actions */}
@@ -234,7 +234,7 @@ export default function AdminUserProfile() {
                   ["Phone", user.phone],
                   ["Location", user.location],
                   ["Pincode", user.pincode],
-                  ["Plan", user.subscription_plan],
+                  ["Plan", user.active_plan_name || user.subscription_plan || "Free"],
                   ["Primary Role", user.primary_role || "—"],
                   ["Avg Rating", user.avg_rating ? `★ ${user.avg_rating.toFixed(2)}` : "—"],
                   ["Negative Stars", user.negative_stars ?? 0],
