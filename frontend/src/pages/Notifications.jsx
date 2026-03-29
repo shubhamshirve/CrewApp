@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Bell, Check, CheckCheck, BellOff, BellRing } from "lucide-react";
+import { Bell, Check, CheckCheck, BellOff, BellRing, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { pushService } from "@/services/pushService";
 
@@ -22,6 +23,7 @@ const TYPE_COLORS = {
 
 export default function Notifications() {
   const { api } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pushState, setPushState] = useState("default"); // 'default' | 'granted' | 'denied' | 'subscribed'
@@ -91,6 +93,12 @@ export default function Notifications() {
       await api.put(`/notifications/${id}/read`);
       setNotifications(p => p.map(n => n.id === id ? { ...n, is_read: true } : n));
     } catch {}
+  };
+
+  const handleNotificationClick = async (n) => {
+    if (!n.is_read) await markRead(n.id);
+    const url = n.url || "/notifications";
+    if (url !== "/notifications") navigate(url);
   };
 
   const markAllRead = async () => {
@@ -175,7 +183,7 @@ export default function Notifications() {
                   <div
                     key={n.id}
                     data-testid={`notification-${n.id}`}
-                    onClick={() => !n.is_read && markRead(n.id)}
+                    onClick={() => handleNotificationClick(n)}
                     className={`p-4 rounded-xl border cursor-pointer transition-all ${
                       !n.is_read
                         ? "border-orange-200 bg-orange-50 hover:bg-orange-100/60"
@@ -196,15 +204,20 @@ export default function Notifications() {
                           {new Date(n.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                         </p>
                       </div>
-                      {!n.is_read && (
-                        <button
-                          onClick={e => { e.stopPropagation(); markRead(n.id); }}
-                          className="text-slate-400 hover:text-orange-500 flex-shrink-0"
-                          data-testid={`mark-read-${n.id}`}
-                        >
-                          <Check size={14} />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {!n.is_read && (
+                          <button
+                            onClick={e => { e.stopPropagation(); markRead(n.id); }}
+                            className="text-slate-400 hover:text-orange-500"
+                            data-testid={`mark-read-${n.id}`}
+                          >
+                            <Check size={14} />
+                          </button>
+                        )}
+                        {n.url && n.url !== "/notifications" && (
+                          <ChevronRight size={14} className="text-slate-300" />
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

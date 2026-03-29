@@ -83,7 +83,7 @@ async def send_request(user_id: str, current_user: dict = Depends(get_current_us
         db, user_id, "connection_request",
         "New Connection Request",
         f"{current_user['full_name']} wants to connect with you",
-        {"connection_id": conn["_id"], "requester_id": current_user["id"]}
+        {"connection_id": conn["_id"], "requester_id": current_user["id"], "profile_id": current_user["id"]}
     )
     conn["id"] = conn.pop("_id")
     return conn
@@ -100,7 +100,7 @@ async def accept_request(conn_id: str, current_user: dict = Depends(get_current_
         db, conn["requester_id"], "connection_accepted",
         "Connection Accepted",
         f"{current_user['full_name']} accepted your connection request",
-        {"connection_id": conn_id}
+        {"connection_id": conn_id, "profile_id": current_user["id"]}
     )
     return {"status": "accepted"}
 
