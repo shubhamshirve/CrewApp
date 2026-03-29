@@ -82,11 +82,12 @@ def _compute_match(gig: dict, user: dict) -> int:
 
 
 def _has_public_gig_access(user: dict) -> bool:
-    """Return True if user's active plan grants public gig board access."""
+    """Return True if user is admin OR their active plan grants public gig board access."""
+    if user.get("is_admin"):
+        return True
     features = user.get("active_plan_features") or {}
     if features:
         return bool(features.get("public_gig_enabled", False))
-    # Legacy fallback: no plan features means no access
     return False
 
 
@@ -108,7 +109,7 @@ async def get_event_types():
 @router.post("")
 async def create_public_gig(data: CreatePublicGig, current_user: dict = Depends(get_current_user)):
     _require_public_gig_access(current_user)
-    if not current_user.get("is_verified"):
+    if not current_user.get("is_verified") and not current_user.get("is_admin"):
         raise HTTPException(status_code=403, detail="Only verified users can post public gigs")
     if not data.roles:
         raise HTTPException(status_code=400, detail="At least one role is required")

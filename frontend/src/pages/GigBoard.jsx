@@ -707,8 +707,8 @@ export default function GigBoard() {
   const [dynamicRoles, setDynamicRoles] = useState(ROLES);
   const [dynamicEventTypes, setDynamicEventTypes] = useState(EVENT_TYPES);
 
-  // Check plan access
-  const hasAccess = user?.active_plan_features?.public_gig_enabled === true;
+  // Check plan access — admins always have full access
+  const hasAccess = user?.is_admin === true || user?.active_plan_features?.public_gig_enabled === true;
 
   // Load dynamic roles and event types
   useEffect(() => {

@@ -12,15 +12,17 @@ logger = logging.getLogger(__name__)
 
 
 async def _user_has_whatsapp(db, user_id: str) -> bool:
-    """Check if user's active plan enables WhatsApp notifications."""
+    """Check if user's active plan enables WhatsApp notifications. Admins always have access."""
     if not user_id:
         return False
     user = await db.users.find_one(
         {"_id": user_id},
-        {"_id": 0, "active_plan_features": 1, "whatsapp_enabled": 1}
+        {"_id": 0, "active_plan_features": 1, "whatsapp_enabled": 1, "is_admin": 1}
     )
     if not user:
         return False
+    if user.get("is_admin"):
+        return True
     features = user.get("active_plan_features") or {}
     if features:
         return bool(features.get("whatsapp_enabled", False))
