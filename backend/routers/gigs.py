@@ -101,6 +101,10 @@ class InviteResponse(BaseModel):
         return v
 
 
+class SnoozeRequest(BaseModel):
+    hours: int = Field(4, ge=1, le=48)
+
+
 class WorkspaceFile(BaseModel):
     type: str
     title: str = Field(..., min_length=1, max_length=200)
@@ -598,6 +602,47 @@ async def mark_invite_viewed(invite_id: str, current_user: dict = Depends(get_cu
             {"$set": {"invite_viewed_at": datetime.now(timezone.utc).isoformat()}}
         )
     return {"invite_viewed_at": invite.get("invite_viewed_at") or datetime.now(timezone.utc).isoformat()}
+
+
+@router.put("/invites/{invite_id}/snooze")
+async def snooze_invite(invite_id: str, data: SnoozeRequest, current_user: dict = Depends(get_current_user)):
+    """Freelancer snoozes a pending invite — fires a push reminder when the snooze expires."""
+    import asyncio
+    db = get_db()
+    invite = await db.gig_invites.find_one({"_id": invite_id, "freelancer_id": current_user["id"]})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    if invite["status"] not in ("pending", "counter_offered"):
+        raise HTTPException(status_code=400, detail="Can only snooze pending or counter-offered invites")
+
+    now = datetime.now(timezone.utc)
+    snoozed_until = now + timedelta(hours=data.hours)
+    snoozed_until_iso = snoozed_until.isoformat()
+
+    await db.gig_invites.update_one(
+        {"_id": invite_id},
+        {"$set": {"snoozed_until": snoozed_until_iso, "updated_at": now.isoformat()}}
+    )
+
+    # Async background reminder — fires after snooze duration if invite still pending
+    async def _send_snooze_reminder(inv_id: str, gig_title: str, user_id: str, gig_id: str, delay_secs: float):
+        if delay_secs > 0:
+            await asyncio.sleep(delay_secs)
+        fresh = await db.gig_invites.find_one({"_id": inv_id})
+        if fresh and fresh.get("status") in ("pending", "counter_offered"):
+            await send_notification(
+                db, user_id, "invite",
+                "Reminder: Pending Invite",
+                f"You snoozed an invite for \"{gig_title}\". It's still waiting for your response!",
+                {"invite_id": inv_id, "gig_id": gig_id}
+            )
+
+    delay = (snoozed_until - datetime.now(timezone.utc)).total_seconds()
+    asyncio.create_task(_send_snooze_reminder(
+        invite_id, invite["gig_title"], current_user["id"], invite["gig_id"], delay
+    ))
+
+    return {"snoozed_until": snoozed_until_iso, "hours": data.hours}
 
 
 @router.put("/invites/{invite_id}/respond")

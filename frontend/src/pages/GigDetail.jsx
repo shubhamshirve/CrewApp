@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar, Clock, MapPin, Users, UserPlus, Check, X,
   ArrowRightLeft, Upload, PackageCheck, Sparkles, FileText, IndianRupee, CheckCircle2,
-  Pencil, Trash2, Plus, Eye, EyeOff,
+  Pencil, Trash2, Plus, Eye, EyeOff, Bell, BellOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,6 +48,7 @@ export default function GigDetail() {
   });
   const [workspaceForm, setWorkspaceForm] = useState({ type: "moodboard", title: "", content: "" });
   const [counterFee, setCounterFee] = useState({});
+  const [snoozing, setSnoozing] = useState(false);
   const [ledger, setLedger] = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(null);  // { invite_id, type, mode: "record"|"edit", suggested_amount }
@@ -199,6 +200,15 @@ export default function GigDetail() {
       toast.success(`Invite ${action === "accept" ? "accepted" : action === "reject" ? "rejected" : "counter sent"}!`);
       load();
     } catch (err) { toast.error(err.response?.data?.detail || "Failed"); }
+  };
+
+  const handleSnooze = async (inviteId, hours = 4) => {
+    setSnoozing(true);
+    try {
+      await api.put(`/gigs/invites/${inviteId}/snooze`, { hours });
+      toast.success(`Invite snoozed for ${hours}h — we'll remind you then!`);
+      load();
+    } catch (err) { toast.error(err.response?.data?.detail || "Failed to snooze"); } finally { setSnoozing(false); }
   };
 
   const handleLeadAcceptCounter = async (inviteId) => {
@@ -422,6 +432,23 @@ export default function GigDetail() {
                     <Button size="sm" data-testid="reject-invite-btn" onClick={() => handleRespond(myInvite.id, "reject")} variant="outline" className="border-red-200 text-red-500 text-xs hover:bg-red-50 gap-1">
                       <X size={12} /> Reject
                     </Button>
+                    <Button
+                      size="sm"
+                      data-testid="snooze-invite-btn"
+                      onClick={() => handleSnooze(myInvite.id, 4)}
+                      disabled={snoozing}
+                      variant="outline"
+                      className="border-amber-200 text-amber-600 text-xs hover:bg-amber-50 gap-1"
+                    >
+                      <BellOff size={12} /> {snoozing ? "Snoozing…" : "Snooze 4h"}
+                    </Button>
+                  </div>
+                )}
+                {/* Snoozed indicator */}
+                {myInvite.snoozed_until && myInvite.status === "pending" && (
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 w-fit" data-testid="snoozed-indicator">
+                    <Bell size={11} />
+                    Reminder set for {new Date(myInvite.snoozed_until).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </div>
                 )}
                 {myInvite.status === "accepted" && !gig.data_delivered && (
