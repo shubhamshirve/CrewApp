@@ -14,6 +14,9 @@ def _get_notification_url(notif_type: str, data: dict) -> str:
     if notif_type in ("invite", "accepted", "rejected", "counter", "data_delivered"):
         return f"/gigs/{gig_id}" if gig_id else "/gigs"
 
+    if notif_type == "chat_message":
+        return f"/gigs/{gig_id}?tab=chat" if gig_id else "/gigs"
+
     if notif_type in ("connection_request", "connection_accepted"):
         return f"/profile/{profile_id}" if profile_id else "/connections"
 

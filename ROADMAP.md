@@ -47,7 +47,7 @@
 ### P0
 - [ ] **Portfolio Gallery** — Freelancers upload work samples (photos/videos) to their profile; stored via object storage; visible on public profile
 - [ ] **Auto-Invoice PDF** — Per-gig invoice with GST breakdown (18% GST), client details, line items per session; downloadable by lead
-- [x] **In-App Chat Per Gig** — `GET/POST /api/gigs/{id}/messages`, `PUT .../read`; orange/grey bubbles; 4s polling; unread badge on tab
+- [x] **In-App Chat Per Gig** — `GET/POST /api/gigs/{id}/messages`, `PUT .../read`; orange/grey bubbles; 4s polling; unread badge on tab; push + in-app notifications to all gig members on new message; `?tab=chat` deep-link auto-opens Chat tab
 
 ### P1
 - [ ] **Availability Broadcast** — "Free this weekend" button sends push notification to all connections

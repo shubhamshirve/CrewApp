@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,10 @@ export default function GigDetail() {
   const { id } = useParams();
   const { user, api } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Read ?tab= query param — used by push notification deep-links (e.g. ?tab=chat)
+  const initialTab = new URLSearchParams(location.search).get("tab") || "sessions";
   const [gig, setGig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
@@ -56,7 +60,7 @@ export default function GigDetail() {
   const [chatUnread, setChatUnread] = useState(0);
   const [chatInput, setChatInput] = useState("");
   const [chatSending, setChatSending] = useState(false);
-  const [activeTab, setActiveTab] = useState("sessions");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const chatBottomRef = useRef(null);
   const chatPollRef = useRef(null);
   const [ledger, setLedger] = useState(null);
@@ -426,7 +430,7 @@ export default function GigDetail() {
           )}
         </div>
 
-        <Tabs defaultValue="sessions" onValueChange={v => { setActiveTab(v); if (v === "ledger") loadLedger(); }}>
+        <Tabs defaultValue={initialTab} onValueChange={v => { setActiveTab(v); if (v === "ledger") loadLedger(); }}>
           <TabsList className="bg-slate-100 border border-slate-200">
             <TabsTrigger value="sessions" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
               Sessions

@@ -2,9 +2,11 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 import uuid
+import asyncio
 
 from db import get_db
 from auth_utils import get_current_user
+from services.notifications_service import send_notification
 
 router = APIRouter(prefix="/gigs")
 
@@ -72,6 +74,31 @@ async def send_message(gig_id: str, data: SendMessageRequest, current_user: dict
     await db.gig_messages.insert_one(msg)
     msg["id"] = msg.pop("_id")
     msg.pop("read_by", None)
+
+    # Fire push + in-app notifications to all other gig members (background, non-blocking)
+    async def _notify_members():
+        gig = await db.gigs.find_one({"_id": gig_id})
+        if not gig:
+            return
+        # Build the set of all member IDs (lead + accepted freelancers)
+        member_ids = {gig["lead_photographer_id"]}
+        accepted = await db.gig_invites.find(
+            {"gig_id": gig_id, "status": "accepted"}
+        ).to_list(50)
+        for inv in accepted:
+            member_ids.add(inv["freelancer_id"])
+        # Remove the sender — they don't get notified of their own message
+        member_ids.discard(current_user["id"])
+        for uid in member_ids:
+            await send_notification(
+                db, uid, "chat_message",
+                f"New message in {gig.get('title', 'gig')}",
+                f"{current_user['full_name']}: {data.content[:80]}",
+                {"gig_id": gig_id},
+            )
+
+    asyncio.create_task(_notify_members())
+
     return msg
 
 
