@@ -2,12 +2,30 @@
 Mock WhatsApp Business API service.
 Simulates sending WhatsApp messages by logging them and storing in DB.
 Replace with real Meta WhatsApp Cloud API when credentials are available.
+Only sends to users whose active plan has whatsapp_enabled = True.
 """
 import logging
 import uuid
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
+
+
+async def _user_has_whatsapp(db, user_id: str) -> bool:
+    """Check if user's active plan enables WhatsApp notifications."""
+    if not user_id:
+        return False
+    user = await db.users.find_one(
+        {"_id": user_id},
+        {"_id": 0, "active_plan_features": 1, "whatsapp_enabled": 1}
+    )
+    if not user:
+        return False
+    features = user.get("active_plan_features") or {}
+    if features:
+        return bool(features.get("whatsapp_enabled", False))
+    # Legacy fallback
+    return bool(user.get("whatsapp_enabled", False))
 
 
 async def send_whatsapp_message(
@@ -41,6 +59,9 @@ async def send_gig_invite_whatsapp(
     db, phone: str, freelancer_name: str, gig_title: str,
     fee: float, invite_id: str, user_id: str = None,
 ):
+    if not await _user_has_whatsapp(db, user_id):
+        logger.info(f"[WhatsApp] Skipped (no plan access) for user {user_id}")
+        return {"status": "skipped", "reason": "whatsapp_not_enabled_on_plan"}
     message = (
         f"Hi {freelancer_name}! You have a new gig invite for '{gig_title}'. "
         f"Proposed fee: ₹{fee:.0f}. "
@@ -54,6 +75,9 @@ async def send_gig_invite_whatsapp(
 
 
 async def send_sunday_dispatch(db, phone: str, user_name: str, gigs_summary: list, user_id: str = None):
+    if not await _user_has_whatsapp(db, user_id):
+        logger.info(f"[WhatsApp] Skipped dispatch (no plan access) for user {user_id}")
+        return {"status": "skipped", "reason": "whatsapp_not_enabled_on_plan"}
     if not gigs_summary:
         message = f"Hi {user_name}! No confirmed gigs next week. Stay ready!"
     else:

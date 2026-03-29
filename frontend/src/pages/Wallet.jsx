@@ -4,34 +4,17 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import {
   Wallet as WalletIcon, Check, Crown, MessageSquare,
-  Gift, CreditCard, Copy, Share2, Users,
+  Gift, CreditCard, Copy, Share2, Users, Globe, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const DEFAULT_PLANS = [
-  {
-    id: "base",
-    name: "Base Plan",
-    price: 69,
-    features: ["Verified professional badge", "Unlimited bookings", "In-app & email alerts", "Digital wallet & referrals", "Calendar sync"],
-    color: "#9CA3AF",
-  },
-  {
-    id: "premium",
-    name: "Premium Plan",
-    price: 99,
-    features: ["Everything in Base", "WhatsApp actionable alerts", "Accept/Reject from WhatsApp", "Sunday schedule dispatch"],
-    color: "#F59E0B",
-    popular: true,
-  },
-];
 
 export default function Wallet() {
   const { user, api, refreshUser } = useAuth();
   const [walletData, setWalletData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(null);
-  const [plans, setPlans] = useState(DEFAULT_PLANS);
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [referralStats, setReferralStats] = useState(null);
 
   const loadWallet = useCallback(async () => {
@@ -47,28 +30,10 @@ export default function Wallet() {
 
   useEffect(() => {
     loadWallet();
-    // Fetch dynamic pricing from admin settings
-    api.get("/platform/settings").then(r => {
-      if (r.data) {
-        setPlans([
-          {
-            id: "base",
-            name: r.data.base_plan_name || "Base Plan",
-            price: r.data.base_plan_price || 69,
-            features: ["Verified professional badge", "Unlimited bookings", "In-app & email alerts", "Digital wallet & referrals", "Calendar sync"],
-            color: "#9CA3AF",
-          },
-          {
-            id: "premium",
-            name: r.data.premium_plan_name || "Premium Plan",
-            price: r.data.premium_plan_price || 99,
-            features: ["Everything in Base", "WhatsApp actionable alerts", "Accept/Reject from WhatsApp", "Sunday schedule dispatch"],
-            color: "#F59E0B",
-            popular: true,
-          },
-        ]);
-      }
-    }).catch(() => {});
+    // Load plans from DB
+    api.get("/plans").then(r => {
+      setPlans(r.data.plans || []);
+    }).catch(() => {}).finally(() => setPlansLoading(false));
   }, [loadWallet, api]);
 
   const loadRazorpayScript = () =>
@@ -82,12 +47,12 @@ export default function Wallet() {
       document.body.appendChild(script);
     });
 
-  const handleSubscribe = async (planId) => {
-    setSubscribing(planId);
+  const handleSubscribe = async (plan) => {
+    setSubscribing(plan.id);
     try {
-      const res = await api.post("/wallet/subscribe/create-order", { plan: planId });
+      const res = await api.post("/wallet/subscribe/create-order", { plan_id: plan.id });
       if (res.data.full_wallet_cover) {
-        await api.post("/wallet/subscribe/activate-wallet", { plan: planId });
+        await api.post("/wallet/subscribe/activate-wallet", { plan_id: plan.id });
         toast.success("Subscription activated using your wallet balance!");
         await refreshUser();
         await loadWallet();
@@ -101,7 +66,7 @@ export default function Wallet() {
         amount: order.amount,
         currency: "INR",
         name: "CrewBook",
-        description: `${plans.find(p => p.id === planId)?.name || planId} ₹${plans.find(p => p.id === planId)?.price || ""}/month`,
+        description: `${plan.name} ₹${plan.price}/month`,
         order_id: order.id,
         handler: async (response) => {
           try {
@@ -109,7 +74,7 @@ export default function Wallet() {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              plan: planId,
+              plan_id: plan.id,
               wallet_deducted: wallet_deducted || 0,
             });
             toast.success("Subscription activated!");
@@ -128,34 +93,9 @@ export default function Wallet() {
     }
   };
 
-  const referralCode = referralStats?.referral_code || walletData?.referral_code || user?.referral_code || "";
-  const referralLink = `${window.location.origin}/auth?ref=${referralCode}`;
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(referralCode);
-    toast.success("Referral code copied!");
-  };
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    toast.success("Referral link copied!");
-  };
-
-  const shareLink = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Join CrewBook",
-          text: `Use my referral code ${referralCode} to join CrewBook — India's crew booking platform for photo & video professionals!`,
-          url: referralLink,
-        });
-      } catch { /* user cancelled */ }
-    } else {
-      copyLink();
-    }
-  };
-
   const currentPlan = user?.subscription_plan || "free";
+  const activePlanId = user?.active_plan_id;
+  const activePlanFeatures = user?.active_plan_features || {};
 
   return (
     <Layout>
@@ -227,11 +167,11 @@ export default function Wallet() {
                 data-testid="referral-code"
                 className="flex-1 px-3 py-2 rounded-lg border border-dashed border-orange-300 bg-orange-50 text-orange-600 font-mono font-bold text-base tracking-widest text-center select-all"
               >
-                {referralCode}
+                {referralStats?.referral_code || walletData?.referral_code || user?.referral_code || ""}
               </code>
               <button
                 data-testid="copy-referral-code-btn"
-                onClick={copyCode}
+                onClick={() => { navigator.clipboard.writeText(referralStats?.referral_code || walletData?.referral_code || user?.referral_code || ""); toast.success("Referral code copied!"); }}
                 className="px-3 py-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-display transition-all flex items-center gap-1"
               >
                 <Copy size={12} /> Copy
@@ -246,20 +186,26 @@ export default function Wallet() {
               <input
                 readOnly
                 data-testid="referral-link"
-                value={referralLink}
+                value={`${window.location.origin}/auth?ref=${referralStats?.referral_code || walletData?.referral_code || user?.referral_code || ""}`}
                 className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-500 font-mono outline-none cursor-text select-all truncate"
                 onClick={e => e.target.select()}
               />
               <button
                 data-testid="copy-referral-link-btn"
-                onClick={copyLink}
+                onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/auth?ref=${referralStats?.referral_code || walletData?.referral_code || ""}`); toast.success("Referral link copied!"); }}
                 className="px-3 py-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-display transition-all flex items-center gap-1 whitespace-nowrap"
               >
                 <Copy size={12} /> Copy Link
               </button>
               <button
                 data-testid="share-referral-btn"
-                onClick={shareLink}
+                onClick={async () => {
+                  const link = `${window.location.origin}/auth?ref=${referralStats?.referral_code || walletData?.referral_code || ""}`;
+                  if (navigator.share) {
+                    try { await navigator.share({ title: "Join CrewBook", text: `Use my referral code to join CrewBook!`, url: link }); }
+                    catch {}
+                  } else { navigator.clipboard.writeText(link); toast.success("Referral link copied!"); }
+                }}
                 className="px-3 py-2 rounded-lg text-white text-xs font-display transition-all flex items-center gap-1 whitespace-nowrap"
                 style={{ background: "#F97316" }}
               >
@@ -279,66 +225,102 @@ export default function Wallet() {
             <div className="flex items-center gap-3">
               <Crown size={18} className="text-orange-500" />
               <div>
-                <p className="text-sm font-semibold text-slate-900 font-display">{currentPlan === "premium" ? "Premium Plan" : "Base Plan"} Active</p>
+                <p className="text-sm font-semibold text-slate-900 font-display">{currentPlan} — Active</p>
                 {walletData?.subscription_expires_at && (
                   <p className="text-xs text-slate-500">Renews: {new Date(walletData.subscription_expires_at).toLocaleDateString("en-IN")}</p>
                 )}
               </div>
             </div>
-            {currentPlan === "premium" && walletData?.whatsapp_enabled && (
-              <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1.5 font-display bg-emerald-50 text-emerald-600 border border-emerald-200">
-                <MessageSquare size={11} /> WhatsApp ON
-              </span>
-            )}
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {activePlanFeatures.whatsapp_enabled && (
+                <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1.5 font-display bg-emerald-50 text-emerald-600 border border-emerald-200">
+                  <MessageSquare size={11} /> WhatsApp ON
+                </span>
+              )}
+              {activePlanFeatures.public_gig_enabled && (
+                <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1.5 font-display bg-blue-50 text-blue-600 border border-blue-200">
+                  <Globe size={11} /> Gig Board ON
+                </span>
+              )}
+            </div>
           </div>
         )}
 
         {/* Plans */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {plans.map(plan => {
-            const isActive = currentPlan === plan.id;
-            const isUpgrade = currentPlan === "free" || (currentPlan === "base" && plan.id === "premium");
-            return (
-              <div key={plan.id} data-testid={`plan-card-${plan.id}`} className="p-6 rounded-2xl border relative overflow-hidden bg-white shadow-sm" style={{ borderColor: plan.popular ? "#E05D26" : "#E2E8F0" }}>
-                {plan.popular && <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(90deg, transparent, #E05D26, transparent)" }} />}
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <p className="text-xs text-slate-500 font-display">{plan.name}</p>
-                    <div className="flex items-baseline gap-1 mt-1">
-                      <span className="text-3xl font-bold text-slate-900 font-display">₹{plan.price}</span>
-                      <span className="text-slate-400 text-xs">/month</span>
+        {plansLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 size={20} className="animate-spin text-orange-400" />
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="p-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-center">
+            <CreditCard size={28} className="mx-auto text-slate-300 mb-2" />
+            <p className="text-sm text-slate-500 font-display">No subscription plans available yet</p>
+            <p className="text-xs text-slate-400 mt-1">Check back soon — plans will be published by the admin</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {plans.map(plan => {
+              const isActive = activePlanId === plan.id;
+              return (
+                <div key={plan.id} data-testid={`plan-card-${plan.id}`} className="p-6 rounded-2xl border relative overflow-hidden bg-white shadow-sm border-slate-200">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-xs text-slate-500 font-display">{plan.name}</p>
+                      <div className="flex items-baseline gap-1 mt-1">
+                        <span className="text-3xl font-bold text-slate-900 font-display">₹{plan.price}</span>
+                        <span className="text-slate-400 text-xs">/month</span>
+                      </div>
+                      {plan.description && <p className="text-xs text-slate-400 mt-1">{plan.description}</p>}
                     </div>
                   </div>
-                  {plan.popular && <span className="text-xs px-2 py-0.5 rounded-full font-display bg-orange-50 text-orange-600 border border-orange-200">Popular</span>}
-                </div>
-                <ul className="space-y-2 mb-5">
-                  {plan.features.map(f => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-slate-600">
-                      <Check size={12} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                {isActive ? (
-                  <div className="w-full text-center py-2 text-xs rounded-lg font-display text-emerald-600 border border-emerald-200 bg-emerald-50">
-                    Current Plan
+
+                  {/* Feature indicators */}
+                  <div className="space-y-2 mb-5">
+                    <div className={`flex items-center gap-2 text-xs ${plan.features?.public_gig_enabled ? "text-blue-600" : "text-slate-400"}`}>
+                      {plan.features?.public_gig_enabled ? <Check size={12} className="text-blue-500" /> : <span className="w-3 h-3 rounded-full border border-slate-300 inline-block" />}
+                      <Globe size={12} />
+                      Public Gig Board Access
+                    </div>
+                    <div className={`flex items-center gap-2 text-xs ${plan.features?.whatsapp_enabled ? "text-emerald-600" : "text-slate-400"}`}>
+                      {plan.features?.whatsapp_enabled ? <Check size={12} className="text-emerald-500" /> : <span className="w-3 h-3 rounded-full border border-slate-300 inline-block" />}
+                      <MessageSquare size={12} />
+                      WhatsApp Notifications
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Check size={12} className="text-emerald-500" />
+                      Unlimited bookings & networking
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Check size={12} className="text-emerald-500" />
+                      In-app & email alerts
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Check size={12} className="text-emerald-500" />
+                      Digital wallet & referrals
+                    </div>
                   </div>
-                ) : (
-                  <Button
-                    data-testid={`subscribe-${plan.id}-btn`}
-                    onClick={() => handleSubscribe(plan.id)}
-                    disabled={subscribing === plan.id}
-                    className="w-full font-display font-semibold gap-2 text-white"
-                    style={plan.popular ? { background: "#E05D26" } : { background: "#F8FAFC", color: "#334155", border: "1px solid #E2E8F0" }}
-                  >
-                    <CreditCard size={14} />
-                    {subscribing === plan.id ? "Processing..." : isUpgrade ? "Upgrade" : "Subscribe"}
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+                  {isActive ? (
+                    <div className="w-full text-center py-2 text-xs rounded-lg font-display text-emerald-600 border border-emerald-200 bg-emerald-50">
+                      Current Plan
+                    </div>
+                  ) : (
+                    <Button
+                      data-testid={`subscribe-plan-btn-${plan.id}`}
+                      onClick={() => handleSubscribe(plan)}
+                      disabled={subscribing === plan.id}
+                      className="w-full font-display font-semibold gap-2 text-white"
+                      style={{ background: "#E05D26" }}
+                    >
+                      <CreditCard size={14} />
+                      {subscribing === plan.id ? "Processing..." : "Subscribe"}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Transaction History */}
         {walletData?.transactions?.length > 0 && (

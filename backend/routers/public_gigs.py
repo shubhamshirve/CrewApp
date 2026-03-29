@@ -81,6 +81,23 @@ def _compute_match(gig: dict, user: dict) -> int:
     return min(score, 100)
 
 
+def _has_public_gig_access(user: dict) -> bool:
+    """Return True if user's active plan grants public gig board access."""
+    features = user.get("active_plan_features") or {}
+    if features:
+        return bool(features.get("public_gig_enabled", False))
+    # Legacy fallback: no plan features means no access
+    return False
+
+
+def _require_public_gig_access(user: dict):
+    if not _has_public_gig_access(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Public Gig Board access requires a plan with Gig Board enabled. Upgrade your plan from Wallet.",
+        )
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/event-types")
@@ -90,6 +107,7 @@ async def get_event_types():
 
 @router.post("")
 async def create_public_gig(data: CreatePublicGig, current_user: dict = Depends(get_current_user)):
+    _require_public_gig_access(current_user)
     if not current_user.get("is_verified"):
         raise HTTPException(status_code=403, detail="Only verified users can post public gigs")
     if not data.roles:
@@ -136,10 +154,9 @@ async def browse_gig_board(
     event_type: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
+    _require_public_gig_access(current_user)
     db = get_db()
     now_iso = datetime.now(timezone.utc).isoformat()
-
-    # Auto-expire stale listings
     await db.public_gigs.update_many(
         {"status": "open", "expires_at": {"$lt": now_iso}},
         {"$set": {"status": "expired"}}
@@ -241,6 +258,7 @@ async def get_public_gig(gig_id: str, current_user: dict = Depends(get_current_u
 
 @router.post("/{gig_id}/apply")
 async def apply_to_public_gig(gig_id: str, data: ApplyRequest, current_user: dict = Depends(get_current_user)):
+    _require_public_gig_access(current_user)
     db = get_db()
     gig = await db.public_gigs.find_one({"_id": gig_id})
     if not gig:

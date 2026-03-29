@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, ShieldCheck, Users, AlertTriangle,
-  LogOut, ChevronLeft, ChevronRight, Menu, Shield, Globe, Settings, ScrollText, MessageSquare
+  LogOut, ChevronLeft, ChevronRight, Menu, Shield, Globe, Settings, ScrollText, MessageSquare, CreditCard
 } from "lucide-react";
 
 const ADMIN_NAV = [
@@ -12,6 +12,7 @@ const ADMIN_NAV = [
   { path: "/admin/users", icon: Users, label: "Users" },
   { path: "/admin/penalties", icon: AlertTriangle, label: "Penalties" },
   { path: "/admin/gig-board", icon: Globe, label: "Gig Board" },
+  { path: "/admin/plans", icon: CreditCard, label: "Plans" },
   { path: "/admin/templates", icon: MessageSquare, label: "Templates" },
   { path: "/admin/logs", icon: ScrollText, label: "Logs" },
   { path: "/admin/settings", icon: Settings, label: "Settings" },

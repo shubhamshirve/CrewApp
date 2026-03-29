@@ -6,7 +6,7 @@ import {
   MapPin, Calendar, IndianRupee, Users, Star, CheckCircle,
   Plus, Filter, ChevronDown, X, Briefcase, Clock, Eye,
   FileText, Search, SlidersHorizontal, Loader2, BadgeCheck,
-  ArrowUpDown, Send, ChevronRight
+  ArrowUpDown, Send, ChevronRight, Globe, CreditCard
 } from "lucide-react";
 
 const ROLES = [
@@ -692,12 +692,13 @@ function MyPostCard({ gig, onManage, onCancel, api }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function GigBoard() {
-  const { api } = useAuth();
+  const { api, user } = useAuth();
   const [tab, setTab] = useState("browse");
   const [gigs, setGigs] = useState([]);
   const [myPosts, setMyPosts] = useState([]);
   const [myApps, setMyApps] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
   const [applyModal, setApplyModal] = useState(null);
   const [manageModal, setManageModal] = useState(null);
@@ -705,6 +706,9 @@ export default function GigBoard() {
   const [filters, setFilters] = useState({ role: "", city: "", event_type: "", budget_min: "", budget_max: "" });
   const [dynamicRoles, setDynamicRoles] = useState(ROLES);
   const [dynamicEventTypes, setDynamicEventTypes] = useState(EVENT_TYPES);
+
+  // Check plan access
+  const hasAccess = user?.active_plan_features?.public_gig_enabled === true;
 
   // Load dynamic roles and event types
   useEffect(() => {
@@ -727,8 +731,10 @@ export default function GigBoard() {
       if (filters.budget_max) params.budget_max = Number(filters.budget_max);
       const r = await api.get("/public-gigs", { params });
       setGigs(r.data);
-    } catch {
-      toast.error("Failed to load gig board");
+      setAccessDenied(false);
+    } catch (e) {
+      if (e.response?.status === 403) { setAccessDenied(true); }
+      else { toast.error("Failed to load gig board"); }
     } finally {
       setLoading(false);
     }
@@ -801,7 +807,7 @@ export default function GigBoard() {
           </div>
           <button
             data-testid="post-gig-btn"
-            onClick={() => setShowPostModal(true)}
+            onClick={() => !hasAccess ? toast.error("Upgrade your plan to post gigs") : setShowPostModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90"
             style={{ background: "#F97316" }}
           >
@@ -809,8 +815,26 @@ export default function GigBoard() {
           </button>
         </div>
 
+        {/* Access upgrade wall */}
+        {(!hasAccess || accessDenied) && (
+          <div data-testid="gig-board-upgrade-wall" className="py-14 rounded-2xl border border-dashed border-orange-300 bg-orange-50 text-center px-6">
+            <Globe size={36} className="mx-auto text-orange-400 mb-3" />
+            <h2 className="text-lg font-semibold text-slate-900 font-display">Gig Board Access Required</h2>
+            <p className="text-sm text-slate-500 mt-1.5 max-w-md mx-auto">
+              Access to browse and post public gigs requires a subscription plan with the Gig Board feature enabled.
+            </p>
+            <a
+              href="/wallet"
+              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white"
+              style={{ background: "#F97316" }}
+            >
+              <CreditCard size={14} /> View Plans & Upgrade
+            </a>
+          </div>
+        )}
+
         {/* Tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-xl border border-slate-200 bg-slate-100">
+        {hasAccess && !accessDenied && <div className="flex items-center gap-1 p-1 rounded-xl border border-slate-200 bg-slate-100">
           {TABS.map(t => (
             <button
               key={t.id}
@@ -830,10 +854,10 @@ export default function GigBoard() {
               )}
             </button>
           ))}
-        </div>
+        </div>}
 
         {/* Browse filters */}
-        {tab === "browse" && (
+        {hasAccess && !accessDenied && tab === "browse" && (
           <div className="space-y-3">
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -919,11 +943,11 @@ export default function GigBoard() {
         )}
 
         {/* Content */}
-        {loading ? (
+        {hasAccess && !accessDenied && loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={28} className="animate-spin text-amber-500" />
           </div>
-        ) : (
+        ) : hasAccess && !accessDenied ? (
           <>
             {/* Browse Tab */}
             {tab === "browse" && (
@@ -1016,11 +1040,11 @@ export default function GigBoard() {
                       </div>
                     </div>
                   ))
-                )}}
+                )}
               </div>
             )}
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Modals */}
