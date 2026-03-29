@@ -584,6 +584,22 @@ async def send_invite(gig_id: str, data: InviteRequest, current_user: dict = Dep
     return invite
 
 
+@router.put("/invites/{invite_id}/mark-viewed")
+async def mark_invite_viewed(invite_id: str, current_user: dict = Depends(get_current_user)):
+    """Freelancer marks an invite as viewed — records a seen timestamp."""
+    db = get_db()
+    invite = await db.gig_invites.find_one({"_id": invite_id, "freelancer_id": current_user["id"]})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    # Only set once — don't overwrite the first-seen timestamp
+    if not invite.get("invite_viewed_at"):
+        await db.gig_invites.update_one(
+            {"_id": invite_id},
+            {"$set": {"invite_viewed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+    return {"invite_viewed_at": invite.get("invite_viewed_at") or datetime.now(timezone.utc).isoformat()}
+
+
 @router.put("/invites/{invite_id}/respond")
 async def respond_to_invite(invite_id: str, data: InviteResponse, current_user: dict = Depends(get_current_user)):
     db = get_db()

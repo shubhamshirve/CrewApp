@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar, Clock, MapPin, Users, UserPlus, Check, X,
   ArrowRightLeft, Upload, PackageCheck, Sparkles, FileText, IndianRupee, CheckCircle2,
-  Pencil, Trash2, Plus,
+  Pencil, Trash2, Plus, Eye, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -84,6 +84,12 @@ export default function GigDetail() {
       ]);
       setGig(gigRes.data);
       setConnections(connRes.data);
+
+      // Auto mark-viewed: if current user has a pending invite, record seen timestamp
+      const myInv = gigRes.data?.invites?.find(i => i.freelancer_id === user?.id && i.status === "pending");
+      if (myInv && !myInv.invite_viewed_at) {
+        api.put(`/gigs/invites/${myInv.id}/mark-viewed`).catch(() => {});
+      }
     } catch { toast.error("Failed to load gig"); } finally { setLoading(false); }
   };
 
@@ -452,13 +458,26 @@ export default function GigDetail() {
                 </div>
               ) : gig.invites?.map(inv => {
                 const badge = STATUS_BADGE[inv.status] || STATUS_BADGE.pending;
+                const seenAt = inv.invite_viewed_at
+                  ? new Date(inv.invite_viewed_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+                  : null;
                 return (
                   <div key={inv.id} data-testid={`invite-card-${inv.id}`} className="p-4 rounded-xl border border-slate-200 bg-white">
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-semibold text-slate-900 font-display">{inv.freelancer?.full_name || "Unknown"}</p>
                           <span className="text-xs px-2 py-0.5 rounded-full font-display" style={badge}>{badge.label}</span>
+                          {/* Read receipt badge */}
+                          {seenAt ? (
+                            <span data-testid={`seen-badge-${inv.id}`} className="flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                              <Eye size={10} /> Seen {seenAt}
+                            </span>
+                          ) : inv.status === "pending" ? (
+                            <span data-testid={`unseen-badge-${inv.id}`} className="flex items-center gap-1 text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                              <EyeOff size={10} /> Not seen yet
+                            </span>
+                          ) : null}
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {inv.role} · ₹{(inv.agreed_fee || inv.counter_fee || inv.proposed_fee)?.toLocaleString("en-IN")}
