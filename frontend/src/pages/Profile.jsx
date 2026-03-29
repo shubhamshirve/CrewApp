@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Shield, MapPin, Star, Camera, User, UserPlus, UserCheck,
   StickyNote, Save, Trash2, Pencil, Plus, X, Upload,
-  Instagram, Globe, Wallet, Link2, ChevronDown, ChevronLeft,
+  Instagram, Globe, Wallet, Link2, ChevronDown, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -770,9 +770,9 @@ export default function Profile() {
             </div>
           </DialogHeader>
 
-          {/* ADD — Step 0: Category grid */}
+          {/* ADD — Step 0: Category list */}
           {gearDialog?.mode === "add" && gearStep === 0 && (
-            <div className="grid grid-cols-3 gap-2 mt-3">
+            <div className="mt-2 space-y-1">
               {GEAR_CATEGORIES.map(cat => (
                 <button
                   key={cat}
@@ -781,21 +781,18 @@ export default function Profile() {
                     setGearForm(p => ({ ...p, category: cat, name: "", brand: "", model_number: "", is_custom: false }));
                     setGearStep(1);
                   }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                  style={{
-                    borderColor: `${CAT_COLORS[cat] || "#6B7280"}30`,
-                    background: `${CAT_COLORS[cat] || "#6B7280"}0A`,
-                  }}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-slate-200 hover:border-orange-300 hover:bg-orange-50 transition-all text-left"
                 >
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold font-display"
-                    style={{ background: `${CAT_COLORS[cat] || "#6B7280"}20`, color: CAT_COLORS[cat] || "#6B7280" }}
-                  >
-                    {cat.slice(0, 3)}
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold font-display flex-shrink-0"
+                      style={{ background: `${CAT_COLORS[cat] || "#6B7280"}15`, color: CAT_COLORS[cat] || "#6B7280" }}
+                    >
+                      {cat.slice(0, 3)}
+                    </div>
+                    <span className="text-sm font-display font-medium text-slate-800">{cat}</span>
                   </div>
-                  <span className="text-xs font-display font-medium leading-tight text-center" style={{ color: CAT_COLORS[cat] || "#6B7280" }}>
-                    {cat}
-                  </span>
+                  <ChevronRight size={14} className="text-slate-300" />
                 </button>
               ))}
             </div>
