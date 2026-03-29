@@ -9,8 +9,24 @@ export const API = BACKEND_URL ? `${BACKEND_URL}/api` : "/api";
 const api = axios.create({ baseURL: API });
 
 function getToken() {
-  return localStorage.getItem("crewbook_token") || sessionStorage.getItem("crewbook_token") || null;
+  // sessionStorage token (used for impersonation) takes priority over localStorage
+  return sessionStorage.getItem("crewbook_token") || localStorage.getItem("crewbook_token") || null;
 }
+
+// On page load, check for impersonation token in URL (passed by admin for cross-tab impersonation)
+function bootstrapImpersonationToken() {
+  const params = new URLSearchParams(window.location.search);
+  const tok = params.get("impersonate_token");
+  if (tok) {
+    sessionStorage.setItem("crewbook_token", tok);
+    // Remove token from URL without page reload
+    params.delete("impersonate_token");
+    const newSearch = params.toString();
+    const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "") + window.location.hash;
+    window.history.replaceState({}, "", newUrl);
+  }
+}
+bootstrapImpersonationToken();
 
 api.interceptors.request.use((config) => {
   const token = getToken();

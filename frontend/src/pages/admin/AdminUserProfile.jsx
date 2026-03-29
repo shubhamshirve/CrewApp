@@ -47,8 +47,8 @@ export default function AdminUserProfile() {
   const handleImpersonate = async () => {
     try {
       const r = await api.post(`/admin/impersonate/${id}`);
-      sessionStorage.setItem("crewbook_token", r.data.token);
-      window.open("/dashboard", "_blank");
+      const baseUrl = window.location.origin;
+      window.open(`${baseUrl}/dashboard?impersonate_token=${r.data.token}`, "_blank");
       toast.success("Opened user session in new tab (1-hour token)");
     } catch {
       toast.error("Impersonation failed");
