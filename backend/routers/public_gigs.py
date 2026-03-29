@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 import uuid
+import re
 
 from db import get_db
 from auth_utils import get_current_user, _clean_user
@@ -12,37 +13,67 @@ router = APIRouter(prefix="/public-gigs")
 
 EVENT_TYPES = ["Haldi", "Mehendi", "Sangam", "Sangeet", "Baraat", "Wedding",
                "Reception", "Pre-Wedding Shoot", "Corporate", "Birthday", "Other"]
+VALID_ROLES = [
+    "Lead Photographer", "Second Shooter", "Traditional Videographer",
+    "Cinematic Videographer", "Drone Operator", "Photo Assistant",
+    "Video Assistant", "Lighting Technician", "Photo Editor", "Video Editor",
+]
 
 
 # ── Models ──────────────────────────────────────────────────────────────────
 
 class RoleSpec(BaseModel):
     role: str
-    budget: float
-    slots: int = 1
+    budget: float = Field(..., gt=0, le=500000)
+    slots: int = Field(1, ge=1, le=20)
     verified_only: bool = False
-    min_rating: Optional[float] = None
+    min_rating: Optional[float] = Field(None, ge=1.0, le=5.0)
     style_tags: Optional[List[str]] = None
-    gear_required: Optional[str] = None
+    gear_required: Optional[str] = Field(None, max_length=200)
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        if v not in VALID_ROLES:
+            raise ValueError(f"role must be one of: {', '.join(VALID_ROLES)}")
+        return v
 
 
 class CreatePublicGig(BaseModel):
-    title: str
-    description: Optional[str] = None
+    title: str = Field(..., min_length=3, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
     event_type: str
-    date: str
-    city: str
-    location: str
-    venue_name: Optional[str] = None
-    style_preference: Optional[str] = None
-    roles: List[RoleSpec]
-    expires_hours: int = 48
+    date: str = Field(..., max_length=10)
+    city: str = Field(..., min_length=2, max_length=100)
+    location: str = Field(..., min_length=2, max_length=300)
+    venue_name: Optional[str] = Field(None, max_length=200)
+    style_preference: Optional[str] = Field(None, max_length=60)
+    roles: List[RoleSpec] = Field(..., min_length=1, max_length=10)
+    expires_hours: int = Field(48, ge=1, le=168)  # 1 hour – 1 week
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type(cls, v: str) -> str:
+        if v not in EVENT_TYPES:
+            raise ValueError(f"event_type must be one of: {', '.join(EVENT_TYPES)}")
+        return v
+
+    @field_validator("date")
+    @classmethod
+    def validate_date(cls, v: str) -> str:
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", v):
+            raise ValueError("date must be YYYY-MM-DD")
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("Invalid calendar date")
+        return v
 
 
 class ApplyRequest(BaseModel):
-    role_id: str
-    offer_price: float
-    cover_note: Optional[str] = None
+    role_id: str = Field(..., min_length=1, max_length=50)
+    offer_price: float = Field(..., gt=0, le=500000)
+    cover_note: Optional[str] = Field(None, max_length=1000)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -188,15 +219,22 @@ async def browse_gig_board(
         query["roles"] = {"$elemMatch": em}
 
     gigs = await db.public_gigs.find(query).sort("created_at", -1).limit(50).to_list(50)
+
+    # Batch-fetch all my applications for returned gigs in one query
+    gig_ids = [g["_id"] for g in gigs]
+    my_apps_raw = await db.public_gig_applications.find({
+        "public_gig_id": {"$in": gig_ids},
+        "applicant_id": current_user["id"],
+    }).to_list(200)
+    app_map = {a["public_gig_id"]: _app(a) for a in my_apps_raw}
+
     result = []
     for g in gigs:
         g_dict = _pg(g)
         g_dict["match_score"] = _compute_match(g, current_user)
-        app = await db.public_gig_applications.find_one({
-            "public_gig_id": g_dict["id"], "applicant_id": current_user["id"]
-        })
-        g_dict["has_applied"] = app is not None
-        g_dict["my_application"] = _app(app)
+        my_app = app_map.get(g_dict["id"])
+        g_dict["has_applied"] = my_app is not None
+        g_dict["my_application"] = my_app
         result.append(g_dict)
 
     result.sort(key=lambda x: x["match_score"], reverse=True)
@@ -241,11 +279,18 @@ async def get_public_gig(gig_id: str, current_user: dict = Depends(get_current_u
 
     if gig["lead_id"] == current_user["id"]:
         apps = await db.public_gig_applications.find({"public_gig_id": gig_id}).sort("created_at", -1).to_list(100)
+
+        # Batch-fetch all applicant users
+        applicant_ids = list({a["applicant_id"] for a in apps})
+        applicants_raw = await db.users.find(
+            {"_id": {"$in": applicant_ids}}, {"password_hash": 0}
+        ).to_list(100)
+        applicant_map = {u["_id"]: _clean_user(u) for u in applicants_raw}
+
         enriched = []
         for a in apps:
             a_dict = _app(a)
-            applicant = await db.users.find_one({"_id": a["applicant_id"]}, {"password_hash": 0})
-            a_dict["applicant"] = _clean_user(applicant) if applicant else None
+            a_dict["applicant"] = applicant_map.get(a["applicant_id"])
             enriched.append(a_dict)
         gig_dict["applications"] = enriched
     else:

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 import uuid
+import re
 
 from db import get_db
 from auth_utils import get_current_user, _clean_user
@@ -15,42 +16,102 @@ from services.pdf_service import generate_contract_pdf
 router = APIRouter(prefix="/gigs")
 
 EVENT_TYPES = ["Haldi", "Mehendi", "Sangam", "Sangeet", "Baraat", "Wedding", "Reception", "Pre-Wedding Shoot", "Corporate", "Birthday", "Other"]
+VALID_ROLES = [
+    "Lead Photographer", "Second Shooter", "Traditional Videographer",
+    "Cinematic Videographer", "Drone Operator", "Photo Assistant",
+    "Video Assistant", "Lighting Technician", "Photo Editor", "Video Editor",
+]
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 
 
 class GigSession(BaseModel):
-    date: str
-    start_time: str
-    end_time: str
-    location: str
-    venue_name: Optional[str] = None
+    date: str = Field(..., max_length=10)
+    start_time: str = Field(..., max_length=5)
+    end_time: str = Field(..., max_length=5)
+    location: str = Field(..., min_length=2, max_length=200)
+    venue_name: Optional[str] = Field(None, max_length=200)
     event_type: str
+
+    @field_validator("date")
+    @classmethod
+    def validate_date(cls, v: str) -> str:
+        if not _DATE_RE.match(v):
+            raise ValueError("date must be YYYY-MM-DD")
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("Invalid calendar date")
+        return v
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_time(cls, v: str) -> str:
+        if not _TIME_RE.match(v):
+            raise ValueError("time must be HH:MM (24h)")
+        return v
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type(cls, v: str) -> str:
+        if v not in EVENT_TYPES:
+            raise ValueError(f"event_type must be one of: {', '.join(EVENT_TYPES)}")
+        return v
 
 
 class CreateGigRequest(BaseModel):
-    title: str
-    description: Optional[str] = None
-    sessions: List[GigSession]
+    title: str = Field(..., min_length=3, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    sessions: List[GigSession] = Field(..., min_length=1, max_length=20)
 
 
 class InviteRequest(BaseModel):
-    freelancer_id: str
-    session_id: str
-    session_date: str
+    freelancer_id: str = Field(..., min_length=1, max_length=50)
+    session_id: str = Field(..., min_length=1, max_length=50)
+    session_date: str = Field(..., max_length=10)
     role: str
-    proposed_fee: float
-    notes: Optional[str] = None
+    proposed_fee: float = Field(..., gt=0, le=500000)
+    notes: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        if v not in VALID_ROLES:
+            raise ValueError(f"role must be one of: {', '.join(VALID_ROLES)}")
+        return v
+
+    @field_validator("session_date")
+    @classmethod
+    def validate_date(cls, v: str) -> str:
+        if not _DATE_RE.match(v):
+            raise ValueError("session_date must be YYYY-MM-DD")
+        return v
 
 
 class InviteResponse(BaseModel):
     action: str  # accept / reject / counter
-    counter_fee: Optional[float] = None
-    message: Optional[str] = None
+    counter_fee: Optional[float] = Field(None, gt=0, le=500000)
+    message: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, v: str) -> str:
+        if v not in ("accept", "reject", "counter"):
+            raise ValueError("action must be accept, reject, or counter")
+        return v
 
 
 class WorkspaceFile(BaseModel):
-    type: str  # moodboard, callsheet, location_pin, other
-    title: str
-    content: str  # URL, text, or base64
+    type: str
+    title: str = Field(..., min_length=1, max_length=200)
+    content: str = Field(..., max_length=5_000_000)  # ~3.75 MB base64 limit
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        if v not in ("moodboard", "callsheet", "location_pin", "other"):
+            raise ValueError("type must be moodboard, callsheet, location_pin, or other")
+        return v
 
 
 def _gig_to_dict(g: dict) -> dict:
@@ -157,12 +218,17 @@ async def get_received_invites(current_user: dict = Depends(get_current_user)):
         {"$set": {"status": "expired"}}
     )
     invites = await db.gig_invites.find({"freelancer_id": current_user["id"]}).sort("created_at", -1).to_list(50)
+
+    # Batch-fetch all referenced gigs
+    gig_ids = list({inv["gig_id"] for inv in invites})
+    gigs_raw = await db.gigs.find({"_id": {"$in": gig_ids}}).to_list(100)
+    gig_map = {g["_id"]: _gig_to_dict(g) for g in gigs_raw}
+
     result = []
     for inv in invites:
         inv_dict = dict(inv)
         inv_dict["id"] = str(inv_dict.pop("_id"))
-        gig = await db.gigs.find_one({"_id": inv_dict["gig_id"]})
-        inv_dict["gig"] = _gig_to_dict(gig) if gig else None
+        inv_dict["gig"] = gig_map.get(inv_dict["gig_id"])
         result.append(inv_dict)
     return result
 
@@ -175,21 +241,35 @@ async def get_gig(gig_id: str, current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Gig not found")
     gig_dict = _gig_to_dict(gig)
     invites = await db.gig_invites.find({"gig_id": gig_id}).to_list(50)
+
+    # Batch-fetch all freelancers in one query to avoid N+1
+    freelancer_ids = list({inv["freelancer_id"] for inv in invites})
+    freelancers_raw = await db.users.find(
+        {"_id": {"$in": freelancer_ids}}, {"password_hash": 0}
+    ).to_list(100)
+    fl_map = {f["_id"]: _clean_user(f) for f in freelancers_raw}
+
     invite_dicts = []
     for inv in invites:
         d = dict(inv)
         d["id"] = str(d.pop("_id"))
-        freelancer = await db.users.find_one({"_id": d["freelancer_id"]}, {"password_hash": 0})
-        d["freelancer"] = _clean_user(freelancer) if freelancer else None
+        d["freelancer"] = fl_map.get(d["freelancer_id"])
         invite_dicts.append(d)
     gig_dict["invites"] = invite_dicts
     return gig_dict
 
 
 class PaymentRecord(BaseModel):
-    type: str  # advance | balance
-    amount: float
-    notes: Optional[str] = None
+    type: str
+    amount: float = Field(..., gt=0, le=10_000_000)
+    notes: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        if v not in ("advance", "balance"):
+            raise ValueError("type must be advance or balance")
+        return v
 
 
 @router.get("/{gig_id}/ledger")
@@ -291,8 +371,8 @@ async def record_payment(invite_id: str, data: PaymentRecord, current_user: dict
 
 
 class UpdateGigRequest(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=3, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
 
 
 @router.put("/{gig_id}")

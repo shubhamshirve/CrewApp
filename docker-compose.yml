@@ -4,16 +4,23 @@ services:
     image: mongo:7.0
     container_name: crewbook-mongodb
     restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: crewbook_db
     volumes:
       - mongodb_data:/data/db
     networks:
       - crewbook-net
+    # Do NOT expose port externally in production; backend connects internally
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   # ── Backend (FastAPI) ────────────────────────────────────────────────────
   backend:
@@ -25,8 +32,9 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      # Override MONGO_URL to use Docker service name instead of localhost
-      - MONGO_URL=mongodb://mongodb:27017
+      # Override MONGO_URL to use the Docker service name
+      MONGO_URL: mongodb://mongodb:27017
+      ENV: production
     depends_on:
       mongodb:
         condition: service_healthy
@@ -39,7 +47,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   # ── Frontend (React → nginx) ─────────────────────────────────────────────
   frontend:
@@ -47,8 +59,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Leave empty to use nginx proxy for /api (recommended)
-        # Set to your server URL if deploying frontend/backend on separate domains
+        # Leave empty so nginx proxy handles /api — no hard-coded URL in the bundle
         REACT_APP_BACKEND_URL: ""
     container_name: crewbook-frontend
     restart: unless-stopped
@@ -59,6 +70,10 @@ services:
         condition: service_healthy
     networks:
       - crewbook-net
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
 volumes:
   mongodb_data:

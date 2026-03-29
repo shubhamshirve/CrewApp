@@ -6,7 +6,9 @@ from datetime import datetime, timedelta, timezone
 import os
 from db import get_db
 
-SECRET_KEY = os.environ.get("JWT_SECRET", "crewbook_fallback_secret")
+SECRET_KEY = os.environ.get("JWT_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET environment variable is required but not set")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 

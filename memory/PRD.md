@@ -169,6 +169,17 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ **Profile.jsx**: UPI Pay Now button — non-owners see green "Pay Now" UPI deeplink button; owners see their UPI ID text
 - ✅ **Onboarding.jsx**: Gear section updated with category select → filtered gear dropdown → custom gear name fallback
 
+### Production Hardening (Done — March 2026)
+- ✅ **Rate limiting** via `slowapi`: Register 3/min, Login 10/min, Global 200/min per IP
+- ✅ **Input validation**: Pydantic v2 field_validators on all write endpoints (email format, password strength, phone, enums, length limits, URL format, UPI format)
+- ✅ **Regex injection prevention**: `re.escape()` on all MongoDB text search inputs
+- ✅ **N+1 query fixes**: Batch-fetch freelancers in `gigs.get_gig`, batch-fetch gigs in `get_received_invites`, batch-fetch applications in `public_gigs.browse`, batch-fetch applicants in `public_gigs.get_detail`
+- ✅ **Security headers middleware**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy
+- ✅ **JWT secret hardened**: Random 256-bit secret in .env, fail-fast if missing
+- ✅ **Docker hardened**: Non-root user in backend (uid 1001), yarn in frontend, resource limits (512m backend, 128m frontend), PYTHONDONTWRITEBYTECODE/PYTHONUNBUFFERED set
+- ✅ **nginx.conf upgraded**: Security headers, CSP, rate-limit body size (15m), block .env/.git paths
+- ✅ **FastAPI lifespan** replaces deprecated `@app.on_event`, docs hidden in production
+
 ### P1 (Important)
 - [x] **Post-event rating flow trigger** ✅ DONE — Dashboard banner + rating modal with sliders
 - [x] **Private lead notes on freelancer profiles** ✅ DONE — Profile page section, only visible to note author

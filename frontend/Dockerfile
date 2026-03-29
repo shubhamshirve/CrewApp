@@ -3,28 +3,42 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies (cached layer)
-COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps
+# Install dependencies using yarn (matches project's package manager)
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --non-interactive
 
 # Copy source and build
 COPY . .
 
-# REACT_APP_BACKEND_URL is empty by default so nginx proxy handles /api routing
+# REACT_APP_BACKEND_URL is empty so nginx proxy handles /api routing internally.
+# Set it to an external URL only when deploying frontend/backend on separate domains.
 ARG REACT_APP_BACKEND_URL=""
-ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
-ENV GENERATE_SOURCEMAP=false
+ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL \
+    GENERATE_SOURCEMAP=false \
+    INLINE_RUNTIME_CHUNK=false
 
-RUN npm run build
+RUN yarn build
 
 # ── Stage 2: Serve with nginx ──────────────────────────────────────────────
 FROM nginx:1.27-alpine
 
+# Security: remove default nginx config and run as non-root
+RUN rm -f /etc/nginx/conf.d/default.conf
+
 # Copy built assets
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# Copy nginx config
+# Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Fix permissions so nginx worker can run as non-root
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown nginx:nginx /var/run/nginx.pid
+
+USER nginx
 
 EXPOSE 80
 
