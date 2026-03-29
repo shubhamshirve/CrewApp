@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar, Clock, MapPin, Users, UserPlus, Check, X,
   ArrowRightLeft, Upload, PackageCheck, Sparkles, FileText, IndianRupee, CheckCircle2,
-  Pencil, Trash2, Plus, Eye, EyeOff, Bell, BellOff,
+  Pencil, Trash2, Plus, Eye, EyeOff, Bell, BellOff, MessageSquare, Send,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,6 +50,15 @@ export default function GigDetail() {
   const [counterFee, setCounterFee] = useState({});
   const [snoozing, setSnoozing] = useState(false);
   const [conflictDialog, setConflictDialog] = useState(null); // { message, pendingForm }
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatUnread, setChatUnread] = useState(0);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const [activeTab, setActiveTab] = useState("sessions");
+  const chatBottomRef = useRef(null);
+  const chatPollRef = useRef(null);
   const [ledger, setLedger] = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(null);  // { invite_id, type, mode: "record"|"edit", suggested_amount }
@@ -223,6 +232,69 @@ export default function GigDetail() {
     } catch (err) { toast.error(err.response?.data?.detail || "Failed to snooze"); } finally { setSnoozing(false); }
   };
 
+  // ── Chat helpers ─────────────────────────────────────────────────────────────
+  const fetchChat = useCallback(async (markRead = false) => {
+    if (!id) return;
+    try {
+      const res = await api.get(`/gigs/${id}/messages`);
+      setChatMessages(res.data.messages || []);
+      setChatUnread(res.data.unread_count || 0);
+      if (markRead && res.data.unread_count > 0) {
+        await api.put(`/gigs/${id}/messages/read`);
+        setChatUnread(0);
+      }
+    } catch { /* ignore */ }
+  }, [id]);
+
+  const startChatPoll = useCallback(() => {
+    fetchChat(true);
+    chatPollRef.current = setInterval(() => fetchChat(false), 4000);
+  }, [fetchChat]);
+
+  const stopChatPoll = useCallback(() => {
+    if (chatPollRef.current) { clearInterval(chatPollRef.current); chatPollRef.current = null; }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "chat") {
+      startChatPoll();
+    } else {
+      stopChatPoll();
+    }
+    return () => stopChatPoll();
+  }, [activeTab, startChatPoll, stopChatPoll]);
+
+  // Auto-scroll to bottom when new messages arrive on chat tab
+  useEffect(() => {
+    if (activeTab === "chat") {
+      chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, activeTab]);
+
+  // Poll unread count even when chat tab isn't active (for badge)
+  useEffect(() => {
+    const unreadPoll = setInterval(async () => {
+      if (activeTab !== "chat" && id) {
+        try {
+          const res = await api.get(`/gigs/${id}/messages`);
+          setChatUnread(res.data.unread_count || 0);
+        } catch { /* ignore */ }
+      }
+    }, 15000);
+    return () => clearInterval(unreadPoll);
+  }, [id, activeTab]);
+
+  const handleSendMessage = async () => {
+    const content = chatInput.trim();
+    if (!content) return;
+    setChatSending(true);
+    try {
+      const res = await api.post(`/gigs/${id}/messages`, { content });
+      setChatMessages(prev => [...prev, res.data]);
+      setChatInput("");
+    } catch (err) { toast.error(err.response?.data?.detail || "Failed to send"); } finally { setChatSending(false); }
+  };
+
   const handleLeadAcceptCounter = async (inviteId) => {
     try {
       await api.put(`/gigs/invites/${inviteId}/lead-accept-counter`);
@@ -354,13 +426,21 @@ export default function GigDetail() {
           )}
         </div>
 
-        <Tabs defaultValue="sessions" onValueChange={v => { if (v === "ledger") loadLedger(); }}>
+        <Tabs defaultValue="sessions" onValueChange={v => { setActiveTab(v); if (v === "ledger") loadLedger(); }}>
           <TabsList className="bg-slate-100 border border-slate-200">
             <TabsTrigger value="sessions" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
               Sessions
             </TabsTrigger>
             <TabsTrigger value="team" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
               Team ({gig.invites?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="chat" data-testid="chat-tab" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600 relative">
+              <MessageSquare size={12} className="mr-1" />Chat
+              {chatUnread > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
+                  {chatUnread > 9 ? "9+" : chatUnread}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="workspace" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
               Workspace
@@ -539,6 +619,77 @@ export default function GigDetail() {
                   </div>
                 );
               })}
+            </div>
+          </TabsContent>
+
+          {/* Chat */}
+          <TabsContent value="chat" className="mt-4">
+            <div className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden" style={{ height: "480px" }}>
+              {/* Messages area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {chatMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <MessageSquare size={32} className="text-slate-200 mb-3" />
+                    <p className="text-sm text-slate-400 font-display">No messages yet</p>
+                    <p className="text-xs text-slate-300 mt-1">Send a message to start the gig conversation</p>
+                  </div>
+                ) : (
+                  <>
+                    {chatMessages.map((msg, i) => {
+                      const isMine = msg.sender_id === user?.id;
+                      const showName = !isMine && (i === 0 || chatMessages[i - 1]?.sender_id !== msg.sender_id);
+                      const time = new Date(msg.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+                      return (
+                        <div key={msg.id} data-testid={`chat-msg-${msg.id}`} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[70%] ${isMine ? "items-end" : "items-start"} flex flex-col`}>
+                            {showName && (
+                              <p className="text-[10px] text-slate-400 mb-1 px-1 font-display">{msg.sender_name}</p>
+                            )}
+                            <div
+                              className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+                                isMine
+                                  ? "bg-orange-500 text-white rounded-br-sm"
+                                  : "bg-slate-100 text-slate-900 rounded-bl-sm"
+                              }`}
+                            >
+                              {msg.content}
+                            </div>
+                            <span className="text-[10px] text-slate-400 mt-0.5 px-1">{time}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={chatBottomRef} />
+                  </>
+                )}
+              </div>
+              {/* Input area */}
+              <div className="border-t border-slate-100 p-3 flex gap-2 items-end bg-white">
+                <textarea
+                  data-testid="chat-input"
+                  className="flex-1 resize-none bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 text-sm rounded-xl px-3 py-2 outline-none focus:border-orange-400 transition-colors"
+                  rows={1}
+                  placeholder="Type a message…"
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
+                  }}
+                  style={{ minHeight: "38px", maxHeight: "96px" }}
+                />
+                <Button
+                  data-testid="chat-send-btn"
+                  onClick={handleSendMessage}
+                  disabled={chatSending || !chatInput.trim()}
+                  className="h-9 w-9 p-0 rounded-xl flex-shrink-0 text-white"
+                  style={{ background: chatInput.trim() ? "#F97316" : undefined }}
+                >
+                  {chatSending
+                    ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : <Send size={14} />
+                  }
+                </Button>
+              </div>
             </div>
           </TabsContent>
 

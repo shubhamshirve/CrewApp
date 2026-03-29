@@ -169,6 +169,12 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ **Profile.jsx**: UPI Pay Now button — non-owners see green "Pay Now" UPI deeplink button; owners see their UPI ID text
 - ✅ **Onboarding.jsx**: Gear section updated with category select → filtered gear dropdown → custom gear name fallback
 
+### In-App Chat Per Gig (Done — March 2026)
+- ✅ **New `gig_messages` collection** with compound index on `(gig_id, created_at)`
+- ✅ **3 endpoints** in `/app/backend/routers/chat.py`: `GET /api/gigs/{id}/messages` (returns messages + unread count), `POST /api/gigs/{id}/messages` (send), `PUT /api/gigs/{id}/messages/read` (mark all read)
+- ✅ **Access control**: only gig lead + accepted freelancers; non-members get 403
+- ✅ **Chat tab** added to `GigDetail.jsx` with: orange sent-bubbles (right), grey received-bubbles (left), sender name for grouped messages, timestamp, auto-scroll to bottom, 4s polling when tab active, 15s background unread badge polling, Enter to send, red unread count badge on the Chat tab trigger
+
 ### Read Receipts, Snooze & Buffer Override (Done — March 2026)
 - ✅ **Read Receipts on Invites**: `PUT /api/gigs/invites/{id}/mark-viewed` — auto-called when freelancer opens GigDetail; `invite_viewed_at` stored (idempotent); lead's Team tab shows "Seen [date/time]" (green Eye badge) or "Not seen yet" (grey EyeOff badge) on each pending invite
 - ✅ **Snooze Invite**: `PUT /api/gigs/invites/{id}/snooze` body `{hours: 1-48, default 4}` — stores `snoozed_until` timestamp; asyncio background task sends push notification reminder when snooze expires (re-checks if still pending); freelancer sees "Snooze 4h" button + amber "Reminder set for..." indicator
