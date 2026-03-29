@@ -510,7 +510,7 @@ async def delete_session(gig_id: str, session_id: str, current_user: dict = Depe
 
 
 @router.post("/{gig_id}/invites")
-async def send_invite(gig_id: str, data: InviteRequest, current_user: dict = Depends(get_current_user)):
+async def send_invite(gig_id: str, data: InviteRequest, force: bool = False, current_user: dict = Depends(get_current_user)):
     db = get_db()
     gig = await db.gigs.find_one({"_id": gig_id, "lead_photographer_id": current_user["id"]})
     if not gig:
@@ -527,9 +527,9 @@ async def send_invite(gig_id: str, data: InviteRequest, current_user: dict = Dep
     if existing:
         raise HTTPException(status_code=400, detail="Invite already sent for this session")
 
-    # 90-minute buffer check
+    # 90-minute buffer check — skipped when force=true (lead override)
     session = next((s for s in gig.get("sessions", []) if s.get("id") == data.session_id), None)
-    if session:
+    if session and not force:
         conflict = await _check_90min_buffer(
             db, data.freelancer_id,
             session.get("date", data.session_date),

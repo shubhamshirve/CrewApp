@@ -49,6 +49,7 @@ export default function GigDetail() {
   const [workspaceForm, setWorkspaceForm] = useState({ type: "moodboard", title: "", content: "" });
   const [counterFee, setCounterFee] = useState({});
   const [snoozing, setSnoozing] = useState(false);
+  const [conflictDialog, setConflictDialog] = useState(null); // { message, pendingForm }
   const [ledger, setLedger] = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(null);  // { invite_id, type, mode: "record"|"edit", suggested_amount }
@@ -181,17 +182,28 @@ export default function GigDetail() {
 
   const myInvite = gig?.invites?.find(i => i.freelancer_id === user?.id);
 
-  const handleInvite = async () => {
+  const handleInvite = async (force = false) => {
     if (!inviteForm.freelancer_id || !inviteForm.session_id || !inviteForm.proposed_fee) {
       toast.error("Fill all invite fields");
       return;
     }
     try {
-      await api.post(`/gigs/${id}/invites`, { ...inviteForm, proposed_fee: parseFloat(inviteForm.proposed_fee) });
+      const url = `/gigs/${id}/invites${force ? "?force=true" : ""}`;
+      await api.post(url, { ...inviteForm, proposed_fee: parseFloat(inviteForm.proposed_fee) });
       toast.success("Invite sent!");
       setShowInvite(false);
+      setConflictDialog(null);
       load();
-    } catch (err) { toast.error(err.response?.data?.detail || "Failed"); }
+    } catch (err) {
+      if (err.response?.status === 409) {
+        // Conflict — show override dialog instead of generic toast
+        const msg = err.response?.data?.detail?.replace("Schedule conflict: ", "") || "Schedule conflict detected.";
+        setConflictDialog({ message: msg, pendingForm: { ...inviteForm } });
+        setShowInvite(false);
+      } else {
+        toast.error(err.response?.data?.detail || "Failed");
+      }
+    }
   };
 
   const handleRespond = async (inviteId, action, fee = null) => {
@@ -1022,6 +1034,47 @@ export default function GigDetail() {
                       Saving...
                     </span>
                   ) : "Confirm Payment"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      {/* Schedule Conflict Override Dialog */}
+      <Dialog open={!!conflictDialog} onOpenChange={() => setConflictDialog(null)}>
+        <DialogContent className="bg-white border-slate-200 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Clock size={14} className="text-amber-600" />
+              </span>
+              Schedule Conflict Detected
+            </DialogTitle>
+          </DialogHeader>
+          {conflictDialog && (
+            <div className="mt-2 space-y-4">
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
+                {conflictDialog.message}
+              </div>
+              <p className="text-xs text-slate-500">
+                The 90-minute buffer rule helps avoid back-to-back exhaustion. You can still send the invite — the freelancer will decide.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => { setConflictDialog(null); setShowInvite(true); }}
+                  className="flex-1 border-slate-200 text-slate-500 text-xs"
+                  data-testid="conflict-cancel-btn"
+                >
+                  Go Back
+                </Button>
+                <Button
+                  data-testid="conflict-force-send-btn"
+                  onClick={() => handleInvite(true)}
+                  className="flex-1 font-display text-white text-xs gap-1"
+                  style={{ background: "#F97316" }}
+                >
+                  Send Anyway
                 </Button>
               </div>
             </div>
