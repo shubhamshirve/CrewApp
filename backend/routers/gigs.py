@@ -290,6 +290,85 @@ async def record_payment(invite_id: str, data: PaymentRecord, current_user: dict
     return {"message": f"{data.type.capitalize()} payment recorded", "invite_id": invite_id}
 
 
+class UpdateGigRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
+@router.put("/{gig_id}")
+async def update_gig(gig_id: str, data: UpdateGigRequest, current_user: dict = Depends(get_current_user)):
+    """Edit gig title/description only. Existing session dates/times cannot be changed."""
+    db = get_db()
+    gig = await db.gigs.find_one({"_id": gig_id})
+    if not gig:
+        raise HTTPException(status_code=404, detail="Gig not found")
+    if gig["lead_photographer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the lead photographer can edit this gig")
+    update = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if data.title is not None:
+        update["title"] = data.title.strip()
+    if data.description is not None:
+        update["description"] = data.description
+    await db.gigs.update_one({"_id": gig_id}, {"$set": update})
+    gig = await db.gigs.find_one({"_id": gig_id})
+    return _gig_to_dict(gig)
+
+
+@router.delete("/{gig_id}")
+async def delete_gig(gig_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a gig — only allowed if no accepted invites exist."""
+    db = get_db()
+    gig = await db.gigs.find_one({"_id": gig_id})
+    if not gig:
+        raise HTTPException(status_code=404, detail="Gig not found")
+    if gig["lead_photographer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the lead photographer can delete this gig")
+    accepted = await db.gig_invites.count_documents({"gig_id": gig_id, "status": "accepted"})
+    if accepted > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete a gig with accepted crew members. Cancel invites first.")
+    await db.gig_invites.delete_many({"gig_id": gig_id})
+    await db.gigs.delete_one({"_id": gig_id})
+    return {"message": "Gig deleted successfully"}
+
+
+@router.post("/{gig_id}/sessions")
+async def add_session(gig_id: str, data: GigSession, current_user: dict = Depends(get_current_user)):
+    """Add a new session to an existing gig."""
+    db = get_db()
+    gig = await db.gigs.find_one({"_id": gig_id})
+    if not gig:
+        raise HTTPException(status_code=404, detail="Gig not found")
+    if gig["lead_photographer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the lead photographer can add sessions")
+    new_session = {"id": str(uuid.uuid4()), **data.model_dump()}
+    await db.gigs.update_one(
+        {"_id": gig_id},
+        {"$push": {"sessions": new_session}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Session added", "session": new_session}
+
+
+@router.delete("/{gig_id}/sessions/{session_id}")
+async def delete_session(gig_id: str, session_id: str, current_user: dict = Depends(get_current_user)):
+    """Remove a session — only if no accepted invite exists for it."""
+    db = get_db()
+    gig = await db.gigs.find_one({"_id": gig_id})
+    if not gig:
+        raise HTTPException(status_code=404, detail="Gig not found")
+    if gig["lead_photographer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if len(gig.get("sessions", [])) <= 1:
+        raise HTTPException(status_code=400, detail="A gig must have at least one session")
+    accepted = await db.gig_invites.count_documents({"gig_id": gig_id, "session_id": session_id, "status": "accepted"})
+    if accepted > 0:
+        raise HTTPException(status_code=400, detail="Cannot remove a session with an accepted crew member")
+    await db.gigs.update_one(
+        {"_id": gig_id},
+        {"$pull": {"sessions": {"id": session_id}}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Session removed"}
+
+
 @router.post("/{gig_id}/invites")
 async def send_invite(gig_id: str, data: InviteRequest, current_user: dict = Depends(get_current_user)):
     db = get_db()

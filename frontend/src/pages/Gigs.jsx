@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Plus, ChevronRight, Calendar, Users, Briefcase, Trash2 } from "lucide-react";
+import { Plus, ChevronRight, Calendar, Briefcase, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 const STATUS_COLORS = {
   draft: { bg: "rgba(107,114,128,0.15)", color: "#9CA3AF" },
@@ -25,10 +24,11 @@ export default function Gigs() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [eventTypes, setEventTypes] = useState(["Wedding"]);
-
   const [newGig, setNewGig] = useState({ title: "", description: "" });
   const [sessions, setSessions] = useState([{ date: "", start_time: "09:00", end_time: "18:00", location: "", venue_name: "", event_type: "Wedding" }]);
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // gig object to confirm delete
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     load();
@@ -60,6 +60,17 @@ export default function Gigs() {
       setGigs(p => [res.data, ...p]);
       navigate(`/gigs/${res.data.id}`);
     } catch (err) { toast.error(err.response?.data?.detail || "Failed to create gig"); } finally { setCreating(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/gigs/${deleteTarget.id}`);
+      setGigs(p => p.filter(g => g.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      toast.success("Gig deleted");
+    } catch (err) { toast.error(err.response?.data?.detail || "Cannot delete gig"); } finally { setDeleting(false); }
   };
 
   return (
@@ -97,9 +108,9 @@ export default function Gigs() {
               const s = STATUS_COLORS[g.status] || STATUS_COLORS.draft;
               const isLead = g.lead_photographer_id === user?.id;
               return (
-                <div key={g.id} data-testid={`gig-item-${g.id}`} className="p-5 rounded-xl border border-slate-200 card-hover cursor-pointer bg-white shadow-sm" onClick={() => navigate(`/gigs/${g.id}`)}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                <div key={g.id} data-testid={`gig-item-${g.id}`} className="p-5 rounded-xl border border-slate-200 card-hover bg-white shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/gigs/${g.id}`)}>
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 className="text-base font-semibold text-slate-900 font-display truncate">{g.title}</h3>
                         <span className="text-xs px-2 py-0.5 rounded-full font-display" style={s}>{g.status}</span>
@@ -110,7 +121,29 @@ export default function Gigs() {
                         {g.sessions?.[0] && <span>{g.sessions[0].event_type} · {g.sessions[0].date}</span>}
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-slate-300 flex-shrink-0 mt-1" />
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {isLead && (
+                        <>
+                          <button
+                            data-testid={`edit-gig-list-${g.id}`}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/gigs/${g.id}`); }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-all"
+                            title="Edit gig"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            data-testid={`delete-gig-list-${g.id}`}
+                            onClick={(e) => { e.stopPropagation(); setDeleteTarget(g); }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                            title="Delete gig"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
+                      <ChevronRight size={16} className="text-slate-300 cursor-pointer" onClick={() => navigate(`/gigs/${g.id}`)} />
+                    </div>
                   </div>
                 </div>
               );
@@ -189,6 +222,30 @@ export default function Gigs() {
               <Button variant="outline" onClick={() => setShowCreate(false)} className="flex-1 border-slate-200 text-slate-500">Cancel</Button>
               <Button data-testid="submit-create-gig-btn" onClick={handleCreate} className="flex-1 font-display font-semibold text-white" style={{ background: "#E05D26" }} disabled={creating}>
                 {creating ? "Creating..." : "Create Gig"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Delete Confirm */}
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent className="bg-white border-slate-200 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display">Delete Gig?</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 space-y-4">
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+              Permanently delete <strong>"{deleteTarget?.title}"</strong>? Gigs with accepted crew members cannot be deleted.
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} className="flex-1 border-slate-200 text-slate-500">Cancel</Button>
+              <Button
+                data-testid="confirm-delete-gig-btn"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 font-display text-white bg-red-500 hover:bg-red-600"
+              >
+                {deleting ? "Deleting…" : "Yes, Delete"}
               </Button>
             </div>
           </div>

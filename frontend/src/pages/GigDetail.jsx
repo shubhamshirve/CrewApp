@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar, Clock, MapPin, Users, UserPlus, Check, X,
   ArrowRightLeft, Upload, PackageCheck, Sparkles, FileText, IndianRupee, CheckCircle2,
+  Pencil, Trash2, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,15 +50,29 @@ export default function GigDetail() {
   const [counterFee, setCounterFee] = useState({});
   const [ledger, setLedger] = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
-  const [paymentDialog, setPaymentDialog] = useState(null); // { invite_id, type, suggested_amount }
+  const [paymentDialog, setPaymentDialog] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", notes: "" });
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+
+  // Gig edit/delete
+  const [showEditGig, setShowEditGig] = useState(false);
+  const [editGigForm, setEditGigForm] = useState({ title: "", description: "" });
+  const [editGigSaving, setEditGigSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingGig, setDeletingGig] = useState(false);
+  const [showAddSession, setShowAddSession] = useState(false);
+  const [newSession, setNewSession] = useState({ date: "", start_time: "09:00", end_time: "18:00", location: "", venue_name: "", event_type: "Wedding" });
+  const [addingSession, setAddingSession] = useState(false);
+  const [eventTypes, setEventTypes] = useState(["Wedding", "Pre-Wedding Shoot", "Reception", "Corporate", "Birthday", "Other"]);
 
   useEffect(() => { load(); }, [id]);
 
   useEffect(() => {
     api.get("/platform/roles").then(r => {
       if (r.data?.roles?.length) setRolesList(r.data.roles);
+    }).catch(() => {});
+    api.get("/platform/event-types").then(r => {
+      if (r.data?.event_types?.length) setEventTypes(r.data.event_types);
     }).catch(() => {});
   }, []);
 
@@ -102,6 +117,46 @@ export default function GigDetail() {
       loadLedger();
     } catch { toast.error("Failed to record payment"); } finally { setPaymentSubmitting(false); }
   };
+  const handleEditGigSave = async () => {
+    if (!editGigForm.title.trim()) { toast.error("Title is required"); return; }
+    setEditGigSaving(true);
+    try {
+      const res = await api.put(`/gigs/${id}`, editGigForm);
+      setGig(g => ({ ...g, title: res.data.title, description: res.data.description }));
+      setShowEditGig(false);
+      toast.success("Gig updated!");
+    } catch (err) { toast.error(err.response?.data?.detail || "Failed to update"); } finally { setEditGigSaving(false); }
+  };
+
+  const handleDeleteGig = async () => {
+    setDeletingGig(true);
+    try {
+      await api.delete(`/gigs/${id}`);
+      toast.success("Gig deleted");
+      navigate("/gigs");
+    } catch (err) { toast.error(err.response?.data?.detail || "Failed to delete"); } finally { setDeletingGig(false); }
+  };
+
+  const handleAddSession = async () => {
+    if (!newSession.date || !newSession.location) { toast.error("Date and location are required"); return; }
+    setAddingSession(true);
+    try {
+      await api.post(`/gigs/${id}/sessions`, newSession);
+      toast.success("Session added!");
+      setShowAddSession(false);
+      setNewSession({ date: "", start_time: "09:00", end_time: "18:00", location: "", venue_name: "", event_type: "Wedding" });
+      load();
+    } catch (err) { toast.error(err.response?.data?.detail || "Failed to add session"); } finally { setAddingSession(false); }
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    try {
+      await api.delete(`/gigs/${id}/sessions/${sessionId}`);
+      toast.success("Session removed");
+      load();
+    } catch (err) { toast.error(err.response?.data?.detail || "Cannot remove session"); }
+  };
+
   const myInvite = gig?.invites?.find(i => i.freelancer_id === user?.id);
 
   const handleInvite = async () => {
@@ -211,19 +266,43 @@ export default function GigDetail() {
         {/* Header */}
         <div className="p-5 rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="text-xl font-semibold text-slate-900 font-display">{gig.title}</h1>
               {gig.description && <p className="text-sm text-slate-500 mt-1">{gig.description}</p>}
             </div>
-            <span
-              className="text-xs px-2.5 py-1 rounded-full font-display flex-shrink-0"
-              style={{
-                background: gig.status === "active" ? "rgba(16,185,129,0.1)" : "rgba(107,114,128,0.1)",
-                color: gig.status === "active" ? "#059669" : "#6B7280",
-              }}
-            >
-              {gig.status}
-            </span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span
+                className="text-xs px-2.5 py-1 rounded-full font-display"
+                style={{
+                  background: gig.status === "active" ? "rgba(16,185,129,0.1)" : "rgba(107,114,128,0.1)",
+                  color: gig.status === "active" ? "#059669" : "#6B7280",
+                }}
+              >
+                {gig.status}
+              </span>
+              {isLead && (
+                <>
+                  <Button
+                    size="sm"
+                    data-testid="edit-gig-btn"
+                    variant="outline"
+                    className="h-7 text-xs font-display border-slate-200 text-slate-600 gap-1"
+                    onClick={() => { setEditGigForm({ title: gig.title, description: gig.description || "" }); setShowEditGig(true); }}
+                  >
+                    <Pencil size={11} /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    data-testid="delete-gig-btn"
+                    variant="outline"
+                    className="h-7 text-xs font-display border-red-200 text-red-500 hover:bg-red-50 gap-1"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    <Trash2 size={11} /> Delete
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
           {gig.data_delivered && (
             <div className="flex items-center gap-2 text-emerald-600 text-xs p-2 rounded-lg mt-2 bg-emerald-50">
@@ -252,10 +331,33 @@ export default function GigDetail() {
 
           {/* Sessions */}
           <TabsContent value="sessions" className="mt-4 space-y-3">
+            {isLead && (
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  data-testid="add-session-btn"
+                  onClick={() => setShowAddSession(true)}
+                  className="h-7 text-xs font-display gap-1 text-white"
+                  style={{ background: "#F97316" }}
+                >
+                  <Plus size={12} /> Add Session
+                </Button>
+              </div>
+            )}
             {gig.sessions?.map((s, i) => (
               <div key={s.id || i} className="p-4 rounded-xl border border-slate-200 bg-white">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-xs px-2 py-0.5 rounded font-display bg-orange-50 text-orange-600">{s.event_type}</span>
+                  {isLead && gig.sessions.length > 1 && (
+                    <button
+                      data-testid={`delete-session-${s.id}`}
+                      onClick={() => handleDeleteSession(s.id)}
+                      className="text-slate-300 hover:text-red-400 transition-colors"
+                      title="Remove session"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-4 text-sm text-slate-700 flex-wrap">
                   <span className="flex items-center gap-1.5"><Calendar size={13} className="text-slate-400" />{s.date}</span>
@@ -609,6 +711,151 @@ export default function GigDetail() {
               </Button>
               <Button data-testid="submit-workspace-btn" onClick={handleAddWorkspace} className="flex-1 font-display" style={{ background: "#F97316", color: "#fff" }}>
                 Add
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Gig Dialog */}
+      <Dialog open={showEditGig} onOpenChange={setShowEditGig}>
+        <DialogContent className="bg-white border-slate-200 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display">Edit Gig</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="text-xs font-display text-slate-600 mb-1 block">Gig Title *</label>
+              <input
+                data-testid="edit-gig-title-input"
+                className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                value={editGigForm.title}
+                onChange={e => setEditGigForm(p => ({ ...p, title: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-display text-slate-600 mb-1 block">Description</label>
+              <textarea
+                data-testid="edit-gig-desc-input"
+                className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-800 resize-none h-20 focus:border-orange-400 outline-none"
+                placeholder="Brief overview of the event…"
+                value={editGigForm.description}
+                onChange={e => setEditGigForm(p => ({ ...p, description: e.target.value }))}
+              />
+              <p className="text-xs text-slate-400 mt-1">Note: Session dates and times cannot be changed after creation.</p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setShowEditGig(false)} className="flex-1 border-slate-200 text-slate-500">Cancel</Button>
+              <Button
+                data-testid="save-edit-gig-btn"
+                onClick={handleEditGigSave}
+                disabled={editGigSaving}
+                className="flex-1 font-display text-white"
+                style={{ background: "#F97316" }}
+              >
+                {editGigSaving ? "Saving…" : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="bg-white border-slate-200 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display">Delete Gig?</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 space-y-4">
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+              This will permanently delete <strong>"{gig?.title}"</strong> and all pending invites. This cannot be undone.
+              Gigs with accepted crew members cannot be deleted.
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} className="flex-1 border-slate-200 text-slate-500">Cancel</Button>
+              <Button
+                data-testid="confirm-delete-gig-btn"
+                onClick={handleDeleteGig}
+                disabled={deletingGig}
+                className="flex-1 font-display text-white bg-red-500 hover:bg-red-600"
+              >
+                {deletingGig ? "Deleting…" : "Yes, Delete"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Session Dialog */}
+      <Dialog open={showAddSession} onOpenChange={setShowAddSession}>
+        <DialogContent className="bg-white border-slate-200 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display">Add New Session</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-display text-slate-600 mb-1 block">Date *</label>
+                <input
+                  data-testid="new-session-date"
+                  type="date"
+                  className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                  value={newSession.date}
+                  onChange={e => setNewSession(p => ({ ...p, date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-display text-slate-600 mb-1 block">Event Type</label>
+                <select
+                  data-testid="new-session-event-type"
+                  className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                  value={newSession.event_type}
+                  onChange={e => setNewSession(p => ({ ...p, event_type: e.target.value }))}
+                >
+                  {eventTypes.map(et => <option key={et} value={et}>{et}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-display text-slate-600 mb-1 block">Start Time</label>
+                <input type="time" className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                  value={newSession.start_time} onChange={e => setNewSession(p => ({ ...p, start_time: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs font-display text-slate-600 mb-1 block">End Time</label>
+                <input type="time" className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                  value={newSession.end_time} onChange={e => setNewSession(p => ({ ...p, end_time: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-display text-slate-600 mb-1 block">Location / City *</label>
+              <input
+                data-testid="new-session-location"
+                className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                placeholder="Mumbai"
+                value={newSession.location}
+                onChange={e => setNewSession(p => ({ ...p, location: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-display text-slate-600 mb-1 block">Venue Name</label>
+              <input
+                data-testid="new-session-venue"
+                className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                placeholder="Hotel / Banquet Hall"
+                value={newSession.venue_name}
+                onChange={e => setNewSession(p => ({ ...p, venue_name: e.target.value }))}
+              />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" onClick={() => setShowAddSession(false)} className="flex-1 border-slate-200 text-slate-500">Cancel</Button>
+              <Button
+                data-testid="confirm-add-session-btn"
+                onClick={handleAddSession}
+                disabled={addingSession}
+                className="flex-1 font-display text-white"
+                style={{ background: "#F97316" }}
+              >
+                {addingSession ? "Adding…" : "Add Session"}
               </Button>
             </div>
           </div>
