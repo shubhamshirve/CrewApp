@@ -23,6 +23,7 @@ const emptyForm = {
   price: "",
   description: "",
   features: { public_gig_enabled: false, whatsapp_enabled: false },
+  validity: "monthly",
   legacy_tier: "",
   is_active: true,
   sort_order: 0,
@@ -130,6 +131,24 @@ function PlanDialog({ open, onClose, onSave, initial }) {
               placeholder="Brief description visible to users"
               className="mt-1 border-slate-200"
             />
+          </div>
+
+          {/* Validity */}
+          <div>
+            <Label className="text-xs font-display text-slate-600">Billing Cycle</Label>
+            <div className="flex gap-2 mt-1">
+              {["monthly", "yearly"].map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  data-testid={`validity-${v}`}
+                  onClick={() => set("validity", v)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-display border transition-all ${form.validity === v ? "border-blue-400 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+                >
+                  {v === "monthly" ? "Monthly (30 days)" : "Yearly (365 days)"}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Feature toggles */}
@@ -382,6 +401,9 @@ export default function AdminPlans() {
                           maps → {plan.legacy_tier}
                         </span>
                       )}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 font-display capitalize">
+                        {plan.validity || "monthly"}
+                      </span>
                       {!plan.is_active && (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-display">Inactive</span>
                       )}

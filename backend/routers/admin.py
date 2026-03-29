@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 
 from db import get_db
@@ -666,3 +666,134 @@ async def get_login_logs(
     for item in items:
         item["id"] = str(item.pop("_id"))
     return {"items": items, "total": total}
+
+
+# ── Reports Endpoints ─────────────────────────────────────────────────────────
+
+@router.get("/reports/overview")
+async def get_reports_overview(admin: dict = Depends(get_admin_user)):
+    """Platform-wide analytics overview."""
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+
+    total_users, new_30d, new_7d, verified, pending_v, subscribed, total_gigs, public_gigs, total_revenue = await __import__('asyncio').gather(
+        db.users.count_documents({"is_admin": {"$ne": True}}),
+        db.users.count_documents({"created_at": {"$gte": thirty_days_ago}, "is_admin": {"$ne": True}}),
+        db.users.count_documents({"created_at": {"$gte": seven_days_ago}, "is_admin": {"$ne": True}}),
+        db.users.count_documents({"is_verified": True}),
+        db.users.count_documents({"verification_status": "pending"}),
+        db.users.count_documents({"subscription_plan": {"$nin": ["free", None]}, "is_admin": {"$ne": True}}),
+        db.gigs.count_documents({}),
+        db.public_gigs.count_documents({}),
+        db.payment_logs.count_documents({"event": "payment_verified", "status": "success"}),
+    )
+
+    # Revenue last 30 days
+    rev_cursor = await db.payment_logs.aggregate([
+        {"$match": {"event": "payment_verified", "status": "success", "created_at": {"$gte": thirty_days_ago}}},
+        {"$group": {"_id": None, "total": {"$sum": {"$divide": [{"$ifNull": ["$amount_paise", 0]}, 100]}}}}
+    ]).to_list(1)
+    rev_30d = rev_cursor[0]["total"] if rev_cursor else 0.0
+
+    # Subscriptions by plan
+    plan_breakdown_cursor = await db.users.aggregate([
+        {"$match": {"subscription_plan": {"$nin": ["free", None]}, "is_admin": {"$ne": True}}},
+        {"$group": {"_id": "$active_plan_name", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]).to_list(20)
+    plan_breakdown = [{"plan": p["_id"] or "Legacy", "count": p["count"]} for p in plan_breakdown_cursor]
+
+    return {
+        "total_users": total_users,
+        "new_users_30d": new_30d,
+        "new_users_7d": new_7d,
+        "verified_users": verified,
+        "pending_verification": pending_v,
+        "subscribed_users": subscribed,
+        "total_gigs": total_gigs,
+        "public_gigs": public_gigs,
+        "total_payments": total_revenue,
+        "revenue_30d": round(rev_30d, 2),
+        "plan_breakdown": plan_breakdown,
+    }
+
+
+@router.get("/reports/registrations")
+async def get_registrations_chart(days: int = 30, admin: dict = Depends(get_admin_user)):
+    """New user registrations per day for the last N days."""
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=days)).isoformat()
+    pipeline = [
+        {"$match": {"created_at": {"$gte": start}, "is_admin": {"$ne": True}}},
+        {"$addFields": {"date_str": {"$substr": ["$created_at", 0, 10]}}},
+        {"$group": {"_id": "$date_str", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}},
+    ]
+    result = await db.users.aggregate(pipeline).to_list(100)
+    # Fill missing days with 0
+    from datetime import date as dt_date
+    day_map = {r["_id"]: r["count"] for r in result}
+    output = []
+    for i in range(days):
+        d = (now - timedelta(days=days - 1 - i)).date().isoformat()
+        output.append({"date": d, "count": day_map.get(d, 0)})
+    return {"data": output}
+
+
+@router.get("/reports/revenue")
+async def get_revenue_chart(days: int = 30, admin: dict = Depends(get_admin_user)):
+    """Daily revenue from successful payments for the last N days."""
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=days)).isoformat()
+    pipeline = [
+        {"$match": {"event": "payment_verified", "status": "success", "created_at": {"$gte": start}}},
+        {"$addFields": {"date_str": {"$substr": ["$created_at", 0, 10]}}},
+        {"$group": {
+            "_id": "$date_str",
+            "revenue": {"$sum": {"$divide": [{"$ifNull": ["$amount_paise", 0]}, 100]}},
+            "transactions": {"$sum": 1},
+        }},
+        {"$sort": {"_id": 1}},
+    ]
+    result = await db.payment_logs.aggregate(pipeline).to_list(100)
+    day_map = {r["_id"]: {"revenue": round(r["revenue"], 2), "transactions": r["transactions"]} for r in result}
+    output = []
+    for i in range(days):
+        d = (now - timedelta(days=days - 1 - i)).date().isoformat()
+        entry = day_map.get(d, {"revenue": 0.0, "transactions": 0})
+        output.append({"date": d, **entry})
+    return {"data": output}
+
+
+@router.get("/reports/recent-payments")
+async def get_recent_payments(limit: int = 20, admin: dict = Depends(get_admin_user)):
+    """Recent successful payment transactions."""
+    db = get_db()
+    items = await db.payment_logs.find(
+        {"event": "payment_verified", "status": "success"}
+    ).sort("created_at", -1).limit(min(limit, 50)).to_list(50)
+    result = []
+    for item in items:
+        item["id"] = str(item.pop("_id"))
+        # Enrich with user name
+        if item.get("user_id"):
+            u = await db.users.find_one({"_id": item["user_id"]}, {"_id": 0, "full_name": 1, "email": 1})
+            item["user_name"] = u.get("full_name", "Unknown") if u else "Unknown"
+            item["user_email"] = u.get("email", "") if u else ""
+        result.append(item)
+    return {"items": result}
+
+
+@router.get("/reports/recent-registrations")
+async def get_recent_registrations(limit: int = 20, admin: dict = Depends(get_admin_user)):
+    """Most recently registered users."""
+    db = get_db()
+    items = await db.users.find(
+        {"is_admin": {"$ne": True}},
+        {"_id": 0, "password_hash": 0}
+    ).sort("created_at", -1).limit(min(limit, 50)).to_list(50)
+    return {"items": [_clean_user(u) for u in items]}

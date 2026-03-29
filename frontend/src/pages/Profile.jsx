@@ -131,11 +131,16 @@ export default function Profile() {
           const conns = await api.get("/connections");
           const found = conns.data.find(c => c.user?.id === id);
           setConnectionStatus(found ? "connected" : null);
-          setNoteLoading(true);
-          const noteRes = await api.get(`/notes/${id}`);
-          setNote(noteRes.data.content || "");
-          setNoteExists(noteRes.data.exists || false);
-          setNoteLoading(false);
+          // Only load notes if connected
+          if (found) {
+            setNoteLoading(true);
+            try {
+              const noteRes = await api.get(`/notes/${id}`);
+              setNote(noteRes.data.content || "");
+              setNoteExists(noteRes.data.exists || false);
+            } catch { /* not connected or error */ }
+            finally { setNoteLoading(false); }
+          }
         }
         setRatings(ratingsRes.data);
         try {
@@ -558,8 +563,8 @@ export default function Profile() {
           )}
         </div>
 
-        {/* Private Lead Notes */}
-        {!isOwn && (
+        {/* Private Lead Notes — connections only */}
+        {!isOwn && connectionStatus === "connected" && (
           <div data-testid="lead-notes-section" className="p-5 rounded-xl border border-orange-100 bg-white">
             <div className="flex items-center gap-2 mb-3">
               <StickyNote size={14} className="text-orange-500" />

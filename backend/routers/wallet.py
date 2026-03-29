@@ -72,6 +72,7 @@ async def _resolve_plan(db, data, cfg: dict) -> dict:
             "plan_key": plan.get("legacy_tier") or plan_id,
             "plan_name": plan["name"],
             "plan_price": float(plan["price"]),
+            "plan_validity": plan.get("validity", "monthly"),
             "features": plan.get("features", {}),
         }
     elif plan_name_legacy in ("base", "premium"):
@@ -83,6 +84,7 @@ async def _resolve_plan(db, data, cfg: dict) -> dict:
             "plan_key": plan_name_legacy,
             "plan_name": name,
             "plan_price": price,
+            "plan_validity": "monthly",
             "features": {
                 "whatsapp_enabled": plan_name_legacy == "premium",
                 "public_gig_enabled": False,
@@ -91,9 +93,35 @@ async def _resolve_plan(db, data, cfg: dict) -> dict:
     raise HTTPException(status_code=400, detail="Invalid plan")
 
 
+def _plan_duration_days(validity: str) -> int:
+    return 365 if validity == "yearly" else 30
+
+
 @router.get("")
 async def get_wallet(current_user: dict = Depends(get_current_user)):
     db = get_db()
+    # Apply pending plan change if its date has passed
+    if current_user.get("pending_plan_id") and current_user.get("pending_plan_change_at"):
+        try:
+            change_date = datetime.fromisoformat(current_user["pending_plan_change_at"])
+            if datetime.now(timezone.utc) >= change_date:
+                pending_plan = await db.plans.find_one({"_id": current_user["pending_plan_id"]})
+                if pending_plan:
+                    await db.users.update_one({"_id": current_user["id"]}, {"$set": {
+                        "active_plan_id": pending_plan["_id"],
+                        "active_plan_name": pending_plan["name"],
+                        "active_plan_features": pending_plan.get("features", {}),
+                        "subscription_plan": pending_plan.get("legacy_tier") or pending_plan["_id"],
+                        "subscription_price": float(pending_plan["price"]),
+                        "subscription_validity": pending_plan.get("validity", "monthly"),
+                        "whatsapp_enabled": pending_plan.get("features", {}).get("whatsapp_enabled", False),
+                        "pending_plan_id": None,
+                        "pending_plan_name": None,
+                        "pending_plan_change_at": None,
+                    }})
+        except Exception as e:
+            logger.warning(f"Pending plan apply failed: {e}")
+
     transactions = await db.wallet_transactions.find(
         {"user_id": current_user["id"]}
     ).sort("created_at", -1).limit(20).to_list(20)
@@ -102,9 +130,16 @@ async def get_wallet(current_user: dict = Depends(get_current_user)):
     return {
         "balance": current_user.get("wallet_balance", 0.0),
         "subscription_plan": current_user.get("subscription_plan", "free"),
+        "active_plan_id": current_user.get("active_plan_id"),
+        "active_plan_name": current_user.get("active_plan_name"),
+        "subscription_price": current_user.get("subscription_price"),
+        "subscription_validity": current_user.get("subscription_validity", "monthly"),
         "subscription_expires_at": current_user.get("subscription_expires_at"),
         "whatsapp_enabled": current_user.get("whatsapp_enabled", False),
         "referral_code": current_user.get("referral_code"),
+        "pending_plan_id": current_user.get("pending_plan_id"),
+        "pending_plan_name": current_user.get("pending_plan_name"),
+        "pending_plan_change_at": current_user.get("pending_plan_change_at"),
         "transactions": transactions,
     }
 
@@ -201,15 +236,21 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
         raise HTTPException(status_code=400, detail="Insufficient wallet balance")
 
     now = datetime.now(timezone.utc)
-    expires_at = (now + timedelta(days=30)).isoformat()
+    expires_at = (now + timedelta(days=_plan_duration_days(plan_info["plan_validity"]))).isoformat()
     new_balance = wallet_balance - bill_rs
 
     user_update = {
         "wallet_balance": new_balance,
         "subscription_plan": plan_info["plan_key"],
+        "active_plan_name": plan_info["plan_name"],
+        "subscription_price": bill_rs,
+        "subscription_validity": plan_info["plan_validity"],
         "subscription_expires_at": expires_at,
         "whatsapp_enabled": plan_info["features"].get("whatsapp_enabled", False),
         "active_plan_features": plan_info["features"],
+        "pending_plan_id": None,
+        "pending_plan_name": None,
+        "pending_plan_change_at": None,
     }
     if plan_info["plan_id"]:
         user_update["active_plan_id"] = plan_info["plan_id"]
@@ -250,7 +291,6 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
     rp = get_razorpay_client()
     db = get_db()
     now = datetime.now(timezone.utc)
-    expires_at = (now + timedelta(days=30)).isoformat()
 
     try:
         rp.utility.verify_payment_signature({
@@ -285,9 +325,15 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
     user_update = {
         "wallet_balance": new_balance,
         "subscription_plan": plan_info["plan_key"],
-        "subscription_expires_at": expires_at,
+        "active_plan_name": plan_info["plan_name"],
+        "subscription_price": plan_info["plan_price"],
+        "subscription_validity": plan_info["plan_validity"],
+        "subscription_expires_at": (now + timedelta(days=_plan_duration_days(plan_info["plan_validity"]))).isoformat(),
         "whatsapp_enabled": plan_info["features"].get("whatsapp_enabled", False),
         "active_plan_features": plan_info["features"],
+        "pending_plan_id": None,
+        "pending_plan_name": None,
+        "pending_plan_change_at": None,
     }
     if plan_info["plan_id"]:
         user_update["active_plan_id"] = plan_info["plan_id"]
@@ -325,7 +371,124 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
         })
     except Exception as e:
         logger.error("payment_log write failed: %s", e)
-    return {"message": "Payment verified. Subscription active!", "plan": plan_info["plan_key"], "expires_at": expires_at}
+    return {"message": "Payment verified. Subscription active!", "plan": plan_info["plan_key"], "expires_at": (datetime.now(timezone.utc) + timedelta(days=_plan_duration_days(plan_info["plan_validity"]))).isoformat()}
+
+
+@router.post("/subscribe/upgrade")
+async def upgrade_plan(data: SubscribeRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Immediate plan upgrade with pro-rata wallet credit for unused days.
+    Pro-rata = (remaining_days / plan_duration) * current_plan_price → credited to wallet.
+    User is then charged new plan full price (wallet-first).
+    """
+    db = get_db()
+    cfg = await _get_platform_settings(db)
+    new_plan_info = await _resolve_plan(db, data, cfg)
+
+    now = datetime.now(timezone.utc)
+    expires_raw = current_user.get("subscription_expires_at")
+    current_price = float(current_user.get("subscription_price") or 0)
+    current_validity = current_user.get("subscription_validity", "monthly")
+    plan_duration = _plan_duration_days(current_validity)
+
+    # Calculate pro-rata refund
+    pro_rata = 0.0
+    if expires_raw and current_price > 0:
+        try:
+            expires_dt = datetime.fromisoformat(expires_raw)
+            remaining_days = max(0, (expires_dt - now).days)
+            pro_rata = round((remaining_days / plan_duration) * current_price, 2)
+        except Exception:
+            pass
+
+    # Credit pro-rata to wallet
+    wallet_balance = current_user.get("wallet_balance", 0.0)
+    if pro_rata > 0:
+        wallet_balance += pro_rata
+        await db.wallet_transactions.insert_one({
+            "_id": str(uuid.uuid4()),
+            "user_id": current_user["id"],
+            "type": "credit",
+            "amount": pro_rata,
+            "description": f"Pro-rata refund on upgrade to {new_plan_info['plan_name']}",
+            "balance_after": wallet_balance,
+            "created_at": now.isoformat(),
+        })
+        await db.users.update_one({"_id": current_user["id"]}, {"$set": {"wallet_balance": wallet_balance}})
+        current_user["wallet_balance"] = wallet_balance
+
+    # Now subscribe to new plan using wallet-first billing
+    bill_rs = new_plan_info["plan_price"]
+    wallet_deducted = min(wallet_balance, bill_rs)
+    remaining_rs = bill_rs - wallet_deducted
+    remaining_paise = int(remaining_rs * 100)
+
+    if remaining_paise == 0:
+        # Full wallet cover after pro-rata
+        expires_at = (now + timedelta(days=_plan_duration_days(new_plan_info["plan_validity"]))).isoformat()
+        new_balance = wallet_balance - wallet_deducted
+        user_update = {
+            "wallet_balance": new_balance,
+            "subscription_plan": new_plan_info["plan_key"],
+            "active_plan_name": new_plan_info["plan_name"],
+            "subscription_price": bill_rs,
+            "subscription_validity": new_plan_info["plan_validity"],
+            "subscription_expires_at": expires_at,
+            "whatsapp_enabled": new_plan_info["features"].get("whatsapp_enabled", False),
+            "active_plan_features": new_plan_info["features"],
+            "pending_plan_id": None, "pending_plan_name": None, "pending_plan_change_at": None,
+        }
+        if new_plan_info["plan_id"]:
+            user_update["active_plan_id"] = new_plan_info["plan_id"]
+        await db.users.update_one({"_id": current_user["id"]}, {"$set": user_update})
+        await db.wallet_transactions.insert_one({
+            "_id": str(uuid.uuid4()), "user_id": current_user["id"], "type": "debit",
+            "amount": wallet_deducted, "description": f"Subscription upgrade: {new_plan_info['plan_name']}",
+            "balance_after": new_balance, "created_at": now.isoformat(),
+        })
+        return {"full_wallet_cover": True, "pro_rata_credited": pro_rata, "wallet_deducted": wallet_deducted, "expires_at": expires_at}
+
+    rp = get_razorpay_client()
+    order = rp.order.create({
+        "amount": remaining_paise, "currency": "INR",
+        "receipt": f"upg_{current_user['id'][:8]}_{uuid.uuid4().hex[:8]}",
+        "notes": {"user_id": current_user["id"], "plan_id": new_plan_info["plan_id"] or "", "type": "upgrade"},
+    })
+    return {
+        "full_wallet_cover": False,
+        "pro_rata_credited": pro_rata,
+        "wallet_deducted": wallet_deducted,
+        "remaining_to_pay": remaining_rs,
+        "plan_id": new_plan_info["plan_id"],
+        "order": order,
+        "key_id": os.environ.get("RAZORPAY_KEY_ID"),
+    }
+
+
+@router.post("/subscribe/downgrade")
+async def downgrade_plan(data: SubscribeRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Schedule a plan downgrade at end of current tenure.
+    No immediate charge. Stores pending_plan_id for auto-apply on tenure end.
+    """
+    db = get_db()
+    cfg = await _get_platform_settings(db)
+    new_plan_info = await _resolve_plan(db, data, cfg)
+
+    expires_at = current_user.get("subscription_expires_at")
+    if not expires_at:
+        raise HTTPException(status_code=400, detail="No active subscription to schedule downgrade from")
+
+    await db.users.update_one({"_id": current_user["id"]}, {"$set": {
+        "pending_plan_id": new_plan_info["plan_id"],
+        "pending_plan_name": new_plan_info["plan_name"],
+        "pending_plan_change_at": expires_at,
+    }})
+    return {
+        "message": f"Downgrade to '{new_plan_info['plan_name']}' scheduled.",
+        "effective_date": expires_at,
+        "pending_plan_name": new_plan_info["plan_name"],
+    }
 
 
 async def _check_and_reward_referrer(db, user: dict):

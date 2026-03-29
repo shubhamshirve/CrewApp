@@ -29,6 +29,7 @@ import AdminUserProfile from "@/pages/admin/AdminUserProfile";
 import AdminLogs from "@/pages/admin/AdminLogs";
 import AdminTemplates from "@/pages/admin/AdminTemplates";
 import AdminPlans from "@/pages/admin/AdminPlans";
+import AdminReports from "@/pages/admin/AdminReports";
 
 // ── Guards ────────────────────────────────────────────────────────────────────
 function ProtectedRoute({ children }) {
@@ -71,6 +72,7 @@ function AdminRoutes() {
       <Route path="/admin/settings" element={<AdminGuard><AdminSettings /></AdminGuard>} />
       <Route path="/admin/templates" element={<AdminGuard><AdminTemplates /></AdminGuard>} />
       <Route path="/admin/plans" element={<AdminGuard><AdminPlans /></AdminGuard>} />
+      <Route path="/admin/reports" element={<AdminGuard><AdminReports /></AdminGuard>} />
       <Route path="/admin/users/:id" element={<AdminGuard><AdminUserProfile /></AdminGuard>} />
       <Route path="/admin/logs" element={<AdminGuard><AdminLogs /></AdminGuard>} />
       <Route path="/admin/*" element={<Navigate to="/admin/dashboard" replace />} />

@@ -5,8 +5,15 @@ import { Button } from "@/components/ui/button";
 import {
   Wallet as WalletIcon, Check, Crown, MessageSquare,
   Gift, CreditCard, Copy, Share2, Users, Globe, Loader2,
+  RefreshCw, ArrowUpCircle, ArrowDownCircle, Calendar, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+
+function daysUntil(isoDate) {
+  if (!isoDate) return null;
+  const diff = new Date(isoDate) - new Date();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
 
 export default function Wallet() {
   const { user, api, refreshUser } = useAuth();
@@ -96,6 +103,61 @@ export default function Wallet() {
   const currentPlan = user?.subscription_plan || "free";
   const activePlanId = user?.active_plan_id;
   const activePlanFeatures = user?.active_plan_features || {};
+  const activePlanName = walletData?.active_plan_name || user?.active_plan_name;
+  const expiresAt = walletData?.subscription_expires_at;
+  const daysLeft = daysUntil(expiresAt);
+  const canRenew = daysLeft !== null && daysLeft <= 3 && currentPlan !== "free";
+  const pendingPlanName = walletData?.pending_plan_name;
+  const pendingPlanAt = walletData?.pending_plan_change_at;
+
+  // Upgrade: new plan has higher price than current
+  // Downgrade: new plan has lower price
+  const handleUpgrade = async (plan) => {
+    setSubscribing(plan.id + "_upgrade");
+    try {
+      const res = await api.post("/wallet/subscribe/upgrade", { plan_id: plan.id });
+      if (res.data.full_wallet_cover) {
+        toast.success(`Upgraded to ${plan.name}! Pro-rata ₹${res.data.pro_rata_credited} credited to wallet.`);
+        await refreshUser(); await loadWallet(); return;
+      }
+      const loaded = await loadRazorpayScript();
+      if (!loaded) { toast.error("Failed to load payment gateway"); return; }
+      const { order, key_id, wallet_deducted, pro_rata_credited } = res.data;
+      const options = {
+        key: key_id, amount: order.amount, currency: "INR",
+        name: "CrewBook", description: `Upgrade to ${plan.name}`,
+        order_id: order.id,
+        handler: async (response) => {
+          try {
+            await api.post("/wallet/subscribe/verify", {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              plan_id: plan.id, wallet_deducted: wallet_deducted || 0,
+            });
+            toast.success(`Upgraded to ${plan.name}!${pro_rata_credited > 0 ? ` ₹${pro_rata_credited} refunded to wallet.` : ""}`);
+            await refreshUser(); await loadWallet();
+          } catch { toast.error("Payment verification failed"); }
+        },
+        prefill: { name: user?.full_name, contact: user?.phone },
+        theme: { color: "#F59E0B" },
+      };
+      new window.Razorpay(options).open();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Upgrade failed");
+    } finally { setSubscribing(null); }
+  };
+
+  const handleDowngrade = async (plan) => {
+    setSubscribing(plan.id + "_downgrade");
+    try {
+      const res = await api.post("/wallet/subscribe/downgrade", { plan_id: plan.id });
+      toast.success(res.data.message);
+      await loadWallet();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Downgrade scheduling failed");
+    } finally { setSubscribing(null); }
+  };
 
   return (
     <Layout>
@@ -221,28 +283,57 @@ export default function Wallet() {
 
         {/* Current Plan */}
         {currentPlan !== "free" && (
-          <div className="p-4 rounded-xl border border-orange-200 flex items-center justify-between gap-3 bg-orange-50">
-            <div className="flex items-center gap-3">
-              <Crown size={18} className="text-orange-500" />
-              <div>
-                <p className="text-sm font-semibold text-slate-900 font-display">{currentPlan} — Active</p>
-                {walletData?.subscription_expires_at && (
-                  <p className="text-xs text-slate-500">Renews: {new Date(walletData.subscription_expires_at).toLocaleDateString("en-IN")}</p>
+          <div className="p-4 rounded-xl border border-orange-200 bg-orange-50 space-y-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <Crown size={18} className="text-orange-500 flex-shrink-0" />
+                <div>
+                  <p data-testid="active-plan-name" className="text-sm font-semibold text-slate-900 font-display">
+                    {activePlanName || currentPlan}
+                  </p>
+                  {expiresAt && (
+                    <p data-testid="plan-expiry" className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                      <Calendar size={10} />
+                      Expires {new Date(expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      {daysLeft !== null && daysLeft >= 0 && (
+                        <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-display ${daysLeft <= 3 ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600"}`}>
+                          {daysLeft === 0 ? "expires today" : `${daysLeft}d left`}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {activePlanFeatures.whatsapp_enabled && (
+                  <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1.5 font-display bg-emerald-50 text-emerald-600 border border-emerald-200">
+                    <MessageSquare size={11} /> WhatsApp
+                  </span>
+                )}
+                {activePlanFeatures.public_gig_enabled && (
+                  <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1.5 font-display bg-blue-50 text-blue-600 border border-blue-200">
+                    <Globe size={11} /> Gig Board
+                  </span>
+                )}
+                {canRenew && activePlanId && (
+                  <button
+                    data-testid="renew-plan-btn"
+                    onClick={() => handleSubscribe(plans.find(p => p.id === activePlanId) || {})}
+                    className="text-xs px-3 py-1.5 rounded-lg font-display text-white flex items-center gap-1.5"
+                    style={{ background: "#F97316" }}
+                  >
+                    <RefreshCw size={11} /> Renew Now
+                  </button>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              {activePlanFeatures.whatsapp_enabled && (
-                <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1.5 font-display bg-emerald-50 text-emerald-600 border border-emerald-200">
-                  <MessageSquare size={11} /> WhatsApp ON
-                </span>
-              )}
-              {activePlanFeatures.public_gig_enabled && (
-                <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1.5 font-display bg-blue-50 text-blue-600 border border-blue-200">
-                  <Globe size={11} /> Gig Board ON
-                </span>
-              )}
-            </div>
+            {/* Pending downgrade notice */}
+            {pendingPlanName && pendingPlanAt && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <AlertCircle size={12} className="flex-shrink-0" />
+                <span>Plan will change to <strong>{pendingPlanName}</strong> on {new Date(pendingPlanAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -261,6 +352,10 @@ export default function Wallet() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {plans.map(plan => {
               const isActive = activePlanId === plan.id;
+              const currentPlanObj = plans.find(p => p.id === activePlanId);
+              const isUpgrade = !isActive && currentPlanObj && plan.price > currentPlanObj.price;
+              const isDowngrade = !isActive && currentPlanObj && plan.price < currentPlanObj.price;
+              const hasActivePlan = currentPlan !== "free" && activePlanId;
               return (
                 <div key={plan.id} data-testid={`plan-card-${plan.id}`} className="p-6 rounded-2xl border relative overflow-hidden bg-white shadow-sm border-slate-200">
                   <div className="flex items-start justify-between mb-4">
@@ -268,10 +363,13 @@ export default function Wallet() {
                       <p className="text-xs text-slate-500 font-display">{plan.name}</p>
                       <div className="flex items-baseline gap-1 mt-1">
                         <span className="text-3xl font-bold text-slate-900 font-display">₹{plan.price}</span>
-                        <span className="text-slate-400 text-xs">/month</span>
+                        <span className="text-slate-400 text-xs">/{plan.validity === "yearly" ? "year" : "month"}</span>
                       </div>
                       {plan.description && <p className="text-xs text-slate-400 mt-1">{plan.description}</p>}
                     </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-display capitalize border border-slate-200">
+                      {plan.validity || "monthly"}
+                    </span>
                   </div>
 
                   {/* Feature indicators */}
@@ -294,21 +392,39 @@ export default function Wallet() {
                       <Check size={12} className="text-emerald-500" />
                       In-app & email alerts
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                      <Check size={12} className="text-emerald-500" />
-                      Digital wallet & referrals
-                    </div>
                   </div>
 
                   {isActive ? (
                     <div className="w-full text-center py-2 text-xs rounded-lg font-display text-emerald-600 border border-emerald-200 bg-emerald-50">
                       Current Plan
                     </div>
+                  ) : isUpgrade ? (
+                    <Button
+                      data-testid={`upgrade-plan-btn-${plan.id}`}
+                      onClick={() => handleUpgrade(plan)}
+                      disabled={!!subscribing}
+                      className="w-full font-display font-semibold gap-2 text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                      <ArrowUpCircle size={14} />
+                      {subscribing === plan.id + "_upgrade" ? "Processing..." : "Upgrade — Pro-rata refund"}
+                    </Button>
+                  ) : isDowngrade ? (
+                    <Button
+                      data-testid={`downgrade-plan-btn-${plan.id}`}
+                      onClick={() => handleDowngrade(plan)}
+                      disabled={!!subscribing || pendingPlanName === plan.name}
+                      variant="outline"
+                      className="w-full font-display font-semibold gap-2 border-slate-300"
+                    >
+                      <ArrowDownCircle size={14} />
+                      {pendingPlanName === plan.name ? "Downgrade Scheduled" :
+                        subscribing === plan.id + "_downgrade" ? "Scheduling..." : "Downgrade at Renewal"}
+                    </Button>
                   ) : (
                     <Button
                       data-testid={`subscribe-plan-btn-${plan.id}`}
                       onClick={() => handleSubscribe(plan)}
-                      disabled={subscribing === plan.id}
+                      disabled={!!subscribing}
                       className="w-full font-display font-semibold gap-2 text-white"
                       style={{ background: "#E05D26" }}
                     >

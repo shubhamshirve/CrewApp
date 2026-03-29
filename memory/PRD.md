@@ -146,7 +146,13 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
   - Converted gigs create real invite + calendar entry on acceptance
 - ✅ `/gig-board` route added to App.js, "Gig Board" nav item in Layout.jsx
 
-### Admin Plans Management + Plan-Based Feature Gating (March 2026)
+### 4-Feature Update (March 2026)
+- ✅ **Private Notes — Connections Only**: Notes endpoint now checks `accepted` connection before allowing read/write. 403 for non-connected users. Frontend only renders notes section when `connectionStatus === "connected"`.
+- ✅ **Wallet Plan Name + Expiry**: Wallet now stores `active_plan_name`, `subscription_price`, `subscription_validity`, `pending_plan_name`, `pending_plan_change_at`. GET /wallet returns all fields. UI shows plan name + expiry date with days-left badge + renew CTA (3 days before expiry).
+- ✅ **Plan Validity (Monthly/Yearly)**: Plans have `validity: "monthly"/"yearly"` field. Monthly = 30 days, Yearly = 365 days. Upgrade: immediate with pro-rata refund to wallet. Downgrade: scheduled at plan tenure end. Pending change shown in Wallet UI.
+- ✅ **Admin Reports Page** (`/admin/reports`): Overview stats (users, revenue, gigs), area chart for registrations, bar chart for daily revenue, payment log table. 7/14/30 day range selector.
+
+
 - ✅ **Backend**: New `plans` collection + `/api/plans` CRUD router (admin create/edit/delete/migrate, public list endpoint)
 - ✅ **Plan features**: `public_gig_enabled` and `whatsapp_enabled` flags per plan
 - ✅ **Auto-migration**: When plan with `legacy_tier="base"/"premium"` is created, existing users auto-migrated to new plan

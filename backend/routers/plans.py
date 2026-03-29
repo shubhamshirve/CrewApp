@@ -28,7 +28,8 @@ class CreatePlanRequest(BaseModel):
     price: float
     description: Optional[str] = None
     features: PlanFeatures = PlanFeatures()
-    legacy_tier: Optional[str] = None   # "base" | "premium" | None
+    validity: str = "monthly"         # "monthly" (30 days) | "yearly" (365 days)
+    legacy_tier: Optional[str] = None
     is_active: bool = True
     sort_order: int = 0
 
@@ -38,6 +39,7 @@ class UpdatePlanRequest(BaseModel):
     price: Optional[float] = None
     description: Optional[str] = None
     features: Optional[PlanFeatures] = None
+    validity: Optional[str] = None
     legacy_tier: Optional[str] = None
     is_active: Optional[bool] = None
     sort_order: Optional[int] = None
@@ -105,6 +107,7 @@ async def create_plan(data: CreatePlanRequest, _: dict = Depends(get_admin_user)
         "price": data.price,
         "description": data.description or "",
         "features": data.features.dict(),
+        "validity": data.validity,
         "legacy_tier": data.legacy_tier,
         "is_active": data.is_active,
         "sort_order": data.sort_order,
@@ -135,6 +138,7 @@ async def update_plan(plan_id: str, data: UpdatePlanRequest, _: dict = Depends(g
     if data.price is not None:      updates["price"] = data.price
     if data.description is not None: updates["description"] = data.description
     if data.features is not None:   updates["features"] = data.features.dict()
+    if data.validity is not None:   updates["validity"] = data.validity
     if data.legacy_tier is not None: updates["legacy_tier"] = data.legacy_tier
     if data.is_active is not None:  updates["is_active"] = data.is_active
     if data.sort_order is not None: updates["sort_order"] = data.sort_order
