@@ -23,7 +23,12 @@ EDITING_TAGS = ["Lightroom", "Photoshop", "Final Cut Pro", "Premiere Pro", "DaVi
 class ProfileUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
-    location: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    whatsapp_same_as_mobile: Optional[bool] = None
+    location: Optional[str] = None      # city
+    area: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
     pincode: Optional[str] = None
     bio: Optional[str] = None
     primary_role: Optional[str] = None
@@ -33,6 +38,11 @@ class ProfileUpdate(BaseModel):
     style_tags: Optional[List[str]] = None
     editing_ecosystem: Optional[List[str]] = None
     profile_image: Optional[str] = None
+    instagram_url: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    website_url: Optional[str] = None
+    upi_id: Optional[str] = None
+    years_of_experience: Optional[int] = None
 
 
 class GearItem(BaseModel):
@@ -120,6 +130,13 @@ async def get_user(user_id: str, current_user: Optional[dict] = Depends(get_curr
 async def update_profile(data: ProfileUpdate, current_user: dict = Depends(get_current_user)):
     db = get_db()
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    # If same as mobile, copy phone number
+    if data.whatsapp_same_as_mobile and data.phone:
+        update_data["whatsapp_number"] = data.phone
+    elif data.whatsapp_same_as_mobile:
+        existing = await db.users.find_one({"_id": current_user["id"]}, {"phone": 1})
+        if existing:
+            update_data["whatsapp_number"] = existing.get("phone", "")
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     if update_data:
         await db.users.update_one({"_id": current_user["id"]}, {"$set": update_data})
@@ -138,6 +155,22 @@ async def add_gear(gear: GearItem, current_user: dict = Depends(get_current_user
     return gear_item
 
 
+@router.put("/gear/{gear_id}")
+async def edit_gear(gear_id: str, gear: GearItem, current_user: dict = Depends(get_current_user)):
+    db = get_db()
+    await db.users.update_one(
+        {"_id": current_user["id"], "gear_vault.id": gear_id},
+        {"$set": {
+            "gear_vault.$.name": gear.name,
+            "gear_vault.$.category": gear.category,
+            "gear_vault.$.brand": gear.brand,
+            "gear_vault.$.model_number": gear.model_number,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    return {"message": "Gear updated", "id": gear_id, **gear.model_dump()}
+
+
 @router.delete("/gear/{gear_id}")
 async def delete_gear(gear_id: str, current_user: dict = Depends(get_current_user)):
     db = get_db()
@@ -151,8 +184,8 @@ async def delete_gear(gear_id: str, current_user: dict = Depends(get_current_use
 @router.post("/id-upload")
 async def upload_id(data: IdUpload, current_user: dict = Depends(get_current_user)):
     db = get_db()
-    if current_user.get("verification_status") in ("approved",):
-        raise HTTPException(status_code=400, detail="Already verified")
+    if current_user.get("verification_status") == "approved":
+        raise HTTPException(status_code=400, detail="Already verified — no resubmission needed")
     await db.users.update_one(
         {"_id": current_user["id"]},
         {

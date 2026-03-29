@@ -14,8 +14,17 @@ export default function Auth() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
 
+  // Pre-fill referral code from URL ?ref=CODE
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlRef = urlParams.get("ref") || "";
+
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [regData, setRegData] = useState({ email: "", password: "", full_name: "", phone: "", location: "", pincode: "", referral_code: "" });
+  const [regData, setRegData] = useState({
+    email: "", password: "", full_name: "", phone: "",
+    whatsapp_number: "", whatsapp_same_as_mobile: true,
+    location: "", area: "", state: "", country: "India",
+    pincode: "", referral_code: urlRef,
+  });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
@@ -58,7 +67,10 @@ export default function Auth() {
     }
     setLoading(true);
     try {
-      await register(regData);
+      const payload = { ...regData };
+      if (payload.whatsapp_same_as_mobile) payload.whatsapp_number = payload.phone;
+      delete payload.whatsapp_same_as_mobile;
+      await register(payload);
 
       // Check if notification modal was dismissed recently
       const dismissedUntil = localStorage.getItem('crewbook_notification_dismissed');
@@ -110,11 +122,6 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
       <div className="w-full max-w-md">
-        {/* Back */}
-        <button onClick={() => navigate("/")} className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm mb-8 transition-colors" data-testid="auth-back-btn">
-          <ArrowLeft size={16} /> Back
-        </button>
-
         {/* Logo */}
         <div className="flex items-center gap-2 mb-8">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#E05D26" }}>
@@ -149,25 +156,45 @@ export default function Auth() {
                 <Button type="submit" data-testid="login-submit-btn" className="w-full font-semibold font-display mt-2 text-white" style={{ background: "#E05D26" }} disabled={loading}>
                   {loading ? "Signing in..." : "Sign In"}
                 </Button>
-                <p className="text-center text-xs text-slate-400 mt-3">
-                  Admin: admin@crewbook.in / Admin@123
-                </p>
               </form>
             </TabsContent>
 
             {/* Register */}
             <TabsContent value="register">
+              <div className="mb-4">
+                <button onClick={() => navigate("/auth")} className="flex items-center gap-1.5 text-slate-400 hover:text-slate-600 text-xs transition-colors" data-testid="register-back-btn">
+                  <ArrowLeft size={13} /> Back to login
+                </button>
+              </div>
               <form onSubmit={handleRegister} className="space-y-3">
+                {/* Row 1: Name + Phone */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-slate-700 text-xs font-display">Full Name *</Label>
                     <Input data-testid="reg-name" className={`mt-1 ${inputClass}`} placeholder="Raj Sharma" value={regData.full_name} onChange={e => setRegData(p => ({ ...p, full_name: e.target.value }))} />
                   </div>
                   <div>
-                    <Label className="text-slate-700 text-xs font-display">Phone *</Label>
+                    <Label className="text-slate-700 text-xs font-display">Mobile *</Label>
                     <Input data-testid="reg-phone" className={`mt-1 ${inputClass}`} placeholder="9876543210" value={regData.phone} onChange={e => setRegData(p => ({ ...p, phone: e.target.value }))} />
                   </div>
                 </div>
+                {/* WhatsApp */}
+                <div>
+                  <Label className="text-slate-700 text-xs font-display">WhatsApp Number</Label>
+                  <Input
+                    data-testid="reg-whatsapp"
+                    className={`mt-1 ${inputClass} ${regData.whatsapp_same_as_mobile ? "opacity-50" : ""}`}
+                    disabled={regData.whatsapp_same_as_mobile}
+                    placeholder="Same as mobile"
+                    value={regData.whatsapp_same_as_mobile ? regData.phone : regData.whatsapp_number}
+                    onChange={e => setRegData(p => ({ ...p, whatsapp_number: e.target.value }))}
+                  />
+                  <label className="flex items-center gap-1.5 mt-1 cursor-pointer">
+                    <input type="checkbox" checked={regData.whatsapp_same_as_mobile} onChange={e => setRegData(p => ({ ...p, whatsapp_same_as_mobile: e.target.checked }))} className="accent-orange-500" />
+                    <span className="text-xs text-slate-500">Same as mobile</span>
+                  </label>
+                </div>
+                {/* Email + Password */}
                 <div>
                   <Label className="text-slate-700 text-xs font-display">Email *</Label>
                   <Input data-testid="reg-email" className={`mt-1 ${inputClass}`} type="email" placeholder="you@example.com" value={regData.email} onChange={e => setRegData(p => ({ ...p, email: e.target.value }))} />
@@ -176,19 +203,39 @@ export default function Auth() {
                   <Label className="text-slate-700 text-xs font-display">Password *</Label>
                   <Input data-testid="reg-password" className={`mt-1 ${inputClass}`} type="password" placeholder="Min 6 characters" value={regData.password} onChange={e => setRegData(p => ({ ...p, password: e.target.value }))} />
                 </div>
+                {/* Location */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-slate-700 text-xs font-display">City *</Label>
                     <Input data-testid="reg-location" className={`mt-1 ${inputClass}`} placeholder="Mumbai" value={regData.location} onChange={e => setRegData(p => ({ ...p, location: e.target.value }))} />
                   </div>
                   <div>
+                    <Label className="text-slate-700 text-xs font-display">Area</Label>
+                    <Input data-testid="reg-area" className={`mt-1 ${inputClass}`} placeholder="Bandra West" value={regData.area} onChange={e => setRegData(p => ({ ...p, area: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-slate-700 text-xs font-display">State</Label>
+                    <Input data-testid="reg-state" className={`mt-1 ${inputClass}`} placeholder="Maharashtra" value={regData.state} onChange={e => setRegData(p => ({ ...p, state: e.target.value }))} />
+                  </div>
+                  <div>
                     <Label className="text-slate-700 text-xs font-display">Pincode *</Label>
                     <Input data-testid="reg-pincode" className={`mt-1 ${inputClass}`} placeholder="400001" value={regData.pincode} onChange={e => setRegData(p => ({ ...p, pincode: e.target.value }))} />
                   </div>
                 </div>
+                {/* Referral */}
                 <div>
-                  <Label className="text-slate-700 text-xs font-display">Referral Code (optional)</Label>
-                  <Input data-testid="reg-referral" className={`mt-1 ${inputClass}`} placeholder="e.g. RAJ12AB" value={regData.referral_code} onChange={e => setRegData(p => ({ ...p, referral_code: e.target.value }))} />
+                  <Label className="text-slate-700 text-xs font-display">Referral Code {urlRef ? "(applied)" : "(optional)"}</Label>
+                  <Input
+                    data-testid="reg-referral"
+                    className={`mt-1 ${inputClass} ${urlRef ? "opacity-60" : ""}`}
+                    readOnly={!!urlRef}
+                    placeholder="e.g. RAJ12AB"
+                    value={regData.referral_code}
+                    onChange={e => !urlRef && setRegData(p => ({ ...p, referral_code: e.target.value }))}
+                  />
+                  {urlRef && <p className="text-xs text-green-600 mt-1">Referral code applied automatically</p>}
                 </div>
                 <Button type="submit" data-testid="register-submit-btn" className="w-full font-semibold font-display mt-2 text-white" style={{ background: "#E05D26" }} disabled={loading}>
                   {loading ? "Creating account..." : "Create Account"}

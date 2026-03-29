@@ -26,6 +26,34 @@ DEFAULT_SETTINGS = {
     "updated_at": datetime.now(timezone.utc).isoformat(),
 }
 
+DEFAULT_GEAR_CATALOGUE = [
+    {"name": "Sony A7 IV", "category": "Camera", "brand": "Sony"},
+    {"name": "Sony A7 III", "category": "Camera", "brand": "Sony"},
+    {"name": "Sony A7S III", "category": "Camera", "brand": "Sony"},
+    {"name": "Canon EOS R5", "category": "Camera", "brand": "Canon"},
+    {"name": "Canon EOS R6", "category": "Camera", "brand": "Canon"},
+    {"name": "Nikon Z6 II", "category": "Camera", "brand": "Nikon"},
+    {"name": "Nikon Z7 II", "category": "Camera", "brand": "Nikon"},
+    {"name": "Fujifilm X-T5", "category": "Camera", "brand": "Fujifilm"},
+    {"name": "Sony 24-70mm f/2.8 GM", "category": "Lens", "brand": "Sony"},
+    {"name": "Sony 70-200mm f/2.8 GM", "category": "Lens", "brand": "Sony"},
+    {"name": "Canon RF 24-70mm f/2.8", "category": "Lens", "brand": "Canon"},
+    {"name": "Sigma 35mm f/1.4 Art", "category": "Lens", "brand": "Sigma"},
+    {"name": "Godox AD200 Pro", "category": "Lighting", "brand": "Godox"},
+    {"name": "Godox AD600 Pro", "category": "Lighting", "brand": "Godox"},
+    {"name": "Godox SL150 II", "category": "Lighting", "brand": "Godox"},
+    {"name": "Profoto B10", "category": "Lighting", "brand": "Profoto"},
+    {"name": "DJI Mavic 3 Pro", "category": "Drone", "brand": "DJI"},
+    {"name": "DJI Mini 4 Pro", "category": "Drone", "brand": "DJI"},
+    {"name": "DJI Air 3", "category": "Drone", "brand": "DJI"},
+    {"name": "Rode VideoMic Pro+", "category": "Audio", "brand": "Rode"},
+    {"name": "Zoom H5", "category": "Audio", "brand": "Zoom"},
+    {"name": "DJI Mic 2", "category": "Audio", "brand": "DJI"},
+    {"name": "Gitzo GT3543", "category": "Accessories", "brand": "Gitzo"},
+    {"name": "Manfrotto 055", "category": "Accessories", "brand": "Manfrotto"},
+    {"name": "Peak Design Capture", "category": "Accessories", "brand": "Peak Design"},
+]
+
 DEFAULT_EVENT_TYPES = [
     "Haldi", "Mehendi", "Sangeet", "Baraat", "Wedding",
     "Reception", "Pre-Wedding Shoot", "Corporate", "Birthday", "Other"
@@ -227,6 +255,54 @@ async def remove_role(name: str, admin: dict = Depends(get_admin_user)):
         upsert=True
     )
     return {"roles": items}
+
+
+# ── Gear Catalogue ────────────────────────────────────────────────────────────
+
+async def _get_gear_catalogue(db):
+    doc = await db.platform_meta.find_one({"_id": "gear_catalogue"})
+    if not doc:
+        import uuid as _uuid
+        items = [{"id": str(_uuid.uuid4()), **g} for g in DEFAULT_GEAR_CATALOGUE]
+        doc = {"_id": "gear_catalogue", "items": items}
+        await db.platform_meta.insert_one(doc)
+    return doc["items"]
+
+
+@router.get("/gear-catalogue")
+async def get_gear_catalogue():
+    """Public — list master gear catalogue."""
+    db = get_db()
+    items = await _get_gear_catalogue(db)
+    return {"items": items}
+
+
+class GearCatalogueItem(BaseModel):
+    name: str
+    category: str
+    brand: Optional[str] = None
+
+
+@router.post("/gear-catalogue")
+async def add_gear_catalogue_item(data: GearCatalogueItem, admin: dict = Depends(get_admin_user)):
+    """Admin — add an item to master gear catalogue."""
+    import uuid as _uuid
+    db = get_db()
+    items = await _get_gear_catalogue(db)
+    new_item = {"id": str(_uuid.uuid4()), "name": data.name.strip(), "category": data.category, "brand": data.brand}
+    items.append(new_item)
+    await db.platform_meta.update_one({"_id": "gear_catalogue"}, {"$set": {"items": items}}, upsert=True)
+    return {"items": items}
+
+
+@router.delete("/gear-catalogue/{item_id}")
+async def remove_gear_catalogue_item(item_id: str, admin: dict = Depends(get_admin_user)):
+    """Admin — remove an item from master gear catalogue."""
+    db = get_db()
+    items = await _get_gear_catalogue(db)
+    items = [i for i in items if i.get("id") != item_id]
+    await db.platform_meta.update_one({"_id": "gear_catalogue"}, {"$set": {"items": items}}, upsert=True)
+    return {"items": items}
 
 
 

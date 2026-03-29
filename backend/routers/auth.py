@@ -20,6 +20,10 @@ class RegisterRequest(BaseModel):
     location: str
     pincode: str
     referral_code: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    area: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = "India"
 
 
 class LoginRequest(BaseModel):
@@ -53,7 +57,11 @@ async def register(data: RegisterRequest):
         "password_hash": hash_password(data.password),
         "full_name": data.full_name,
         "phone": data.phone,
+        "whatsapp_number": data.whatsapp_number or data.phone,
         "location": data.location,
+        "area": data.area or "",
+        "state": data.state or "",
+        "country": data.country or "India",
         "pincode": data.pincode,
         "primary_role": None,
         "secondary_role": None,
@@ -64,6 +72,11 @@ async def register(data: RegisterRequest):
         "editing_ecosystem": [],
         "bio": "",
         "profile_image": None,
+        "instagram_url": "",
+        "linkedin_url": "",
+        "website_url": "",
+        "upi_id": "",
+        "years_of_experience": None,
         "is_verified": False,
         "verification_status": "not_submitted",
         "govt_id_url": None,
