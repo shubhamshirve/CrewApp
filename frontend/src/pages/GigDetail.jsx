@@ -50,7 +50,7 @@ export default function GigDetail() {
   const [counterFee, setCounterFee] = useState({});
   const [ledger, setLedger] = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
-  const [paymentDialog, setPaymentDialog] = useState(null);
+  const [paymentDialog, setPaymentDialog] = useState(null);  // { invite_id, type, mode: "record"|"edit", suggested_amount }
   const [paymentForm, setPaymentForm] = useState({ amount: "", notes: "" });
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
@@ -100,22 +100,37 @@ export default function GigDetail() {
 
   const handleRecordPayment = async () => {
     if (!paymentDialog) return;
-    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
-      toast.error("Enter a valid amount");
-      return;
-    }
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) { toast.error("Enter a valid amount"); return; }
     setPaymentSubmitting(true);
     try {
-      await api.post(`/gigs/invites/${paymentDialog.invite_id}/payment`, {
-        type: paymentDialog.type,
-        amount: parseFloat(paymentForm.amount),
-        notes: paymentForm.notes || undefined,
-      });
-      toast.success(`${paymentDialog.type === "advance" ? "Advance" : "Balance"} payment recorded`);
+      if (paymentDialog.mode === "edit") {
+        await api.put(`/gigs/invites/${paymentDialog.invite_id}/payment`, {
+          type: paymentDialog.type,
+          amount: parseFloat(paymentForm.amount),
+          notes: paymentForm.notes || undefined,
+        });
+        toast.success(`${paymentDialog.type === "advance" ? "Advance" : "Balance"} payment updated`);
+      } else {
+        await api.post(`/gigs/invites/${paymentDialog.invite_id}/payment`, {
+          type: paymentDialog.type,
+          amount: parseFloat(paymentForm.amount),
+          notes: paymentForm.notes || undefined,
+        });
+        toast.success(`${paymentDialog.type === "advance" ? "Advance" : "Balance"} payment recorded`);
+      }
       setPaymentDialog(null);
       setPaymentForm({ amount: "", notes: "" });
       loadLedger();
-    } catch { toast.error("Failed to record payment"); } finally { setPaymentSubmitting(false); }
+    } catch { toast.error("Failed to save payment"); } finally { setPaymentSubmitting(false); }
+  };
+
+  const handleDeletePayment = async (invite_id, type) => {
+    if (!window.confirm(`Remove ${type} payment? This will mark it as unpaid.`)) return;
+    try {
+      await api.delete(`/gigs/invites/${invite_id}/payment/${type}`);
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} payment removed`);
+      loadLedger();
+    } catch { toast.error("Failed to remove payment"); }
   };
   const handleEditGigSave = async () => {
     if (!editGigForm.title.trim()) { toast.error("Title is required"); return; }
@@ -539,15 +554,30 @@ export default function GigDetail() {
                             <div className="flex items-center gap-1.5 justify-end">
                               <span className="text-xs text-slate-500">Advance ₹{entry.advance_amount?.toLocaleString("en-IN")}</span>
                               {entry.advance_paid ? (
-                                <CheckCircle2 size={14} className="text-green-500" />
+                                <div className="flex items-center gap-1">
+                                  <CheckCircle2 size={14} className="text-green-500" />
+                                  <button
+                                    title="Edit advance"
+                                    onClick={() => { setPaymentDialog({ invite_id: entry.invite_id, type: "advance", mode: "edit" }); setPaymentForm({ amount: String(entry.advance_amount), notes: entry.payment_notes || "" }); }}
+                                    className="text-slate-300 hover:text-orange-400 transition-colors"
+                                    data-testid={`edit-advance-${entry.invite_id}`}
+                                  >
+                                    <Pencil size={11} />
+                                  </button>
+                                  <button
+                                    title="Undo advance"
+                                    onClick={() => handleDeletePayment(entry.invite_id, "advance")}
+                                    className="text-slate-300 hover:text-red-400 transition-colors"
+                                    data-testid={`undo-advance-${entry.invite_id}`}
+                                  >
+                                    <X size={11} />
+                                  </button>
+                                </div>
                               ) : (
                                 <Button
                                   size="sm"
                                   data-testid={`pay-advance-${entry.invite_id}`}
-                                  onClick={() => {
-                                    setPaymentDialog({ invite_id: entry.invite_id, type: "advance", suggested_amount: entry.advance_amount });
-                                    setPaymentForm({ amount: String(entry.advance_amount), notes: "" });
-                                  }}
+                                  onClick={() => { setPaymentDialog({ invite_id: entry.invite_id, type: "advance", mode: "record", suggested_amount: entry.advance_amount }); setPaymentForm({ amount: String(entry.advance_amount), notes: "" }); }}
                                   className="h-6 text-xs px-2 font-display text-white"
                                   style={{ background: "#F59E0B" }}
                                 >
@@ -558,15 +588,30 @@ export default function GigDetail() {
                             <div className="flex items-center gap-1.5 justify-end">
                               <span className="text-xs text-slate-500">Balance ₹{entry.balance_amount?.toLocaleString("en-IN")}</span>
                               {entry.balance_paid ? (
-                                <CheckCircle2 size={14} className="text-green-500" />
+                                <div className="flex items-center gap-1">
+                                  <CheckCircle2 size={14} className="text-green-500" />
+                                  <button
+                                    title="Edit balance"
+                                    onClick={() => { setPaymentDialog({ invite_id: entry.invite_id, type: "balance", mode: "edit" }); setPaymentForm({ amount: String(entry.balance_amount), notes: entry.payment_notes || "" }); }}
+                                    className="text-slate-300 hover:text-orange-400 transition-colors"
+                                    data-testid={`edit-balance-${entry.invite_id}`}
+                                  >
+                                    <Pencil size={11} />
+                                  </button>
+                                  <button
+                                    title="Undo balance"
+                                    onClick={() => handleDeletePayment(entry.invite_id, "balance")}
+                                    className="text-slate-300 hover:text-red-400 transition-colors"
+                                    data-testid={`undo-balance-${entry.invite_id}`}
+                                  >
+                                    <X size={11} />
+                                  </button>
+                                </div>
                               ) : (
                                 <Button
                                   size="sm"
                                   data-testid={`pay-balance-${entry.invite_id}`}
-                                  onClick={() => {
-                                    setPaymentDialog({ invite_id: entry.invite_id, type: "balance", suggested_amount: entry.balance_amount });
-                                    setPaymentForm({ amount: String(entry.balance_amount), notes: "" });
-                                  }}
+                                  onClick={() => { setPaymentDialog({ invite_id: entry.invite_id, type: "balance", mode: "record", suggested_amount: entry.balance_amount }); setPaymentForm({ amount: String(entry.balance_amount), notes: "" }); }}
                                   className="h-6 text-xs px-2 font-display text-white"
                                   style={{ background: "#3B82F6" }}
                                 >
@@ -888,7 +933,7 @@ export default function GigDetail() {
         <DialogContent className="bg-white border-slate-200 max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-slate-900 font-display">
-              Record {paymentDialog?.type === "advance" ? "Advance" : "Balance"} Payment
+              {paymentDialog?.mode === "edit" ? "Edit" : "Record"} {paymentDialog?.type === "advance" ? "Advance" : "Balance"} Payment
             </DialogTitle>
           </DialogHeader>
           {paymentDialog && (

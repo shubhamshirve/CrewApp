@@ -32,6 +32,16 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
 
+  // ── Forgot Password state ──────────────────────────────────────────────────
+  const [forgotStep, setForgotStep] = useState("idle"); // "idle"|"send"|"otp"|"done"
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotNewPass, setForgotNewPass] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotDevOtp, setForgotDevOtp] = useState("");
+  const [forgotCountdown, setForgotCountdown] = useState(0);
+  const forgotTimerRef = useRef(null);
+
   // ── OTP state ──────────────────────────────────────────────────────────────
   const [otpStep, setOtpStep] = useState("form"); // "form" | "otp" | "verified"
   const [otpValue, setOtpValue] = useState("");
@@ -56,6 +66,18 @@ export default function Auth() {
     }
     return () => clearInterval(countdownRef.current);
   }, [countdown]);
+
+  useEffect(() => {
+    if (forgotCountdown > 0) {
+      forgotTimerRef.current = setInterval(() => {
+        setForgotCountdown(c => {
+          if (c <= 1) { clearInterval(forgotTimerRef.current); return 0; }
+          return c - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(forgotTimerRef.current);
+  }, [forgotCountdown]);
 
   // ── Pincode auto-fill ──────────────────────────────────────────────────────
   const handlePincodeBlur = async (pincode) => {
@@ -126,6 +148,48 @@ export default function Auth() {
     } finally {
       setOtpLoading(false);
     }
+  };
+
+  // ── Forgot Password handlers ───────────────────────────────────────────────
+  const handleSendResetOtp = async () => {
+    if (!forgotEmail) { toast.error("Enter your email address"); return; }
+    setForgotLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to send code");
+      setForgotStep("otp");
+      setForgotCountdown(60);
+      if (data.otp_dev) {
+        setForgotDevOtp(data.otp_dev);
+        toast.info(`Dev mode — OTP: ${data.otp_dev}`, { duration: 30000 });
+      } else {
+        toast.success("Reset code sent to your email");
+      }
+    } catch (err) { toast.error(err.message); }
+    finally { setForgotLoading(false); }
+  };
+
+  const handleResetPassword = async () => {
+    if (forgotOtp.length !== 6) { toast.error("Enter the 6-digit code"); return; }
+    if (!forgotNewPass || forgotNewPass.length < 8) { toast.error("Password must be at least 8 characters"); return; }
+    setForgotLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail, otp: forgotOtp, new_password: forgotNewPass }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Reset failed");
+      setForgotStep("done");
+      toast.success("Password reset! You can now sign in.");
+    } catch (err) { toast.error(err.message); }
+    finally { setForgotLoading(false); }
   };
 
   // ── Login ──────────────────────────────────────────────────────────────────
@@ -228,24 +292,123 @@ export default function Auth() {
 
             {/* ── Login ── */}
             <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <Label className="text-slate-700 text-sm font-display">Email</Label>
-                  <Input data-testid="login-email" className={`mt-1 ${ic}`} type="email" placeholder="you@example.com" value={loginData.email} onChange={e => setLoginData(p => ({ ...p, email: e.target.value }))} />
-                </div>
-                <div>
-                  <Label className="text-slate-700 text-sm font-display">Password</Label>
-                  <div className="relative mt-1">
-                    <Input data-testid="login-password" className={ic} type={showPass ? "text" : "password"} placeholder="••••••••" value={loginData.password} onChange={e => setLoginData(p => ({ ...p, password: e.target.value }))} />
-                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+              {forgotStep === "idle" || forgotStep === "done" ? (
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <Label className="text-slate-700 text-sm font-display">Email</Label>
+                    <Input data-testid="login-email" className={`mt-1 ${ic}`} type="email" placeholder="you@example.com" value={loginData.email} onChange={e => setLoginData(p => ({ ...p, email: e.target.value }))} />
                   </div>
+                  <div>
+                    <Label className="text-slate-700 text-sm font-display">Password</Label>
+                    <div className="relative mt-1">
+                      <Input data-testid="login-password" className={ic} type={showPass ? "text" : "password"} placeholder="••••••••" value={loginData.password} onChange={e => setLoginData(p => ({ ...p, password: e.target.value }))} />
+                      <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="forgot-password-link"
+                    onClick={() => { setForgotStep("send"); setForgotEmail(loginData.email); }}
+                    className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+                  >
+                    Forgot password?
+                  </button>
+                  <Button type="submit" data-testid="login-submit-btn" className="w-full font-semibold font-display mt-2 text-white" style={{ background: "#E05D26" }} disabled={loading}>
+                    {loading ? "Signing in…" : "Sign In"}
+                  </Button>
+                </form>
+              ) : (
+                /* ── Forgot Password inline section ── */
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <button onClick={() => setForgotStep("idle")} className="text-slate-400 hover:text-slate-600">
+                      <ArrowLeft size={15} />
+                    </button>
+                    <h3 className="text-sm font-semibold text-slate-800 font-display">Reset Password</h3>
+                  </div>
+
+                  {forgotStep === "send" && (
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-slate-700 text-sm font-display">Email address</Label>
+                        <Input
+                          data-testid="forgot-email"
+                          className={`mt-1 ${ic}`}
+                          type="email"
+                          placeholder="you@example.com"
+                          value={forgotEmail}
+                          onChange={e => setForgotEmail(e.target.value)}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        data-testid="send-reset-otp-btn"
+                        className="w-full font-semibold text-white"
+                        style={{ background: "#E05D26" }}
+                        onClick={handleSendResetOtp}
+                        disabled={forgotLoading}
+                      >
+                        {forgotLoading ? <Loader2 size={15} className="animate-spin mx-auto" /> : "Send Reset Code"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {forgotStep === "otp" && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
+                        <p className="text-xs text-slate-600 mb-2">
+                          Enter the 6-digit code sent to <strong>{forgotEmail}</strong>
+                          {forgotDevOtp && <span className="ml-1 text-orange-600 font-semibold">(Dev: {forgotDevOtp})</span>}
+                        </p>
+                        <div className="flex gap-2">
+                          <Input
+                            data-testid="reset-otp-input"
+                            className={`${ic} tracking-widest text-center font-mono font-bold text-lg`}
+                            placeholder="000000"
+                            maxLength={6}
+                            value={forgotOtp}
+                            onChange={e => setForgotOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="shrink-0 text-white text-xs px-3"
+                            style={{ background: "#E05D26" }}
+                            onClick={handleSendResetOtp}
+                            disabled={forgotLoading || forgotCountdown > 0}
+                          >
+                            {forgotCountdown > 0 ? `${forgotCountdown}s` : "Resend"}
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-slate-700 text-sm font-display">New Password</Label>
+                        <Input
+                          data-testid="reset-new-password"
+                          className={`mt-1 ${ic}`}
+                          type="password"
+                          placeholder="Min 8 chars, letter + number"
+                          value={forgotNewPass}
+                          onChange={e => setForgotNewPass(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && handleResetPassword()}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        data-testid="reset-password-btn"
+                        className="w-full font-semibold text-white"
+                        style={{ background: "#16a34a" }}
+                        onClick={handleResetPassword}
+                        disabled={forgotLoading || forgotOtp.length !== 6}
+                      >
+                        {forgotLoading ? <Loader2 size={15} className="animate-spin mx-auto" /> : "Reset Password"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <Button type="submit" data-testid="login-submit-btn" className="w-full font-semibold font-display mt-2 text-white" style={{ background: "#E05D26" }} disabled={loading}>
-                  {loading ? "Signing in…" : "Sign In"}
-                </Button>
-              </form>
+              )}
             </TabsContent>
 
             {/* ── Register ── */}

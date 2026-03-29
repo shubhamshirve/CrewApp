@@ -169,7 +169,11 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ **Profile.jsx**: UPI Pay Now button — non-owners see green "Pay Now" UPI deeplink button; owners see their UPI ID text
 - ✅ **Onboarding.jsx**: Gear section updated with category select → filtered gear dropdown → custom gear name fallback
 
-### Docker, Security & API Hardening (Done — March 2026)
+### Reports, Ledger CRUD & Password Management (Done — March 2026)
+- ✅ **Password Reset via Email OTP**: `POST /api/auth/forgot-password` + `POST /api/auth/reset-password` — same OTP infrastructure, mock mode returns `otp_dev`; "Forgot password?" link on login inline reveals OTP + new password form
+- ✅ **Password Change in Profile**: `POST /api/auth/change-password` (requires current password) — dialog accessible via "Change Password" link inside profile edit panel
+- ✅ **Gig Ledger Full CRUD**: `PUT /api/gigs/invites/{id}/payment` (edit amount/notes) + `DELETE /api/gigs/invites/{id}/payment/{type}` (undo/unmark) — Edit ✏️ and Undo ✕ buttons on all paid ledger entries in GigDetail.jsx
+- ✅ **User Reports Tab** (`/reports` route, "Reports" in nav): 6 tabs — Overview (summary stats dual role), Bookings (freelancer history), Payments (received), Pending (dues with lead contact), Monthly (bar mini-chart with earned/pending), Gig Expenses (crew payments as lead); all batch-queried efficiently
 - ✅ **Docker — Caddy replaces nginx**: `Caddyfile` with gzip, security headers, SPA fallback, API proxy; updated `docker-compose.yml` with caddy_data/caddy_config volumes
 - ✅ **Docker — npm replaces yarn**: `frontend/Dockerfile` updated to use `npm ci` for reproducible builds
 - ✅ **Pincode API auto-fill**: `src/utils/pincode.js` using `api.postalpincode.in` — auto-fills City & State on blur in both Registration and Profile edit forms; shows loading/valid/invalid states

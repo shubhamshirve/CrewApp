@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Search, Users, Briefcase, Calendar,
   Wallet, Bell, LogOut, User, ChevronLeft, ChevronRight,
-  Menu, Globe, Download, X, ShieldAlert, ArrowLeft
+  Menu, Globe, Download, X, ShieldAlert, ArrowLeft, BarChart2,
 } from "lucide-react";
 import NotificationPrompt from "@/components/NotificationPrompt";
 
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { path: "/gig-board", icon: Globe, label: "Gig Board" },
   { path: "/calendar", icon: Calendar, label: "Calendar" },
   { path: "/wallet", icon: Wallet, label: "Wallet" },
+  { path: "/reports", icon: BarChart2, label: "Reports" },
   { path: "/notifications", icon: Bell, label: "Alerts" },
 ];
 

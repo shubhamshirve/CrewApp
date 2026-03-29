@@ -102,6 +102,31 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [pincodeStatus, setPincodeStatus] = useState("idle"); // "idle"|"loading"|"valid"|"invalid"
 
+  // Change Password state
+  const [showChangePass, setShowChangePass] = useState(false);
+  const [changePassForm, setChangePassForm] = useState({ current: "", newPass: "", confirm: "" });
+  const [changePassLoading, setChangePassLoading] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!changePassForm.current) { toast.error("Enter your current password"); return; }
+    if (changePassForm.newPass.length < 8) { toast.error("New password must be at least 8 characters"); return; }
+    if (changePassForm.newPass !== changePassForm.confirm) { toast.error("Passwords don't match"); return; }
+    setChangePassLoading(true);
+    try {
+      await api.post("/auth/change-password", {
+        current_password: changePassForm.current,
+        new_password: changePassForm.newPass,
+      });
+      toast.success("Password changed successfully");
+      setShowChangePass(false);
+      setChangePassForm({ current: "", newPass: "", confirm: "" });
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to change password");
+    } finally {
+      setChangePassLoading(false);
+    }
+  };
+
   const handleProfilePincodeBlur = async (pincode) => {
     if (!pincode || String(pincode).length !== 6) { setPincodeStatus("idle"); return; }
     setPincodeStatus("loading");
@@ -811,6 +836,75 @@ export default function Profile() {
                 style={{ background: "#F97316" }}
               >
                 {saving ? "Saving…" : <><Save size={14} className="mr-1.5" />Save Changes</>}
+              </Button>
+            </div>
+
+            {/* Change Password link inside edit dialog */}
+            <button
+              type="button"
+              data-testid="open-change-password-btn"
+              onClick={() => { setEditing(false); setShowChangePass(true); }}
+              className="w-full text-xs text-orange-500 hover:text-orange-600 font-medium mt-1 text-center"
+            >
+              Change Password
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Change Password Dialog ───────────────────────────────────────── */}
+      <Dialog open={showChangePass} onOpenChange={setShowChangePass}>
+        <DialogContent className="bg-white border-slate-200 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display text-base">Change Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-1">
+            <div>
+              <label className="text-xs text-slate-600 font-display">Current Password</label>
+              <input
+                data-testid="change-pass-current"
+                type="password"
+                className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-900 bg-white focus:outline-none focus:border-orange-400"
+                placeholder="••••••••"
+                value={changePassForm.current}
+                onChange={e => setChangePassForm(p => ({ ...p, current: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 font-display">New Password</label>
+              <input
+                data-testid="change-pass-new"
+                type="password"
+                className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-900 bg-white focus:outline-none focus:border-orange-400"
+                placeholder="Min 8 chars, letter + number"
+                value={changePassForm.newPass}
+                onChange={e => setChangePassForm(p => ({ ...p, newPass: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 font-display">Confirm New Password</label>
+              <input
+                data-testid="change-pass-confirm"
+                type="password"
+                className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-900 bg-white focus:outline-none focus:border-orange-400"
+                placeholder="Re-enter new password"
+                value={changePassForm.confirm}
+                onChange={e => setChangePassForm(p => ({ ...p, confirm: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && handleChangePassword()}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1 border-slate-200 text-slate-500" onClick={() => { setShowChangePass(false); setChangePassForm({ current: "", newPass: "", confirm: "" }); }}>
+                Cancel
+              </Button>
+              <Button
+                data-testid="change-pass-submit"
+                className="flex-1 text-white font-display"
+                style={{ background: "#F97316" }}
+                onClick={handleChangePassword}
+                disabled={changePassLoading}
+              >
+                {changePassLoading ? "Saving…" : "Update Password"}
               </Button>
             </div>
           </div>

@@ -286,16 +286,21 @@ async def get_gig_ledger(gig_id: str, current_user: dict = Depends(get_current_u
         {"gig_id": gig_id, "status": "accepted"}
     ).to_list(50)
 
+    # Batch-fetch all freelancers (fix N+1)
+    fl_ids = list({inv["freelancer_id"] for inv in invites})
+    fl_raw = await db.users.find({"_id": {"$in": fl_ids}}, {"full_name": 1, "email": 1, "_id": 1}).to_list(100)
+    fl_map = {f["_id"]: f for f in fl_raw}
+
     result = []
     for inv in invites:
-        freelancer = await db.users.find_one({"_id": inv["freelancer_id"]}, {"full_name": 1, "email": 1, "_id": 0})
+        fl = fl_map.get(inv["freelancer_id"], {})
         agreed = inv.get("agreed_fee") or inv.get("counter_fee") or inv.get("proposed_fee", 0)
         advance_amount = inv.get("advance_amount", round(agreed * 0.5, 2))
         result.append({
             "invite_id": inv["_id"],
             "freelancer_id": inv["freelancer_id"],
-            "freelancer_name": freelancer.get("full_name", "Unknown") if freelancer else "Unknown",
-            "freelancer_email": freelancer.get("email", "") if freelancer else "",
+            "freelancer_name": fl.get("full_name", "Unknown"),
+            "freelancer_email": fl.get("email", ""),
             "role": inv.get("role", ""),
             "session_date": inv.get("session_date", ""),
             "agreed_fee": agreed,
@@ -368,6 +373,57 @@ async def record_payment(invite_id: str, data: PaymentRecord, current_user: dict
         {"gig_id": invite["gig_id"], "invite_id": invite_id}
     )
     return {"message": f"{data.type.capitalize()} payment recorded", "invite_id": invite_id}
+
+
+@router.put("/invites/{invite_id}/payment")
+async def update_payment(invite_id: str, data: PaymentRecord, current_user: dict = Depends(get_current_user)):
+    """Edit amount / notes for an existing paid entry."""
+    db = get_db()
+    invite = await db.gig_invites.find_one({"_id": invite_id})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    gig = await db.gigs.find_one({"_id": invite["gig_id"]})
+    if not gig or gig["lead_photographer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the lead photographer can update payments")
+
+    now = datetime.now(timezone.utc).isoformat()
+    if data.type == "advance":
+        if not invite.get("advance_paid"):
+            raise HTTPException(status_code=400, detail="Advance payment not yet recorded")
+        update = {"advance_amount": data.amount, "advance_paid_at": now}
+    else:
+        if not invite.get("balance_paid"):
+            raise HTTPException(status_code=400, detail="Balance payment not yet recorded")
+        update = {"balance_paid_at": now}
+    if data.notes is not None:
+        update["payment_notes"] = data.notes
+    update["updated_at"] = now
+
+    await db.gig_invites.update_one({"_id": invite_id}, {"$set": update})
+    return {"message": f"{data.type.capitalize()} payment updated", "invite_id": invite_id}
+
+
+@router.delete("/invites/{invite_id}/payment/{payment_type}")
+async def delete_payment(invite_id: str, payment_type: str, current_user: dict = Depends(get_current_user)):
+    """Undo/unmark a payment (set paid flag back to False)."""
+    db = get_db()
+    if payment_type not in ("advance", "balance"):
+        raise HTTPException(status_code=400, detail="payment_type must be advance or balance")
+    invite = await db.gig_invites.find_one({"_id": invite_id})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    gig = await db.gigs.find_one({"_id": invite["gig_id"]})
+    if not gig or gig["lead_photographer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the lead photographer can remove payments")
+
+    if payment_type == "advance":
+        update = {"advance_paid": False, "advance_paid_at": None}
+    else:
+        update = {"balance_paid": False, "balance_paid_at": None}
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.gig_invites.update_one({"_id": invite_id}, {"$set": update})
+    return {"message": f"{payment_type.capitalize()} payment removed", "invite_id": invite_id}
 
 
 class UpdateGigRequest(BaseModel):

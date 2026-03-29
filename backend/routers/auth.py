@@ -296,6 +296,136 @@ async def login(request: Request, data: LoginRequest):
     return {"token": token, "user": _clean_user({**user})}
 
 
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(request: Request, data: SendOtpRequest):
+    """Send a password-reset OTP to an existing account's email."""
+    db = get_db()
+    email = data.email.lower()
+    user = await db.users.find_one({"email": email}, {"_id": 1})
+    # Always return success to avoid email enumeration
+    if not user:
+        return {"message": "If that email is registered, a reset code has been sent."}
+
+    # Rate-limit: one OTP per email per minute
+    reset_id = f"reset_{email}"
+    recent = await db.otp_verifications.find_one({"_id": reset_id})
+    if recent:
+        created = datetime.fromisoformat(recent["created_at"])
+        if (datetime.now(timezone.utc) - created).total_seconds() < 60:
+            raise HTTPException(
+                status_code=429,
+                detail="Please wait 60 seconds before requesting a new code"
+            )
+
+    otp = _generate_otp()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=_OTP_TTL_MINUTES)
+
+    await db.otp_verifications.replace_one(
+        {"_id": reset_id},
+        {
+            "_id": reset_id,
+            "otp_hash": _hash_otp(otp),
+            "expires_at": expires_at.isoformat(),
+            "attempts": 0,
+            "verified": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+        upsert=True,
+    )
+
+    result = await send_otp_email(db, email, otp, "")
+    is_mock = result.get("status") != "sent"
+    response: dict = {"message": "If that email is registered, a reset code has been sent."}
+    if is_mock:
+        response["otp_dev"] = otp
+    return response
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        if not re.search(r"[A-Za-z]", v):
+            raise ValueError("Password must contain at least one letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(request: Request, data: ResetPasswordRequest):
+    """Verify reset OTP and set a new password."""
+    db = get_db()
+    email = data.email.lower()
+    reset_id = f"reset_{email}"
+    record = await db.otp_verifications.find_one({"_id": reset_id})
+
+    if not record:
+        raise HTTPException(status_code=400, detail="No reset code found. Please request a new one.")
+
+    expires_at = datetime.fromisoformat(record["expires_at"])
+    if datetime.now(timezone.utc) > expires_at:
+        await db.otp_verifications.delete_one({"_id": reset_id})
+        raise HTTPException(status_code=400, detail="Reset code expired. Please request a new one.")
+
+    if record.get("attempts", 0) >= _OTP_MAX_ATTEMPTS:
+        await db.otp_verifications.delete_one({"_id": reset_id})
+        raise HTTPException(status_code=400, detail="Too many incorrect attempts. Please request a new code.")
+
+    if _hash_otp(data.otp) != record["otp_hash"]:
+        await db.otp_verifications.update_one({"_id": reset_id}, {"$inc": {"attempts": 1}})
+        remaining = _OTP_MAX_ATTEMPTS - record.get("attempts", 0) - 1
+        raise HTTPException(status_code=400, detail=f"Incorrect code. {remaining} attempt(s) remaining.")
+
+    await db.users.update_one(
+        {"email": email},
+        {"$set": {
+            "password_hash": hash_password(data.new_password),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    await db.otp_verifications.delete_one({"_id": reset_id})
+    return {"message": "Password reset successfully. You can now log in with your new password."}
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        if not re.search(r"[A-Za-z]", v):
+            raise ValueError("Password must contain at least one letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
+
+@router.post("/change-password")
+@limiter.limit("5/minute")
+async def change_password(request: Request, data: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    """Change password for a logged-in user (requires current password)."""
+    db = get_db()
+    user = await db.users.find_one({"_id": current_user["id"]}, {"password_hash": 1})
+    if not user or not verify_password(data.current_password, user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    await db.users.update_one(
+        {"_id": current_user["id"]},
+        {"$set": {
+            "password_hash": hash_password(data.new_password),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    return {"message": "Password changed successfully"}
+
+
 @router.get("/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user

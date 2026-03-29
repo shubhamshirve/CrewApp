@@ -17,6 +17,7 @@ import CalendarPage from "@/pages/Calendar";
 import Wallet from "@/pages/Wallet";
 import Notifications from "@/pages/Notifications";
 import GigBoard from "@/pages/GigBoard";
+import UserReports from "@/pages/UserReports";
 
 // Admin app pages
 import AdminOverview from "@/pages/admin/AdminOverview";
@@ -97,6 +98,7 @@ function UserRoutes() {
       <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
       <Route path="/gig-board" element={<ProtectedRoute><GigBoard /></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute><UserReports /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

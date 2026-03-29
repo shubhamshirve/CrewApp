@@ -21,7 +21,7 @@ from rate_limit import limiter
 from routers import (
     auth, users, admin, gigs, connections, wallet, notifications,
     ratings, ai_routes, public_gigs, platform_settings, templates,
-    calendar_sync, notes, push, plans,
+    calendar_sync, notes, push, plans, reports,
 )
 from db import client, db
 
@@ -172,6 +172,7 @@ api_router.include_router(calendar_sync.router, tags=["calendar-sync"])
 api_router.include_router(notes.router, tags=["notes"])
 api_router.include_router(push.router, tags=["push"])
 api_router.include_router(plans.router, tags=["plans"])
+api_router.include_router(reports.router, tags=["reports"])
 
 
 @api_router.get("/health")
