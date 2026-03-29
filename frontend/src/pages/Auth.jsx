@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import InstallAppButton from '@/components/InstallAppButton';
+import NotificationPermissionModal from '@/components/NotificationPermissionModal';
 
 export default function Auth() {
   const { login, register } = useAuth();
@@ -16,16 +18,33 @@ export default function Auth() {
   const [regData, setRegData] = useState({ email: "", password: "", full_name: "", phone: "", location: "", pincode: "", referral_code: "" });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const user = await login(loginData.email, loginData.password);
-      toast.success(`Welcome back, ${user.full_name}!`);
-      navigate(user.is_admin ? "/admin/dashboard" : user.onboarding_complete ? "/dashboard" : "/onboarding");
+
+      // Check if notification modal was dismissed recently
+      const dismissedUntil = localStorage.getItem('crewbook_notification_dismissed');
+      const shouldShowModal = !dismissedUntil || new Date() >= new Date(dismissedUntil);
+
+      if (shouldShowModal) {
+        // Show notification modal before redirecting
+        setShowNotificationModal(true);
+        // Store user data for redirect after modal closes
+        sessionStorage.setItem('pendingUser', JSON.stringify({
+          user,
+          action: 'login'
+        }));
+      } else {
+        // Skip modal, redirect immediately
+        toast.success(`Welcome back, ${user.full_name}!`);
+        navigate(user.is_admin ? '/admin/dashboard' : user.onboarding_complete ? '/dashboard' : '/onboarding');
+      }
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Login failed");
+      toast.error(err.response?.data?.detail || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -40,13 +59,50 @@ export default function Auth() {
     setLoading(true);
     try {
       await register(regData);
-      toast.success("Account created! Let's set up your profile.");
-      navigate("/onboarding");
+
+      // Check if notification modal was dismissed recently
+      const dismissedUntil = localStorage.getItem('crewbook_notification_dismissed');
+      const shouldShowModal = !dismissedUntil || new Date() >= new Date(dismissedUntil);
+
+      if (shouldShowModal) {
+        // Show notification modal before redirecting
+        setShowNotificationModal(true);
+        // Store redirect action in session
+        sessionStorage.setItem('pendingUser', JSON.stringify({
+          action: 'register'
+        }));
+      } else {
+        // Skip modal, redirect immediately
+        toast.success('Account created! Let\'s set up your profile.');
+        navigate('/onboarding');
+      }
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Registration failed");
+      toast.error(err.response?.data?.detail || 'Registration failed');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleNotificationModalComplete = () => {
+    // Modal has completed (user accepted or dismissed)
+    try {
+      const pendingUser = sessionStorage.getItem('pendingUser');
+      if (pendingUser) {
+        const { user, action } = JSON.parse(pendingUser);
+        sessionStorage.removeItem('pendingUser');
+
+        if (action === 'login' && user) {
+          toast.success(`Welcome back, ${user.full_name}!`);
+          navigate(user.is_admin ? '/admin/dashboard' : user.onboarding_complete ? '/dashboard' : '/onboarding');
+        } else if (action === 'register') {
+          toast.success('Account created! Let\'s set up your profile.');
+          navigate('/onboarding');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to parse pending user:', err);
+    }
+    setShowNotificationModal(false);
   };
 
   const inputClass = "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:ring-orange-400/20";
@@ -140,7 +196,12 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
+          <InstallAppButton />
         </div>
+        <NotificationPermissionModal
+          isOpen={showNotificationModal}
+          onComplete={handleNotificationModalComplete}
+        />
       </div>
     </div>
   );
