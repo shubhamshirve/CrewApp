@@ -40,6 +40,14 @@ class UserFlagsRequest(BaseModel):
     is_high_risk: Optional[bool] = None
 
 
+class AssignPlanRequest(BaseModel):
+    plan_id: str     # UUID of plan from db.plans
+
+
+class ExtendExpiryRequest(BaseModel):
+    days: int        # positive integer — days to extend
+
+
 @router.get("/verification-queue")
 async def get_verification_queue(admin: dict = Depends(get_admin_user)):
     db = get_db()
@@ -666,6 +674,72 @@ async def get_login_logs(
     for item in items:
         item["id"] = str(item.pop("_id"))
     return {"items": items, "total": total}
+
+
+@router.post("/users/{user_id}/assign-plan")
+async def assign_plan_to_user(user_id: str, data: AssignPlanRequest, admin: dict = Depends(get_admin_user)):
+    """Admin assigns a subscription plan to a user directly (no payment)."""
+    db = get_db()
+    user = await db.users.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    plan = await db.plans.find_one({"_id": data.plan_id})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    validity = plan.get("validity", "monthly")
+    duration_days = 365 if validity == "yearly" else 30
+    now = datetime.now(timezone.utc)
+    expires_at = (now + timedelta(days=duration_days)).isoformat()
+
+    await db.users.update_one({"_id": user_id}, {"$set": {
+        "active_plan_id": str(plan["_id"]),
+        "active_plan_name": plan["name"],
+        "active_plan_features": plan.get("features", {}),
+        "subscription_plan": plan.get("legacy_tier") or str(plan["_id"]),
+        "subscription_price": float(plan["price"]),
+        "subscription_validity": validity,
+        "subscription_expires_at": expires_at,
+        "whatsapp_enabled": plan.get("features", {}).get("whatsapp_enabled", False),
+        "pending_plan_id": None,
+        "pending_plan_name": None,
+        "pending_plan_change_at": None,
+    }})
+    await send_notification(db, user_id, "subscription",
+        "Plan Assigned by Admin", f"You have been assigned the {plan['name']} plan.")
+    return {"message": f"Plan '{plan['name']}' assigned to user", "expires_at": expires_at}
+
+
+@router.post("/users/{user_id}/extend-expiry")
+async def extend_plan_expiry(user_id: str, data: ExtendExpiryRequest, admin: dict = Depends(get_admin_user)):
+    """Admin extends a user's subscription expiry by N days."""
+    db = get_db()
+    if data.days <= 0:
+        raise HTTPException(status_code=400, detail="days must be a positive integer")
+
+    user = await db.users.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    now = datetime.now(timezone.utc)
+    current_expiry_raw = user.get("subscription_expires_at")
+
+    # Extend from current expiry (or from today if already expired/no plan)
+    if current_expiry_raw:
+        try:
+            base = datetime.fromisoformat(current_expiry_raw)
+            base = max(base, now)   # if already expired, extend from today
+        except Exception:
+            base = now
+    else:
+        base = now
+
+    new_expiry = (base + timedelta(days=data.days)).isoformat()
+    await db.users.update_one({"_id": user_id}, {"$set": {"subscription_expires_at": new_expiry}})
+    await send_notification(db, user_id, "subscription",
+        "Subscription Extended", f"Your plan expiry has been extended by {data.days} day(s).")
+    return {"message": f"Expiry extended by {data.days} day(s)", "new_expiry": new_expiry}
 
 
 # ── Reports Endpoints ─────────────────────────────────────────────────────────

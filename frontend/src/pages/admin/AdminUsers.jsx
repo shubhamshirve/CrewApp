@@ -5,6 +5,7 @@ import AdminLayout from "@/components/AdminLayout";
 import {
   Users, AlertTriangle, Ban, CheckCircle, Search, Loader2, Filter, X, Send,
   MoreHorizontal, Eye, Zap, Shield, Flag, Wallet, Star, ShieldCheck,
+  CreditCard, CalendarClock,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -28,7 +29,7 @@ function ActionMenuItem({ icon: Icon, label, onClick, danger, muted }) {
   );
 }
 
-function ActionMenu({ user, onImpersonate, onVerify, onSuspend, onPenalty, onWallet, onFlag, loading }) {
+function ActionMenu({ user, onImpersonate, onVerify, onSuspend, onPenalty, onWallet, onFlag, onAssignPlan, onExtendExpiry, loading }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -103,6 +104,20 @@ function ActionMenu({ user, onImpersonate, onVerify, onSuspend, onPenalty, onWal
             onClick={() => act(onWallet)}
           />
 
+          {/* Assign Plan */}
+          <ActionMenuItem
+            icon={CreditCard}
+            label="Assign Plan"
+            onClick={() => act(onAssignPlan)}
+          />
+
+          {/* Extend Expiry */}
+          <ActionMenuItem
+            icon={CalendarClock}
+            label="Extend Expiry"
+            onClick={() => act(onExtendExpiry)}
+          />
+
           <div className="h-px bg-slate-100 my-1" />
 
           {/* Featured */}
@@ -165,6 +180,19 @@ export default function AdminUsers() {
   const [walletForm, setWalletForm] = useState({ amount: "", type: "credit", reason: "" });
   const [walletLoading, setWalletLoading] = useState(false);
 
+  // Assign Plan modal
+  const [showAssignPlan, setShowAssignPlan] = useState(false);
+  const [assignPlanUserId, setAssignPlanUserId] = useState(null);
+  const [availablePlans, setAvailablePlans] = useState([]);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  // Extend Expiry modal
+  const [showExtendExpiry, setShowExtendExpiry] = useState(false);
+  const [extendExpiryUserId, setExtendExpiryUserId] = useState(null);
+  const [extendDays, setExtendDays] = useState("30");
+  const [extendLoading, setExtendLoading] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -185,6 +213,11 @@ export default function AdminUsers() {
   }, [api, search, role, city, plan, status, minRating, maxRating]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load available plans once
+  useEffect(() => {
+    api.get("/plans").then(r => setAvailablePlans(r.data.plans || [])).catch(() => {});
+  }, [api]);
 
   const clearFilters = () => {
     setSearch(""); setRole(""); setCity(""); setPlan("");
@@ -293,6 +326,39 @@ export default function AdminUsers() {
   const inputCls = "rounded-xl px-3 py-2 text-sm text-slate-900 border border-slate-200 focus:outline-none focus:border-blue-400 transition-colors bg-white";
   const selectCls = `${inputCls} appearance-none`;
   const walletUser = users.find(u => u.id === walletUserId);
+
+  // Assign Plan handler
+  const handleAssignPlan = async () => {
+    if (!selectedPlanId) { toast.error("Select a plan"); return; }
+    setAssignLoading(true);
+    try {
+      const r = await api.post(`/admin/users/${assignPlanUserId}/assign-plan`, { plan_id: selectedPlanId });
+      toast.success(r.data.message);
+      setShowAssignPlan(false);
+      setSelectedPlanId("");
+      setAssignPlanUserId(null);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to assign plan");
+    } finally { setAssignLoading(false); }
+  };
+
+  // Extend Expiry handler
+  const handleExtendExpiry = async () => {
+    const days = parseInt(extendDays);
+    if (!days || days <= 0) { toast.error("Enter valid number of days"); return; }
+    setExtendLoading(true);
+    try {
+      const r = await api.post(`/admin/users/${extendExpiryUserId}/extend-expiry`, { days });
+      toast.success(r.data.message);
+      setShowExtendExpiry(false);
+      setExtendDays("30");
+      setExtendExpiryUserId(null);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to extend expiry");
+    } finally { setExtendLoading(false); }
+  };
 
   return (
     <AdminLayout>
@@ -438,6 +504,8 @@ export default function AdminUsers() {
                     onSuspend={() => handleToggleSuspend(u.id)}
                     onPenalty={() => { setPenaltyData(p => ({ ...p, userId: u.id })); setShowPenalty(true); }}
                     onWallet={() => { setWalletUserId(u.id); setShowWallet(true); }}
+                    onAssignPlan={() => { setAssignPlanUserId(u.id); setSelectedPlanId(""); setShowAssignPlan(true); }}
+                    onExtendExpiry={() => { setExtendExpiryUserId(u.id); setExtendDays("30"); setShowExtendExpiry(true); }}
                     onFlag={(field, val) => handleFlagUser(u.id, field, val)}
                   />
                 </div>
@@ -561,6 +629,106 @@ export default function AdminUsers() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Assign Plan Modal ── */}
+      <Dialog open={showAssignPlan} onOpenChange={v => { setShowAssignPlan(v); if (!v) { setAssignPlanUserId(null); setSelectedPlanId(""); } }}>
+        <DialogContent className="bg-white border-slate-200 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display flex items-center gap-2">
+              <CreditCard size={15} className="text-blue-500" /> Assign Plan
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-slate-500">Directly assign a subscription plan to this user. No payment required.</p>
+            {availablePlans.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">No active plans found. Create plans first from Admin → Plans.</p>
+            ) : (
+              <div className="space-y-2">
+                {availablePlans.map(p => (
+                  <button
+                    key={p.id}
+                    data-testid={`assign-plan-option-${p.id}`}
+                    onClick={() => setSelectedPlanId(p.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-all ${selectedPlanId === p.id ? "border-blue-400 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}
+                  >
+                    <div>
+                      <p className="text-sm font-display font-medium text-slate-900">{p.name}</p>
+                      <p className="text-xs text-slate-400">₹{p.price}/{p.validity === "yearly" ? "yr" : "mo"}</p>
+                    </div>
+                    <div className="flex gap-1 flex-wrap justify-end">
+                      {p.features?.public_gig_enabled && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-display">Gig Board</span>}
+                      {p.features?.whatsapp_enabled && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 font-display">WhatsApp</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => setShowAssignPlan(false)} className="flex-1 py-2.5 rounded-xl text-sm text-slate-500 border border-slate-200 hover:bg-slate-50">Cancel</button>
+              <button
+                data-testid="confirm-assign-plan-btn"
+                onClick={handleAssignPlan}
+                disabled={assignLoading || !selectedPlanId}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60"
+                style={{ background: "#1D4ED8" }}
+              >
+                {assignLoading ? "Assigning…" : "Assign Plan"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Extend Expiry Modal ── */}
+      <Dialog open={showExtendExpiry} onOpenChange={v => { setShowExtendExpiry(v); if (!v) { setExtendExpiryUserId(null); setExtendDays("30"); } }}>
+        <DialogContent className="bg-white border-slate-200 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display flex items-center gap-2">
+              <CalendarClock size={15} className="text-emerald-500" /> Extend Plan Expiry
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-slate-500">Extend the user's current plan expiry. If already expired, extension starts from today.</p>
+            <div className="grid grid-cols-4 gap-2">
+              {["7", "14", "30", "90"].map(d => (
+                <button
+                  key={d}
+                  data-testid={`extend-days-${d}`}
+                  onClick={() => setExtendDays(d)}
+                  className={`py-2 rounded-xl text-sm font-display border transition-all ${extendDays === d ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1.5 block">Or enter custom days</label>
+              <input
+                data-testid="extend-days-custom-input"
+                type="number"
+                min="1"
+                className={inputCls + " w-full"}
+                value={extendDays}
+                onChange={e => setExtendDays(e.target.value)}
+                placeholder="e.g. 45"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowExtendExpiry(false)} className="flex-1 py-2.5 rounded-xl text-sm text-slate-500 border border-slate-200 hover:bg-slate-50">Cancel</button>
+              <button
+                data-testid="confirm-extend-expiry-btn"
+                onClick={handleExtendExpiry}
+                disabled={extendLoading || !extendDays || parseInt(extendDays) <= 0}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60"
+                style={{ background: "#059669" }}
+              >
+                {extendLoading ? "Extending…" : `Extend by ${extendDays || "?"} days`}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </AdminLayout>
   );
 }
