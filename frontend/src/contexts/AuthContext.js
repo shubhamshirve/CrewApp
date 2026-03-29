@@ -83,7 +83,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, refreshUser, api }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, refreshUser, api, isImpersonating: !!sessionStorage.getItem("crewbook_token") }}>
       {children}
     </AuthContext.Provider>
   );

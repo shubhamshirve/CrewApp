@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Search, Users, Briefcase, Calendar,
   Wallet, Bell, LogOut, User, ChevronLeft, ChevronRight,
-  Menu, Globe, Download, X
+  Menu, Globe, Download, X, ShieldAlert, ArrowLeft
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -20,7 +20,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Layout({ children }) {
-  const { user, logout, api } = useAuth();
+  const { user, logout, api, isImpersonating } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -28,6 +28,11 @@ export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  const handleBackToAdmin = () => {
+    sessionStorage.removeItem("crewbook_token");
+    window.location.href = "/admin/dashboard";
+  };
 
   useEffect(() => {
     api.get("/notifications/unread-count").then(r => setUnread(r.data.count)).catch(() => {});
@@ -190,6 +195,30 @@ export default function Layout({ children }) {
         </div>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Impersonation Banner */}
+          {isImpersonating && (
+            <div
+              data-testid="impersonation-banner"
+              className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm"
+              style={{ background: "#FFFBEB", border: "1.5px solid #F59E0B" }}
+            >
+              <div className="flex items-center gap-2.5">
+                <ShieldAlert size={16} className="text-amber-500 flex-shrink-0" />
+                <span className="text-amber-900 font-display font-medium">
+                  Admin View — browsing as <strong>{user?.full_name}</strong>
+                </span>
+              </div>
+              <button
+                data-testid="back-to-admin-btn"
+                onClick={handleBackToAdmin}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold font-display transition-all hover:opacity-90 flex-shrink-0"
+                style={{ background: "#F59E0B", color: "#fff" }}
+              >
+                <ArrowLeft size={12} /> Back to Admin
+              </button>
+            </div>
+          )}
+
           {/* PWA Install Banner */}
           {showInstallBanner && (
             <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-orange-200 bg-orange-50 text-sm">
