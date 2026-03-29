@@ -169,6 +169,12 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ **Profile.jsx**: UPI Pay Now button — non-owners see green "Pay Now" UPI deeplink button; owners see their UPI ID text
 - ✅ **Onboarding.jsx**: Gear section updated with category select → filtered gear dropdown → custom gear name fallback
 
+### Docker, Security & API Hardening (Done — March 2026)
+- ✅ **Docker — Caddy replaces nginx**: `Caddyfile` with gzip, security headers, SPA fallback, API proxy; updated `docker-compose.yml` with caddy_data/caddy_config volumes
+- ✅ **Docker — npm replaces yarn**: `frontend/Dockerfile` updated to use `npm ci` for reproducible builds
+- ✅ **Pincode API auto-fill**: `src/utils/pincode.js` using `api.postalpincode.in` — auto-fills City & State on blur in both Registration and Profile edit forms; shows loading/valid/invalid states
+- ✅ **Email OTP on Registration**: `POST /api/auth/send-otp` generates 6-digit OTP (mock returns `otp_dev` in response when no Resend key), `POST /api/auth/verify-otp` returns 15-min `email_verified_token`, `POST /api/auth/register` requires the token. OTP: 10-min TTL, max 5 attempts, 60s resend cooldown. MongoDB TTL index auto-cleans expired OTPs.
+
 ### Production Hardening (Done — March 2026)
 - ✅ **Rate limiting** via `slowapi`: Register 3/min, Login 10/min, Global 200/min per IP
 - ✅ **Input validation**: Pydantic v2 field_validators on all write endpoints (email format, password strength, phone, enums, length limits, URL format, UPI format)

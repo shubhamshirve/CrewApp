@@ -71,6 +71,7 @@ async def lifespan(app: FastAPI):
     await db.plans.create_index("is_active")
     await db.public_gigs.create_index([("status", 1), ("created_at", -1)])
     await db.public_gig_applications.create_index([("public_gig_id", 1), ("applicant_id", 1)])
+    await db.otp_verifications.create_index("expires_at", expireAfterSeconds=0)  # TTL auto-delete
 
     cors_origins = os.environ.get("CORS_ORIGINS", "*")
     if cors_origins == "*":

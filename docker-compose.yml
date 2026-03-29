@@ -10,7 +10,6 @@ services:
       - mongodb_data:/data/db
     networks:
       - crewbook-net
-    # Do NOT expose port externally in production; backend connects internally
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -32,7 +31,6 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      # Override MONGO_URL to use the Docker service name
       MONGO_URL: mongodb://mongodb:27017
       ENV: production
     depends_on:
@@ -53,13 +51,13 @@ services:
         limits:
           memory: 512m
 
-  # ── Frontend (React → nginx) ─────────────────────────────────────────────
+  # ── Frontend (React → Caddy) ─────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Leave empty so nginx proxy handles /api — no hard-coded URL in the bundle
+        # Leave empty so Caddy proxy handles /api — no hard-coded URL in the bundle
         REACT_APP_BACKEND_URL: ""
     container_name: crewbook-frontend
     restart: unless-stopped
@@ -70,6 +68,10 @@ services:
         condition: service_healthy
     networks:
       - crewbook-net
+    volumes:
+      # Persist Caddy's ACME/TLS data across restarts
+      - caddy_data:/data
+      - caddy_config:/config
     deploy:
       resources:
         limits:
@@ -78,6 +80,10 @@ services:
 volumes:
   mongodb_data:
     name: crewbook_mongodb_data
+  caddy_data:
+    name: crewbook_caddy_data
+  caddy_config:
+    name: crewbook_caddy_config
 
 networks:
   crewbook-net:

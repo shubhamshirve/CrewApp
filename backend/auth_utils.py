@@ -38,6 +38,27 @@ def create_impersonation_token(user_id: str, admin_id: str) -> str:
     )
 
 
+def create_email_verified_token(email: str) -> str:
+    """Short-lived token (15 min) proving the email was OTP-verified."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    return jwt.encode(
+        {"email": email.lower(), "exp": expire, "type": "email_verified"},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
+def decode_email_verified_token(token: str) -> str | None:
+    """Returns the email string if token is valid, None otherwise."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "email_verified":
+            return None
+        return payload.get("email")
+    except JWTError:
+        return None
+
+
 def _clean_user(user: dict) -> dict:
     user = {k: v for k, v in user.items() if k != "password_hash"}
     if "_id" in user:

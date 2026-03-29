@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,15 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
-import InstallAppButton from '@/components/InstallAppButton';
-import NotificationPermissionModal from '@/components/NotificationPermissionModal';
+import { Eye, EyeOff, ArrowLeft, CheckCircle2, Loader2, MapPin } from "lucide-react";
+import InstallAppButton from "@/components/InstallAppButton";
+import NotificationPermissionModal from "@/components/NotificationPermissionModal";
+import { fetchPincodeData } from "@/utils/pincode";
+
+const API_BASE = process.env.REACT_APP_BACKEND_URL;
 
 export default function Auth() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
 
-  // Pre-fill referral code from URL ?ref=CODE
   const urlParams = new URLSearchParams(window.location.search);
   const urlRef = urlParams.get("ref") || "";
 
@@ -25,99 +27,186 @@ export default function Auth() {
     location: "", area: "", state: "", country: "India",
     pincode: "", referral_code: urlRef,
   });
+
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
 
+  // ── OTP state ──────────────────────────────────────────────────────────────
+  const [otpStep, setOtpStep] = useState("form"); // "form" | "otp" | "verified"
+  const [otpValue, setOtpValue] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpDevCode, setOtpDevCode] = useState(""); // shown when no Resend key
+  const [emailVerifiedToken, setEmailVerifiedToken] = useState("");
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef(null);
+
+  // ── Pincode state ──────────────────────────────────────────────────────────
+  const [pincodeStatus, setPincodeStatus] = useState("idle"); // "idle"|"loading"|"valid"|"invalid"
+
+  // ── Countdown timer for resend ─────────────────────────────────────────────
+  useEffect(() => {
+    if (countdown > 0) {
+      countdownRef.current = setInterval(() => {
+        setCountdown(c => {
+          if (c <= 1) { clearInterval(countdownRef.current); return 0; }
+          return c - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(countdownRef.current);
+  }, [countdown]);
+
+  // ── Pincode auto-fill ──────────────────────────────────────────────────────
+  const handlePincodeBlur = async (pincode) => {
+    if (!pincode || pincode.length !== 6) { setPincodeStatus("idle"); return; }
+    setPincodeStatus("loading");
+    const result = await fetchPincodeData(pincode);
+    if (!result) { setPincodeStatus("idle"); return; }
+    if (result.valid) {
+      setRegData(p => ({
+        ...p,
+        state: result.state || p.state,
+        location: result.city || p.location,
+        area: p.area || result.area,    // don't overwrite if user already typed an area
+      }));
+      setPincodeStatus("valid");
+      toast.success(`Pincode found: ${result.city}, ${result.state}`);
+    } else {
+      setPincodeStatus("invalid");
+      toast.error("Invalid pincode — please check and try again");
+    }
+  };
+
+  // ── Send OTP ───────────────────────────────────────────────────────────────
+  const handleSendOtp = async () => {
+    if (!regData.email) { toast.error("Please enter your email address first"); return; }
+    if (!regData.full_name) { toast.error("Please enter your full name first"); return; }
+    setOtpLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: regData.email, full_name: regData.full_name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to send code");
+      setOtpStep("otp");
+      setCountdown(60);
+      if (data.otp_dev) {
+        setOtpDevCode(data.otp_dev);
+        toast.info(`Dev mode — OTP: ${data.otp_dev}`, { duration: 30000 });
+      } else {
+        toast.success(`Verification code sent to ${regData.email}`);
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // ── Verify OTP ─────────────────────────────────────────────────────────────
+  const handleVerifyOtp = async () => {
+    if (otpValue.length !== 6) { toast.error("Enter the 6-digit code"); return; }
+    setOtpLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: regData.email, otp: otpValue }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Invalid code");
+      setEmailVerifiedToken(data.email_verified_token);
+      setOtpStep("verified");
+      toast.success("Email verified!");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // ── Login ──────────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const user = await login(loginData.email, loginData.password);
-
-      // Check if notification modal was dismissed recently
-      const dismissedUntil = localStorage.getItem('crewbook_notification_dismissed');
+      const dismissedUntil = localStorage.getItem("crewbook_notification_dismissed");
       const shouldShowModal = !dismissedUntil || new Date() >= new Date(dismissedUntil);
-
       if (shouldShowModal) {
-        // Show notification modal before redirecting
         setShowNotificationModal(true);
-        // Store user data for redirect after modal closes
-        sessionStorage.setItem('pendingUser', JSON.stringify({
-          user,
-          action: 'login'
-        }));
+        sessionStorage.setItem("pendingUser", JSON.stringify({ user, action: "login" }));
       } else {
-        // Skip modal, redirect immediately
         toast.success(`Welcome back, ${user.full_name}!`);
-        navigate(user.is_admin ? '/admin/dashboard' : user.onboarding_complete ? '/dashboard' : '/onboarding');
+        navigate(user.is_admin ? "/admin/dashboard" : user.onboarding_complete ? "/dashboard" : "/onboarding");
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Login failed');
+      toast.error(err.response?.data?.detail || "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Register ───────────────────────────────────────────────────────────────
   const handleRegister = async (e) => {
     e.preventDefault();
     if (!regData.email || !regData.password || !regData.full_name || !regData.phone) {
       toast.error("Please fill all required fields");
       return;
     }
+    if (!emailVerifiedToken) {
+      toast.error("Please verify your email first");
+      return;
+    }
+    if (pincodeStatus === "invalid") {
+      toast.error("Please enter a valid 6-digit pincode");
+      return;
+    }
     setLoading(true);
     try {
-      const payload = { ...regData };
+      const payload = { ...regData, email_verified_token: emailVerifiedToken };
       if (payload.whatsapp_same_as_mobile) payload.whatsapp_number = payload.phone;
       delete payload.whatsapp_same_as_mobile;
       await register(payload);
 
-      // Check if notification modal was dismissed recently
-      const dismissedUntil = localStorage.getItem('crewbook_notification_dismissed');
+      const dismissedUntil = localStorage.getItem("crewbook_notification_dismissed");
       const shouldShowModal = !dismissedUntil || new Date() >= new Date(dismissedUntil);
-
       if (shouldShowModal) {
-        // Show notification modal before redirecting
         setShowNotificationModal(true);
-        // Store redirect action in session
-        sessionStorage.setItem('pendingUser', JSON.stringify({
-          action: 'register'
-        }));
+        sessionStorage.setItem("pendingUser", JSON.stringify({ action: "register" }));
       } else {
-        // Skip modal, redirect immediately
-        toast.success('Account created! Let\'s set up your profile.');
-        navigate('/onboarding');
+        toast.success("Account created! Let's set up your profile.");
+        navigate("/onboarding");
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Registration failed');
+      toast.error(err.response?.data?.detail || "Registration failed");
     } finally {
       setLoading(false);
     }
   };
 
   const handleNotificationModalComplete = () => {
-    // Modal has completed (user accepted or dismissed)
     try {
-      const pendingUser = sessionStorage.getItem('pendingUser');
+      const pendingUser = sessionStorage.getItem("pendingUser");
       if (pendingUser) {
         const { user, action } = JSON.parse(pendingUser);
-        sessionStorage.removeItem('pendingUser');
-
-        if (action === 'login' && user) {
+        sessionStorage.removeItem("pendingUser");
+        if (action === "login" && user) {
           toast.success(`Welcome back, ${user.full_name}!`);
-          navigate(user.is_admin ? '/admin/dashboard' : user.onboarding_complete ? '/dashboard' : '/onboarding');
-        } else if (action === 'register') {
-          toast.success('Account created! Let\'s set up your profile.');
-          navigate('/onboarding');
+          navigate(user.is_admin ? "/admin/dashboard" : user.onboarding_complete ? "/dashboard" : "/onboarding");
+        } else if (action === "register") {
+          toast.success("Account created! Let's set up your profile.");
+          navigate("/onboarding");
         }
       }
-    } catch (err) {
-      console.error('Failed to parse pending user:', err);
-    }
+    } catch {}
     setShowNotificationModal(false);
   };
 
-  const inputClass = "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:ring-orange-400/20";
+  const ic = "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:ring-orange-400/20";
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
@@ -137,53 +226,55 @@ export default function Auth() {
               <TabsTrigger value="register" data-testid="auth-register-tab" className="flex-1 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-display text-slate-500">Register</TabsTrigger>
             </TabsList>
 
-            {/* Login */}
+            {/* ── Login ── */}
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <Label className="text-slate-700 text-sm font-display">Email</Label>
-                  <Input data-testid="login-email" className={`mt-1 ${inputClass}`} type="email" placeholder="you@example.com" value={loginData.email} onChange={e => setLoginData(p => ({ ...p, email: e.target.value }))} />
+                  <Input data-testid="login-email" className={`mt-1 ${ic}`} type="email" placeholder="you@example.com" value={loginData.email} onChange={e => setLoginData(p => ({ ...p, email: e.target.value }))} />
                 </div>
                 <div>
                   <Label className="text-slate-700 text-sm font-display">Password</Label>
                   <div className="relative mt-1">
-                    <Input data-testid="login-password" className={inputClass} type={showPass ? "text" : "password"} placeholder="••••••••" value={loginData.password} onChange={e => setLoginData(p => ({ ...p, password: e.target.value }))} />
+                    <Input data-testid="login-password" className={ic} type={showPass ? "text" : "password"} placeholder="••••••••" value={loginData.password} onChange={e => setLoginData(p => ({ ...p, password: e.target.value }))} />
                     <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                       {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
                 <Button type="submit" data-testid="login-submit-btn" className="w-full font-semibold font-display mt-2 text-white" style={{ background: "#E05D26" }} disabled={loading}>
-                  {loading ? "Signing in..." : "Sign In"}
+                  {loading ? "Signing in…" : "Sign In"}
                 </Button>
               </form>
             </TabsContent>
 
-            {/* Register */}
+            {/* ── Register ── */}
             <TabsContent value="register">
               <div className="mb-4">
                 <button onClick={() => navigate("/auth")} className="flex items-center gap-1.5 text-slate-400 hover:text-slate-600 text-xs transition-colors" data-testid="register-back-btn">
                   <ArrowLeft size={13} /> Back to login
                 </button>
               </div>
+
               <form onSubmit={handleRegister} className="space-y-3">
-                {/* Row 1: Name + Phone */}
+                {/* Name + Phone */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-slate-700 text-xs font-display">Full Name *</Label>
-                    <Input data-testid="reg-name" className={`mt-1 ${inputClass}`} placeholder="Raj Sharma" value={regData.full_name} onChange={e => setRegData(p => ({ ...p, full_name: e.target.value }))} />
+                    <Input data-testid="reg-name" className={`mt-1 ${ic}`} placeholder="Raj Sharma" value={regData.full_name} onChange={e => setRegData(p => ({ ...p, full_name: e.target.value }))} />
                   </div>
                   <div>
                     <Label className="text-slate-700 text-xs font-display">Mobile *</Label>
-                    <Input data-testid="reg-phone" className={`mt-1 ${inputClass}`} placeholder="9876543210" value={regData.phone} onChange={e => setRegData(p => ({ ...p, phone: e.target.value }))} />
+                    <Input data-testid="reg-phone" className={`mt-1 ${ic}`} placeholder="9876543210" value={regData.phone} onChange={e => setRegData(p => ({ ...p, phone: e.target.value }))} />
                   </div>
                 </div>
+
                 {/* WhatsApp */}
                 <div>
                   <Label className="text-slate-700 text-xs font-display">WhatsApp Number</Label>
                   <Input
                     data-testid="reg-whatsapp"
-                    className={`mt-1 ${inputClass} ${regData.whatsapp_same_as_mobile ? "opacity-50" : ""}`}
+                    className={`mt-1 ${ic} ${regData.whatsapp_same_as_mobile ? "opacity-50" : ""}`}
                     disabled={regData.whatsapp_same_as_mobile}
                     placeholder="Same as mobile"
                     value={regData.whatsapp_same_as_mobile ? regData.phone : regData.whatsapp_number}
@@ -194,42 +285,150 @@ export default function Auth() {
                     <span className="text-xs text-slate-500">Same as mobile</span>
                   </label>
                 </div>
-                {/* Email + Password */}
+
+                {/* Email + OTP verification block */}
                 <div>
                   <Label className="text-slate-700 text-xs font-display">Email *</Label>
-                  <Input data-testid="reg-email" className={`mt-1 ${inputClass}`} type="email" placeholder="you@example.com" value={regData.email} onChange={e => setRegData(p => ({ ...p, email: e.target.value }))} />
+                  <div className="flex gap-2 mt-1">
+                    <div className="relative flex-1">
+                      <Input
+                        data-testid="reg-email"
+                        className={`${ic} ${otpStep === "verified" ? "border-green-400 pr-8" : ""}`}
+                        type="email"
+                        placeholder="you@example.com"
+                        value={regData.email}
+                        disabled={otpStep !== "form"}
+                        onChange={e => { setRegData(p => ({ ...p, email: e.target.value })); setOtpStep("form"); setEmailVerifiedToken(""); }}
+                      />
+                      {otpStep === "verified" && (
+                        <CheckCircle2 size={15} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-green-500" />
+                      )}
+                    </div>
+                    {otpStep === "form" && (
+                      <Button
+                        type="button"
+                        data-testid="send-otp-btn"
+                        size="sm"
+                        className="shrink-0 text-white font-semibold text-xs px-3"
+                        style={{ background: "#E05D26" }}
+                        onClick={handleSendOtp}
+                        disabled={otpLoading || !regData.email}
+                      >
+                        {otpLoading ? <Loader2 size={14} className="animate-spin" /> : "Send Code"}
+                      </Button>
+                    )}
+                    {otpStep === "otp" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="shrink-0 text-white font-semibold text-xs px-3"
+                        style={{ background: "#E05D26" }}
+                        onClick={handleSendOtp}
+                        disabled={otpLoading || countdown > 0}
+                      >
+                        {countdown > 0 ? `${countdown}s` : "Resend"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                {/* OTP input (shown after code is sent) */}
+                {otpStep === "otp" && (
+                  <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
+                    <p className="text-xs text-slate-600 mb-2 font-display">
+                      Enter the 6-digit code sent to <strong>{regData.email}</strong>
+                      {otpDevCode && <span className="ml-1 text-orange-600 font-semibold">(Dev: {otpDevCode})</span>}
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        data-testid="otp-input"
+                        className={`${ic} tracking-widest text-center font-mono font-bold text-lg`}
+                        placeholder="000000"
+                        maxLength={6}
+                        value={otpValue}
+                        onChange={e => setOtpValue(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        onKeyDown={e => e.key === "Enter" && handleVerifyOtp()}
+                      />
+                      <Button
+                        type="button"
+                        data-testid="verify-otp-btn"
+                        className="shrink-0 text-white font-semibold text-xs px-4"
+                        style={{ background: "#E05D26" }}
+                        onClick={handleVerifyOtp}
+                        disabled={otpLoading || otpValue.length !== 6}
+                      >
+                        {otpLoading ? <Loader2 size={14} className="animate-spin" /> : "Verify"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Password */}
                 <div>
                   <Label className="text-slate-700 text-xs font-display">Password *</Label>
-                  <Input data-testid="reg-password" className={`mt-1 ${inputClass}`} type="password" placeholder="Min 6 characters" value={regData.password} onChange={e => setRegData(p => ({ ...p, password: e.target.value }))} />
+                  <Input data-testid="reg-password" className={`mt-1 ${ic}`} type="password" placeholder="Min 8 chars, letter + number" value={regData.password} onChange={e => setRegData(p => ({ ...p, password: e.target.value }))} />
                 </div>
-                {/* Location */}
+
+                {/* Pincode → auto-fill City + State */}
+                <div>
+                  <Label className="text-slate-700 text-xs font-display">Pincode *</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      data-testid="reg-pincode"
+                      className={`${ic} ${pincodeStatus === "valid" ? "border-green-400 pr-8" : pincodeStatus === "invalid" ? "border-red-400" : ""}`}
+                      placeholder="400001"
+                      maxLength={6}
+                      value={regData.pincode}
+                      onChange={e => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                        setRegData(p => ({ ...p, pincode: v }));
+                        setPincodeStatus("idle");
+                      }}
+                      onBlur={e => handlePincodeBlur(e.target.value)}
+                    />
+                    {pincodeStatus === "loading" && (
+                      <Loader2 size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
+                    )}
+                    {pincodeStatus === "valid" && (
+                      <CheckCircle2 size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-green-500" />
+                    )}
+                    {pincodeStatus === "invalid" && (
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-500 text-xs">✗</span>
+                    )}
+                  </div>
+                  {pincodeStatus === "invalid" && (
+                    <p className="text-xs text-red-500 mt-0.5">Invalid pincode — please check</p>
+                  )}
+                </div>
+
+                {/* City + Area (auto-filled from pincode) */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-slate-700 text-xs font-display">City *</Label>
-                    <Input data-testid="reg-location" className={`mt-1 ${inputClass}`} placeholder="Mumbai" value={regData.location} onChange={e => setRegData(p => ({ ...p, location: e.target.value }))} />
+                    <Label className="text-slate-700 text-xs font-display flex items-center gap-1">
+                      City *
+                      {pincodeStatus === "valid" && <MapPin size={10} className="text-green-500" />}
+                    </Label>
+                    <Input data-testid="reg-location" className={`mt-1 ${ic}`} placeholder="Mumbai" value={regData.location} onChange={e => setRegData(p => ({ ...p, location: e.target.value }))} />
                   </div>
                   <div>
                     <Label className="text-slate-700 text-xs font-display">Area</Label>
-                    <Input data-testid="reg-area" className={`mt-1 ${inputClass}`} placeholder="Bandra West" value={regData.area} onChange={e => setRegData(p => ({ ...p, area: e.target.value }))} />
+                    <Input data-testid="reg-area" className={`mt-1 ${ic}`} placeholder="Bandra West" value={regData.area} onChange={e => setRegData(p => ({ ...p, area: e.target.value }))} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-slate-700 text-xs font-display">State</Label>
-                    <Input data-testid="reg-state" className={`mt-1 ${inputClass}`} placeholder="Maharashtra" value={regData.state} onChange={e => setRegData(p => ({ ...p, state: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label className="text-slate-700 text-xs font-display">Pincode *</Label>
-                    <Input data-testid="reg-pincode" className={`mt-1 ${inputClass}`} placeholder="400001" value={regData.pincode} onChange={e => setRegData(p => ({ ...p, pincode: e.target.value }))} />
-                  </div>
+                <div>
+                  <Label className="text-slate-700 text-xs font-display flex items-center gap-1">
+                    State
+                    {pincodeStatus === "valid" && <MapPin size={10} className="text-green-500" />}
+                  </Label>
+                  <Input data-testid="reg-state" className={`mt-1 ${ic}`} placeholder="Maharashtra" value={regData.state} onChange={e => setRegData(p => ({ ...p, state: e.target.value }))} />
                 </div>
+
                 {/* Referral */}
                 <div>
                   <Label className="text-slate-700 text-xs font-display">Referral Code {urlRef ? "(applied)" : "(optional)"}</Label>
                   <Input
                     data-testid="reg-referral"
-                    className={`mt-1 ${inputClass} ${urlRef ? "opacity-60" : ""}`}
+                    className={`mt-1 ${ic} ${urlRef ? "opacity-60" : ""}`}
                     readOnly={!!urlRef}
                     placeholder="e.g. RAJ12AB"
                     value={regData.referral_code}
@@ -237,14 +436,26 @@ export default function Auth() {
                   />
                   {urlRef && <p className="text-xs text-green-600 mt-1">Referral code applied automatically</p>}
                 </div>
-                <Button type="submit" data-testid="register-submit-btn" className="w-full font-semibold font-display mt-2 text-white" style={{ background: "#E05D26" }} disabled={loading}>
-                  {loading ? "Creating account..." : "Create Account"}
+
+                <Button
+                  type="submit"
+                  data-testid="register-submit-btn"
+                  className="w-full font-semibold font-display mt-2 text-white"
+                  style={{ background: otpStep === "verified" ? "#16a34a" : "#E05D26" }}
+                  disabled={loading || otpStep !== "verified"}
+                >
+                  {loading ? "Creating account…" : otpStep === "verified" ? "Create Account" : "Verify email to continue"}
                 </Button>
+
+                {otpStep !== "verified" && (
+                  <p className="text-xs text-center text-slate-400">You must verify your email before creating an account</p>
+                )}
               </form>
             </TabsContent>
           </Tabs>
           <InstallAppButton />
         </div>
+
         <NotificationPermissionModal
           isOpen={showNotificationModal}
           onComplete={handleNotificationModalComplete}

@@ -83,6 +83,35 @@ def _render_template(template_str: str, variables: dict) -> str:
     return result
 
 
+async def send_otp_email(db, recipient_email: str, otp: str, full_name: str = ""):
+    """Send a 6-digit OTP verification email."""
+    display_name = full_name or "there"
+    subject = "CrewBook — Your verification code"
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <div style="background: #0A0A0A; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h2 style="color: #F97316; margin: 0; font-size: 22px;">CrewBook</h2>
+        <p style="color: #9CA3AF; margin: 4px 0 0; font-size: 13px;">Freelance Crew Booking Platform</p>
+      </div>
+      <div style="padding: 32px 24px; background: #ffffff; text-align: center;">
+        <p style="color: #374151; margin: 0 0 8px;">Hi <strong>{display_name}</strong>,</p>
+        <p style="color: #6B7280; font-size: 14px; margin: 0 0 24px;">
+          Use the code below to verify your email address. It expires in <strong>10 minutes</strong>.
+        </p>
+        <div style="background: #F9FAFB; border: 2px dashed #E5E7EB; border-radius: 12px; padding: 20px; margin: 0 auto 24px; display: inline-block; min-width: 220px;">
+          <span style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #111827; font-family: monospace;">{otp}</span>
+        </div>
+        <p style="color: #9CA3AF; font-size: 12px; margin: 0;">
+          If you didn't request this, ignore this email.
+        </p>
+      </div>
+      <div style="padding: 16px; text-align: center; color: #9CA3AF; font-size: 11px; background: #F9FAFB; border-radius: 0 0 8px 8px;">
+        CrewBook · Freelance Crew Platform · India
+      </div>
+    </div>"""
+    return await send_email(db, recipient_email, subject, html, "otp_verification")
+
+
 async def send_invite_email(db, freelancer_email: str, freelancer_name: str, lead_name: str, gig_title: str, fee: float, invite_id: str):
     tmpl = await get_template(db, "invite_sent")
     variables = {

@@ -8,9 +8,10 @@ import {
   Shield, MapPin, Star, Camera, User, UserPlus, UserCheck,
   StickyNote, Save, Trash2, Pencil, Plus, X, Upload,
   Instagram, Globe, Wallet, Link2, ChevronDown, ChevronLeft, ChevronRight,
-  Phone, MessageCircle,
+  Phone, MessageCircle, Loader2, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { fetchPincodeData } from "@/utils/pincode";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,25 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [pincodeStatus, setPincodeStatus] = useState("idle"); // "idle"|"loading"|"valid"|"invalid"
+
+  const handleProfilePincodeBlur = async (pincode) => {
+    if (!pincode || String(pincode).length !== 6) { setPincodeStatus("idle"); return; }
+    setPincodeStatus("loading");
+    const result = await fetchPincodeData(pincode);
+    if (!result) { setPincodeStatus("idle"); return; }
+    if (result.valid) {
+      setEditForm(p => ({
+        ...p,
+        state: result.state || p.state,
+        location: result.city || p.location,
+      }));
+      setPincodeStatus("valid");
+      toast.success(`Pincode found: ${result.city}, ${result.state}`);
+    } else {
+      setPincodeStatus("invalid");
+    }
+  };
 
   // Notes
   const [note, setNote] = useState("");
@@ -716,7 +736,25 @@ export default function Profile() {
                 </div>
                 <div>
                   <label className={labelClass}>Pincode</label>
-                  <input data-testid="edit-pincode" className={inputClass} placeholder="400001" value={editForm.pincode || ""} onChange={e => setEditForm(p => ({ ...p, pincode: e.target.value }))} />
+                  <div className="relative">
+                    <input
+                      data-testid="edit-pincode"
+                      className={`${inputClass} ${pincodeStatus === "valid" ? "border-green-400 pr-7" : pincodeStatus === "invalid" ? "border-red-400" : ""}`}
+                      placeholder="400001"
+                      maxLength={6}
+                      value={editForm.pincode || ""}
+                      onChange={e => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                        setEditForm(p => ({ ...p, pincode: v }));
+                        setPincodeStatus("idle");
+                      }}
+                      onBlur={e => handleProfilePincodeBlur(e.target.value)}
+                    />
+                    {pincodeStatus === "loading" && <Loader2 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />}
+                    {pincodeStatus === "valid" && <CheckCircle2 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-green-500" />}
+                    {pincodeStatus === "invalid" && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-500 text-xs font-bold">✗</span>}
+                  </div>
+                  {pincodeStatus === "invalid" && <p className="text-xs text-red-500 mt-0.5">Invalid pincode</p>}
                 </div>
               </div>
             </section>
