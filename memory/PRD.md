@@ -149,7 +149,8 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 ### P1 (Important)
 - [x] **Post-event rating flow trigger** ✅ DONE — Dashboard banner + rating modal with sliders
 - [x] **Private lead notes on freelancer profiles** ✅ DONE — Profile page section, only visible to note author
-- [ ] Financial ledger (advance paid / balance due)
+- [x] **Financial ledger (advance paid / balance due)** ✅ DONE — Ledger tab in GigDetail, 50/50 split default, Mark Paid buttons
+- [x] **Admin Appeal Review UI** ✅ DONE — AdminPenalties rewritten with 2 tabs (Penalty Log + Appeals), approve/reject with star removal
 - [ ] Sunday dispatch cron job
 - [ ] Appeal review UI for admin
 

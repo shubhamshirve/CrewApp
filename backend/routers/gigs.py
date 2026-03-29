@@ -186,6 +186,110 @@ async def get_gig(gig_id: str, current_user: dict = Depends(get_current_user)):
     return gig_dict
 
 
+class PaymentRecord(BaseModel):
+    type: str  # advance | balance
+    amount: float
+    notes: Optional[str] = None
+
+
+@router.get("/{gig_id}/ledger")
+async def get_gig_ledger(gig_id: str, current_user: dict = Depends(get_current_user)):
+    """Return financial ledger for a gig — all accepted invites with payment tracking."""
+    db = get_db()
+    gig = await db.gigs.find_one({"_id": gig_id})
+    if not gig:
+        raise HTTPException(status_code=404, detail="Gig not found")
+    if gig["lead_photographer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the lead photographer can view the ledger")
+
+    invites = await db.gig_invites.find(
+        {"gig_id": gig_id, "status": "accepted"}
+    ).to_list(50)
+
+    result = []
+    for inv in invites:
+        freelancer = await db.users.find_one({"_id": inv["freelancer_id"]}, {"full_name": 1, "email": 1, "_id": 0})
+        agreed = inv.get("agreed_fee") or inv.get("counter_fee") or inv.get("proposed_fee", 0)
+        advance_amount = inv.get("advance_amount", round(agreed * 0.5, 2))
+        result.append({
+            "invite_id": inv["_id"],
+            "freelancer_id": inv["freelancer_id"],
+            "freelancer_name": freelancer.get("full_name", "Unknown") if freelancer else "Unknown",
+            "freelancer_email": freelancer.get("email", "") if freelancer else "",
+            "role": inv.get("role", ""),
+            "session_date": inv.get("session_date", ""),
+            "agreed_fee": agreed,
+            "advance_amount": advance_amount,
+            "advance_paid": inv.get("advance_paid", False),
+            "advance_paid_at": inv.get("advance_paid_at"),
+            "balance_amount": round(agreed - advance_amount, 2),
+            "balance_paid": inv.get("balance_paid", False),
+            "balance_paid_at": inv.get("balance_paid_at"),
+            "payment_notes": inv.get("payment_notes", ""),
+        })
+
+    total_fee = sum(r["agreed_fee"] for r in result)
+    total_advance = sum(r["advance_amount"] for r in result)
+    total_balance = sum(r["balance_amount"] for r in result)
+    advance_paid_count = sum(1 for r in result if r["advance_paid"])
+    balance_paid_count = sum(1 for r in result if r["balance_paid"])
+
+    return {
+        "entries": result,
+        "summary": {
+            "total_fee": total_fee,
+            "total_advance": total_advance,
+            "total_balance": total_balance,
+            "advance_paid_count": advance_paid_count,
+            "balance_paid_count": balance_paid_count,
+            "team_size": len(result),
+        }
+    }
+
+
+@router.post("/invites/{invite_id}/payment")
+async def record_payment(invite_id: str, data: PaymentRecord, current_user: dict = Depends(get_current_user)):
+    """Record an advance or balance payment for a gig invite."""
+    db = get_db()
+    if data.type not in ("advance", "balance"):
+        raise HTTPException(status_code=400, detail="type must be advance or balance")
+
+    invite = await db.gig_invites.find_one({"_id": invite_id})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+
+    gig = await db.gigs.find_one({"_id": invite["gig_id"]})
+    if not gig or gig["lead_photographer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the lead photographer can record payments")
+
+    now = datetime.now(timezone.utc).isoformat()
+    if data.type == "advance":
+        update = {
+            "advance_paid": True,
+            "advance_amount": data.amount,
+            "advance_paid_at": now,
+        }
+        msg = f"Advance payment of ₹{data.amount:.0f} has been recorded for {gig['title']}."
+    else:
+        update = {
+            "balance_paid": True,
+            "balance_paid_at": now,
+        }
+        msg = f"Balance payment for {gig['title']} has been marked as settled."
+
+    if data.notes:
+        update["payment_notes"] = data.notes
+    update["updated_at"] = now
+
+    await db.gig_invites.update_one({"_id": invite_id}, {"$set": update})
+    await send_notification(
+        db, invite["freelancer_id"], "wallet_credit",
+        "Payment Recorded", msg,
+        {"gig_id": invite["gig_id"], "invite_id": invite_id}
+    )
+    return {"message": f"{data.type.capitalize()} payment recorded", "invite_id": invite_id}
+
+
 @router.post("/{gig_id}/invites")
 async def send_invite(gig_id: str, data: InviteRequest, current_user: dict = Depends(get_current_user)):
     db = get_db()

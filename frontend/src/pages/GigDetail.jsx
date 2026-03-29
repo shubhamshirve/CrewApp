@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar, Clock, MapPin, Users, UserPlus, Check, X,
-  ArrowRightLeft, Upload, PackageCheck, Sparkles, FileText,
+  ArrowRightLeft, Upload, PackageCheck, Sparkles, FileText, IndianRupee, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -47,6 +47,11 @@ export default function GigDetail() {
   });
   const [workspaceForm, setWorkspaceForm] = useState({ type: "moodboard", title: "", content: "" });
   const [counterFee, setCounterFee] = useState({});
+  const [ledger, setLedger] = useState(null);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [paymentDialog, setPaymentDialog] = useState(null); // { invite_id, type, suggested_amount }
+  const [paymentForm, setPaymentForm] = useState({ amount: "", notes: "" });
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
   useEffect(() => { load(); }, [id]);
 
@@ -67,7 +72,36 @@ export default function GigDetail() {
     } catch { toast.error("Failed to load gig"); } finally { setLoading(false); }
   };
 
+  const loadLedger = async () => {
+    if (!id) return;
+    setLedgerLoading(true);
+    try {
+      const res = await api.get(`/gigs/${id}/ledger`);
+      setLedger(res.data);
+    } catch { /* gig may not have accepted invites yet */ } finally { setLedgerLoading(false); }
+  };
+
   const isLead = gig?.lead_photographer_id === user?.id;
+
+  const handleRecordPayment = async () => {
+    if (!paymentDialog) return;
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    setPaymentSubmitting(true);
+    try {
+      await api.post(`/gigs/invites/${paymentDialog.invite_id}/payment`, {
+        type: paymentDialog.type,
+        amount: parseFloat(paymentForm.amount),
+        notes: paymentForm.notes || undefined,
+      });
+      toast.success(`${paymentDialog.type === "advance" ? "Advance" : "Balance"} payment recorded`);
+      setPaymentDialog(null);
+      setPaymentForm({ amount: "", notes: "" });
+      loadLedger();
+    } catch { toast.error("Failed to record payment"); } finally { setPaymentSubmitting(false); }
+  };
   const myInvite = gig?.invites?.find(i => i.freelancer_id === user?.id);
 
   const handleInvite = async () => {
@@ -198,7 +232,7 @@ export default function GigDetail() {
           )}
         </div>
 
-        <Tabs defaultValue="sessions">
+        <Tabs defaultValue="sessions" onValueChange={v => { if (v === "ledger") loadLedger(); }}>
           <TabsList className="bg-slate-100 border border-slate-200">
             <TabsTrigger value="sessions" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
               Sessions
@@ -209,6 +243,11 @@ export default function GigDetail() {
             <TabsTrigger value="workspace" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
               Workspace
             </TabsTrigger>
+            {isLead && (
+              <TabsTrigger value="ledger" data-testid="ledger-tab" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
+                <IndianRupee size={12} className="mr-1" />Ledger
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Sessions */}
@@ -354,6 +393,103 @@ export default function GigDetail() {
               </div>
             )}
           </TabsContent>
+
+          {/* Financial Ledger */}
+          {isLead && (
+            <TabsContent value="ledger" className="mt-4">
+              {ledgerLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : !ledger || ledger.entries?.length === 0 ? (
+                <div className="text-center py-16">
+                  <IndianRupee size={36} className="text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm text-slate-400">No accepted team members yet</p>
+                  <p className="text-xs text-slate-300 mt-1">Invite crew and once they accept, payment tracking will appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Summary */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Total Fees", value: `₹${ledger.summary.total_fee.toLocaleString("en-IN")}`, color: "text-slate-900" },
+                      { label: "Advance Due", value: `₹${ledger.summary.total_advance.toLocaleString("en-IN")}`, color: "text-amber-600" },
+                      { label: "Balance Due", value: `₹${ledger.summary.total_balance.toLocaleString("en-IN")}`, color: "text-blue-600" },
+                    ].map(s => (
+                      <div key={s.label} className="p-3 rounded-xl border border-slate-200 bg-white text-center">
+                        <p className={`text-base font-bold font-display ${s.color}`}>{s.value}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Entries */}
+                  <div className="space-y-3">
+                    {ledger.entries.map(entry => (
+                      <div key={entry.invite_id} data-testid={`ledger-entry-${entry.invite_id}`} className="p-4 rounded-xl border border-slate-200 bg-white">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 font-display">{entry.freelancer_name}</p>
+                            <p className="text-xs text-slate-500">{entry.role} · {entry.session_date}</p>
+                            <p className="text-sm font-bold text-slate-900 mt-1">₹{entry.agreed_fee?.toLocaleString("en-IN")}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0 space-y-1">
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <span className="text-xs text-slate-500">Advance ₹{entry.advance_amount?.toLocaleString("en-IN")}</span>
+                              {entry.advance_paid ? (
+                                <CheckCircle2 size={14} className="text-green-500" />
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  data-testid={`pay-advance-${entry.invite_id}`}
+                                  onClick={() => {
+                                    setPaymentDialog({ invite_id: entry.invite_id, type: "advance", suggested_amount: entry.advance_amount });
+                                    setPaymentForm({ amount: String(entry.advance_amount), notes: "" });
+                                  }}
+                                  className="h-6 text-xs px-2 font-display text-white"
+                                  style={{ background: "#F59E0B" }}
+                                >
+                                  Mark Paid
+                                </Button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <span className="text-xs text-slate-500">Balance ₹{entry.balance_amount?.toLocaleString("en-IN")}</span>
+                              {entry.balance_paid ? (
+                                <CheckCircle2 size={14} className="text-green-500" />
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  data-testid={`pay-balance-${entry.invite_id}`}
+                                  onClick={() => {
+                                    setPaymentDialog({ invite_id: entry.invite_id, type: "balance", suggested_amount: entry.balance_amount });
+                                    setPaymentForm({ amount: String(entry.balance_amount), notes: "" });
+                                  }}
+                                  className="h-6 text-xs px-2 font-display text-white"
+                                  style={{ background: "#3B82F6" }}
+                                >
+                                  Mark Paid
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {entry.payment_notes && (
+                          <p className="text-xs text-slate-400 mt-2 italic">{entry.payment_notes}</p>
+                        )}
+                        {(entry.advance_paid_at || entry.balance_paid_at) && (
+                          <div className="flex gap-4 mt-2 text-xs text-slate-400">
+                            {entry.advance_paid_at && <span>Advance paid {new Date(entry.advance_paid_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>}
+                            {entry.balance_paid_at && <span>Balance paid {new Date(entry.balance_paid_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
@@ -495,6 +631,61 @@ export default function GigDetail() {
           ) : (
             <div className="mt-2 p-4 rounded-lg text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 border border-slate-200">
               {aiSuggestion || "No suggestions yet."}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Dialog */}
+      <Dialog open={!!paymentDialog} onOpenChange={() => setPaymentDialog(null)}>
+        <DialogContent className="bg-white border-slate-200 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display">
+              Record {paymentDialog?.type === "advance" ? "Advance" : "Balance"} Payment
+            </DialogTitle>
+          </DialogHeader>
+          {paymentDialog && (
+            <div className="space-y-4 mt-2">
+              <div>
+                <label className="text-xs font-display text-slate-600 mb-1 block">Amount (₹) *</label>
+                <input
+                  data-testid="payment-amount-input"
+                  type="number"
+                  className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                  placeholder={`Suggested: ₹${paymentDialog.suggested_amount?.toLocaleString("en-IN")}`}
+                  value={paymentForm.amount}
+                  onChange={e => setPaymentForm(p => ({ ...p, amount: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-display text-slate-600 mb-1 block">Notes (optional)</label>
+                <textarea
+                  data-testid="payment-notes-input"
+                  className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-800 resize-none h-16 focus:border-orange-400 outline-none"
+                  placeholder="e.g. Paid via UPI"
+                  value={paymentForm.notes}
+                  onChange={e => setPaymentForm(p => ({ ...p, notes: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setPaymentDialog(null)} className="flex-1 border-slate-200 text-slate-500">
+                  Cancel
+                </Button>
+                <Button
+                  data-testid="confirm-payment-btn"
+                  onClick={handleRecordPayment}
+                  disabled={paymentSubmitting}
+                  className="flex-1 font-display text-white"
+                  style={{ background: paymentDialog.type === "advance" ? "#F59E0B" : "#3B82F6" }}
+                >
+                  {paymentSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </span>
+                  ) : "Confirm Payment"}
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

@@ -166,8 +166,8 @@ async def get_user_profile(user_id: str, admin: dict = Depends(get_admin_user)):
     login_logs = await db.login_logs.find(
         {"user_id": user_id}
     ).sort("created_at", -1).limit(50).to_list(50)
-    for l in login_logs:
-        l["id"] = str(l.pop("_id"))
+    for log_entry in login_logs:
+        log_entry["id"] = str(log_entry.pop("_id"))
 
     return {
         "user": _clean_user(user),
@@ -395,6 +395,120 @@ async def toggle_suspend(user_id: str, admin: dict = Depends(get_admin_user)):
         {"is_suspended": new_state},
     )
     return {"is_suspended": new_state}
+
+
+@router.get("/penalties")
+async def get_penalties(
+    limit: int = 50,
+    skip: int = 0,
+    admin: dict = Depends(get_admin_user),
+):
+    """Return all penalty actions from admin audit log, enriched with user names."""
+    db = get_db()
+    limit = min(limit, 100)
+    logs = await db.admin_logs.find(
+        {"action": "add_penalty"},
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.admin_logs.count_documents({"action": "add_penalty"})
+
+    result = []
+    for log in logs:
+        user = await db.users.find_one({"_id": log["target_id"]}, {"full_name": 1, "_id": 0})
+        result.append({
+            "id": log.get("target_id"),
+            "user_id": log["target_id"],
+            "user_name": user.get("full_name", "Unknown") if user else "Unknown",
+            "reason": log.get("after", {}).get("reason", ""),
+            "stars": log.get("after", {}).get("negative_stars", 1) - log.get("before", {}).get("negative_stars", 0),
+            "total_stars": log.get("after", {}).get("negative_stars", 0),
+            "created_at": log["created_at"],
+            "admin_email": log.get("admin_email", ""),
+        })
+    return {"items": result, "total": total}
+
+
+class AppealReviewRequest(BaseModel):
+    action: str  # approve | reject
+    admin_note: Optional[str] = None
+
+
+@router.get("/appeals")
+async def get_appeals(
+    status: Optional[str] = None,
+    admin: dict = Depends(get_admin_user),
+):
+    """Return all penalty appeals with user information."""
+    db = get_db()
+    query = {}
+    if status:
+        query["status"] = status
+    appeals = await db.penalty_appeals.find(query).sort("created_at", -1).to_list(100)
+    result = []
+    for ap in appeals:
+        user = await db.users.find_one(
+            {"_id": ap["user_id"]},
+            {"full_name": 1, "email": 1, "negative_stars": 1, "_id": 0}
+        )
+        result.append({
+            "id": ap["_id"],
+            "user_id": ap["user_id"],
+            "user_name": user.get("full_name", "Unknown") if user else "Unknown",
+            "user_email": user.get("email", "") if user else "",
+            "user_stars": user.get("negative_stars", 0) if user else 0,
+            "reason": ap.get("reason", ""),
+            "gig_id": ap.get("gig_id"),
+            "status": ap.get("status", "pending"),
+            "admin_note": ap.get("admin_note"),
+            "reviewed_at": ap.get("reviewed_at"),
+            "created_at": ap["created_at"],
+        })
+    return result
+
+
+@router.put("/appeals/{appeal_id}")
+async def review_appeal(appeal_id: str, data: AppealReviewRequest, admin: dict = Depends(get_admin_user)):
+    """Admin reviews a penalty appeal — approve or reject."""
+    db = get_db()
+    if data.action not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="action must be approve or reject")
+    appeal = await db.penalty_appeals.find_one({"_id": appeal_id})
+    if not appeal:
+        raise HTTPException(status_code=404, detail="Appeal not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    await db.penalty_appeals.update_one(
+        {"_id": appeal_id},
+        {"$set": {"status": data.action + "d", "admin_note": data.admin_note, "reviewed_at": now}}
+    )
+
+    if data.action == "approve":
+        # Reduce 1 negative star from the user
+        await db.users.update_one(
+            {"_id": appeal["user_id"]},
+            {"$inc": {"negative_stars": -1}}
+        )
+        user = await db.users.find_one({"_id": appeal["user_id"]})
+        if user and user.get("negative_stars", 0) < 5:
+            await db.users.update_one({"_id": appeal["user_id"]}, {"$set": {"is_suspended": False}})
+
+    await send_notification(
+        db, appeal["user_id"], "appeal",
+        "Appeal " + ("Approved" if data.action == "approve" else "Rejected"),
+        (
+            "Your penalty appeal has been approved. 1 negative star has been removed."
+            if data.action == "approve"
+            else f"Your penalty appeal was rejected. {data.admin_note or 'No additional notes.'}"
+        ),
+        {"appeal_id": appeal_id}
+    )
+    await log_admin_action(
+        db, admin, f"appeal_{data.action}",
+        "appeal", appeal_id,
+        {"status": "pending"},
+        {"status": data.action + "d", "admin_note": data.admin_note},
+    )
+    return {"message": f"Appeal {data.action}d"}
 
 
 @router.post("/seed-admin")
