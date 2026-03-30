@@ -1,6 +1,7 @@
 /**
  * Pincode lookup utility using the public India Post API.
  * https://api.postalpincode.in/pincode/{PINCODE}
+ * Returns all post offices for a given pincode.
  */
 
 export async function fetchPincodeData(pincode) {
@@ -16,13 +17,16 @@ export async function fetchPincodeData(pincode) {
       data[0]?.Status === "Success" &&
       data[0]?.PostOffice?.length > 0
     ) {
-      const office = data[0].PostOffice[0];
+      const offices = data[0].PostOffice;
+      const first = offices[0];
       return {
         valid: true,
-        state: office.State || "",
-        city: office.District || "",
-        area: office.Name || "",
-        country: office.Country || "India",
+        state: first.State || "",
+        city: first.District || "",
+        area: first.Name || "",
+        country: first.Country || "India",
+        // All area names for multi-select
+        areas: offices.map(o => o.Name).filter(Boolean),
       };
     }
     return { valid: false };
@@ -30,3 +34,4 @@ export async function fetchPincodeData(pincode) {
     return null;
   }
 }
+

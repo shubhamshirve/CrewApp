@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Wallet, Briefcase, Bell, Star, Shield, ChevronRight, CheckCircle, Clock, XCircle, AlertCircle, User, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import VerificationModal from "@/components/VerificationModal";
 
 const STATUS_MAP = {
   not_submitted: { label: "ID Not Submitted", color: "bg-slate-100 text-slate-600", icon: AlertCircle },
@@ -18,16 +19,17 @@ const STATUS_MAP = {
 const NOTIF_ICONS = { invite: Bell, accepted: CheckCircle, rejected: XCircle, counter: Zap, connection_request: User, connection_accepted: User, wallet_credit: Wallet, verification: Shield, penalty: AlertCircle };
 
 export default function Dashboard() {
-  const { user, api } = useAuth();
+  const { user, api, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [invites, setInvites] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [gigs, setGigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pendingRatings, setPendingRatings] = useState([]);
-  const [ratingModal, setRatingModal] = useState(null); // { gig, users_to_rate, currentIdx }
+  const [ratingModal, setRatingModal] = useState(null);
   const [ratingForm, setRatingForm] = useState({ punctuality: 3, gear_handling: 3, teamwork: 3, notes: "" });
   const [submittingRating, setSubmittingRating] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -147,7 +149,7 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-500">Upload your government ID to get the verified badge and start booking.</p>
               </div>
             </div>
-            <Button size="sm" data-testid="complete-verification-btn" onClick={() => navigate("/onboarding")} style={{ background: "#E05D26" }} className="flex-shrink-0 text-xs font-display font-semibold text-white">
+            <Button size="sm" data-testid="complete-verification-btn" onClick={() => setShowVerification(true)} style={{ background: "#E05D26" }} className="flex-shrink-0 text-xs font-display font-semibold text-white">
               Verify Now
             </Button>
           </div>
@@ -350,6 +352,14 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
       )}
+
+      <VerificationModal
+        open={showVerification}
+        onClose={() => setShowVerification(false)}
+        onSuccess={() => { setShowVerification(false); refreshUser(); }}
+        api={api}
+        verificationStatus={user?.verification_status || "not_submitted"}
+      />
     </Layout>
   );
 }

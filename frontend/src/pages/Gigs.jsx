@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, ChevronRight, Calendar, Briefcase, Trash2, Pencil } from "lucide-react";
+import { Plus, ChevronRight, Calendar, Briefcase, Trash2, Pencil, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { sanitizeText, validateFutureDate, validateTimeRange, minLength, maxLength } from "@/utils/validation";
+import VerificationModal from "@/components/VerificationModal";
 
 const FieldError = ({ msg }) =>
   msg ? <p className="text-xs text-red-500 mt-0.5">{msg}</p> : null;
@@ -23,7 +24,7 @@ const STATUS_COLORS = {
 const inputClass = "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-orange-400/60";
 
 export default function Gigs() {
-  const { user, api } = useAuth();
+  const { user, api, refreshUser } = useAuth();
   const { eventTypes } = usePlatform();
   const navigate = useNavigate();
   const [gigs, setGigs] = useState([]);
@@ -36,6 +37,7 @@ export default function Gigs() {
   const [deleting, setDeleting] = useState(false);
   const [gigErrors, setGigErrors] = useState({});
   const [sessionErrors, setSessionErrors] = useState([]);
+  const [showVerification, setShowVerification] = useState(false);
 
   useEffect(() => {
     load();
@@ -130,7 +132,9 @@ export default function Gigs() {
             {user?.is_verified ? (
               <Button data-testid="empty-create-gig-btn" onClick={() => setShowCreate(true)} size="sm" style={{ background: "#E05D26" }} className="font-display text-white">Create First Gig</Button>
             ) : (
-              <p className="text-xs text-slate-400">Get verified to start booking crew.</p>
+              <Button data-testid="verify-to-create-btn" size="sm" onClick={() => setShowVerification(true)} className="font-display text-white gap-1" style={{ background: "#3B82F6" }}>
+                <Shield size={13} /> Get Verified to Create Gigs
+              </Button>
             )}
           </div>
         ) : (
@@ -319,6 +323,14 @@ export default function Gigs() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <VerificationModal
+        open={showVerification}
+        onClose={() => setShowVerification(false)}
+        onSuccess={() => { setShowVerification(false); refreshUser(); }}
+        api={api}
+        verificationStatus={user?.verification_status || "not_submitted"}
+      />
     </Layout>
   );
 }

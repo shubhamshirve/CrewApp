@@ -60,6 +60,8 @@ export default function Auth() {
 
   // ── Pincode state ──────────────────────────────────────────────────────────
   const [pincodeStatus, setPincodeStatus] = useState("idle"); // "idle"|"loading"|"valid"|"invalid"
+  const [areaOptions, setAreaOptions] = useState([]); // multiple areas from pincode API
+  const [customAreaMode, setCustomAreaMode] = useState(false); // true when "Other" is selected
 
   // ── Inline field errors ────────────────────────────────────────────────────
   const [loginErrors, setLoginErrors] = useState({});
@@ -106,12 +108,21 @@ export default function Auth() {
         ...p,
         state: result.state || p.state,
         location: result.city || p.location,
-        area: p.area || result.area,    // don't overwrite if user already typed an area
+        area: result.areas?.length === 1 ? result.areas[0] : (p.area || ""),
       }));
       setPincodeStatus("valid");
-      toast.success(`Pincode found: ${result.city}, ${result.state}`);
+      if (result.areas && result.areas.length > 1) {
+        setAreaOptions(result.areas);
+        setCustomAreaMode(false);
+        toast.success(`${result.areas.length} areas found in ${result.city}`);
+      } else {
+        setAreaOptions([]);
+        setCustomAreaMode(false);
+        toast.success(`Pincode found: ${result.city}, ${result.state}`);
+      }
     } else {
       setPincodeStatus("invalid");
+      setAreaOptions([]);
       toast.error("Invalid pincode — please check and try again");
     }
   };
@@ -634,7 +645,42 @@ export default function Auth() {
                   </div>
                   <div>
                     <Label className="text-slate-700 text-xs font-display">Area</Label>
-                    <Input data-testid="reg-area" className={`mt-1 ${ic}`} placeholder="Bandra West" value={regData.area} onChange={e => setRegData(p => ({ ...p, area: e.target.value }))} />
+                    {areaOptions.length > 1 && !customAreaMode ? (
+                      <select
+                        data-testid="reg-area-select"
+                        className={`mt-1 w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none ${ic}`}
+                        value={regData.area}
+                        onChange={e => {
+                          if (e.target.value === "__other__") {
+                            setCustomAreaMode(true);
+                            setRegData(p => ({ ...p, area: "" }));
+                          } else {
+                            setRegData(p => ({ ...p, area: e.target.value }));
+                          }
+                        }}
+                      >
+                        <option value="">Select area…</option>
+                        {areaOptions.map(a => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
+                        <option value="__other__">Other (type manually)</option>
+                      </select>
+                    ) : (
+                      <div className="relative mt-1">
+                        <Input data-testid="reg-area" className={ic} placeholder="Bandra West" value={regData.area}
+                          onChange={e => setRegData(p => ({ ...p, area: e.target.value }))}
+                        />
+                        {customAreaMode && (
+                          <button
+                            type="button"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-orange-500 hover:text-orange-700"
+                            onClick={() => { setCustomAreaMode(false); setRegData(p => ({ ...p, area: "" })); }}
+                          >
+                            Show list
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>

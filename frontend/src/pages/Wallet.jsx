@@ -207,6 +207,69 @@ export default function Wallet() {
           <p className="text-slate-500 text-sm mt-0.5">Manage your plan, wallet balance, and referrals</p>
         </div>
 
+        {/* ── 0. Active Plan Summary ── */}
+        {user?.subscription_plan && user.subscription_plan !== "none" && (
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+                  <Crown size={18} className="text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-orange-500 font-medium font-display uppercase tracking-wide">Active Plan</p>
+                  <p className="text-lg font-bold text-slate-900 font-display capitalize leading-tight">{user.subscription_plan} Plan</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200 whitespace-nowrap">Active</span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {/* Expiry */}
+              <div className="bg-white/70 rounded-xl p-3 border border-orange-100">
+                <p className="text-xs text-slate-500 mb-0.5">Expires On</p>
+                <p className="text-sm font-semibold text-slate-800 font-display">
+                  {user.subscription_expires_at
+                    ? new Date(user.subscription_expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                    : "—"}
+                </p>
+                {(() => {
+                  const days = daysUntil(user.subscription_expires_at);
+                  if (days === null) return null;
+                  return (
+                    <p className={`text-xs mt-0.5 font-medium ${days <= 7 ? "text-red-500" : days <= 30 ? "text-amber-500" : "text-green-600"}`}>
+                      {days <= 0 ? "Expired" : `${days} days left`}
+                    </p>
+                  );
+                })()}
+              </div>
+
+              {/* Public Gig Board */}
+              <div className="bg-white/70 rounded-xl p-3 border border-orange-100">
+                <p className="text-xs text-slate-500 mb-0.5">Public Gig Board</p>
+                <p className={`text-sm font-semibold font-display ${user.active_plan_features?.public_gig_enabled ? "text-green-600" : "text-slate-400"}`}>
+                  {user.active_plan_features?.public_gig_enabled ? "Enabled" : "Disabled"}
+                </p>
+              </div>
+
+              {/* WhatsApp */}
+              <div className="bg-white/70 rounded-xl p-3 border border-orange-100">
+                <p className="text-xs text-slate-500 mb-0.5">WhatsApp Alerts</p>
+                <p className={`text-sm font-semibold font-display ${user.active_plan_features?.whatsapp_enabled ? "text-green-600" : "text-slate-400"}`}>
+                  {user.active_plan_features?.whatsapp_enabled ? "Enabled" : "Disabled"}
+                </p>
+              </div>
+            </div>
+
+            {/* Expiry warning */}
+            {user.subscription_expires_at && daysUntil(user.subscription_expires_at) <= 7 && daysUntil(user.subscription_expires_at) > 0 && (
+              <div className="mt-3 flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
+                <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+                <p className="text-xs text-red-700">Your plan expires soon. Renew below to avoid service interruption.</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── 1. Plans (shown FIRST) ── */}
         {plansLoading ? (
           <div className="flex justify-center py-8">

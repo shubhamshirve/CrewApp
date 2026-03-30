@@ -16,6 +16,7 @@ import {
   validateName, validateIndianPhone, validateUrl, validateUpi,
   validateBio, validateFee, sanitizeText,
 } from "@/utils/validation";
+import VerificationModal from "@/components/VerificationModal";
 
 const FieldError = ({ msg }) =>
   msg ? <p className="text-xs text-red-500 mt-0.5">{msg}</p> : null;
@@ -170,8 +171,6 @@ export default function Profile() {
 
   // Doc resubmit
   const [docDialog, setDocDialog] = useState(false);
-  const [docForm, setDocForm] = useState({ id_type: "Aadhar", govt_id_base64: "", selfie_base64: "" });
-  const [docSaving, setDocSaving] = useState(false);
 
   const isOwn = user?.id === id;
 
@@ -225,7 +224,6 @@ export default function Profile() {
       primary_rate: profile.primary_rate || "",
       secondary_rate: profile.secondary_rate || "",
       instagram_url: profile.instagram_url || "",
-      linkedin_url: profile.linkedin_url || "",
       website_url: profile.website_url || "",
       upi_id: profile.upi_id || "",
       years_of_experience: profile.years_of_experience || "",
@@ -240,7 +238,6 @@ export default function Profile() {
       full_name: validateName(editForm.full_name, "Full name"),
       phone: editForm.phone ? validateIndianPhone(editForm.phone) : "",
       instagram_url: validateUrl(editForm.instagram_url),
-      linkedin_url: validateUrl(editForm.linkedin_url),
       website_url: validateUrl(editForm.website_url),
       upi_id: validateUpi(editForm.upi_id),
       bio: validateBio(editForm.bio),
@@ -361,39 +358,6 @@ export default function Profile() {
     } catch { toast.error("Failed to remove gear"); }
   };
 
-  const handleDocSubmit = async () => {
-    if (!docForm.govt_id_base64 || !docForm.selfie_base64) {
-      toast.error("Please upload both documents"); return;
-    }
-    setDocSaving(true);
-    try {
-      await api.post("/users/id-upload", docForm);
-      setProfile(p => ({ ...p, verification_status: "pending" }));
-      setDocDialog(false);
-      toast.success("Documents submitted! Admin will review within 24 hours.");
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to submit documents");
-    } finally { setDocSaving(false); }
-  };
-
-  const toB64 = (file) => new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-
-  const handleFileChange = async (field, e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error("File must be under 2MB"); return; }
-    try {
-      const b64 = await toB64(file);
-      setDocForm(p => ({ ...p, [field]: b64 }));
-      toast.success("File loaded");
-    } catch { toast.error("Failed to read file"); }
-  };
-
   const inputClass = "w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none transition-colors";
   const labelClass = "text-xs font-display text-slate-600 mb-1 block";
 
@@ -501,11 +465,6 @@ export default function Profile() {
                 {profile.website_url && (
                   <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
                     <Globe size={12} /> Website
-                  </a>
-                )}
-                {profile.linkedin_url && (
-                  <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-700 hover:underline">
-                    <Link2 size={12} /> LinkedIn
                   </a>
                 )}
                 {/* UPI: show Pay Now button to others, own UPI ID to self */}
@@ -940,17 +899,6 @@ export default function Profile() {
                   />
                   <FieldError msg={profileErrors.website_url} />
                 </div>
-                <div>
-                  <label className={labelClass}><Link2 size={11} className="inline mr-1" />LinkedIn URL</label>
-                  <input data-testid="edit-linkedin"
-                    className={`${inputClass} ${profileErrors.linkedin_url ? "border-red-400" : ""}`}
-                    placeholder="https://linkedin.com/in/yourprofile"
-                    value={editForm.linkedin_url || ""}
-                    onChange={e => { setEditForm(p => ({ ...p, linkedin_url: e.target.value })); setProfileErrors(p => ({ ...p, linkedin_url: "" })); }}
-                    onBlur={e => setProfileErrors(p => ({ ...p, linkedin_url: validateUrl(e.target.value) }))}
-                  />
-                  <FieldError msg={profileErrors.linkedin_url} />
-                </div>
               </div>
             </section>
 
@@ -1256,56 +1204,17 @@ export default function Profile() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Document Resubmit Dialog ─────────────────────────────────────── */}
-      <Dialog open={docDialog} onOpenChange={() => setDocDialog(false)}>
-        <DialogContent className="bg-white border-slate-200 max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900 font-display">
-              {profile.verification_status === "rejected" ? "Resubmit Documents" : "Submit for Verification"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            {profile.verification_status === "rejected" && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
-                Your previous submission was rejected. Please upload clearer documents and resubmit.
-              </div>
-            )}
-            <div>
-              <label className={labelClass}>ID Type</label>
-              <select data-testid="doc-id-type" className={inputClass} value={docForm.id_type} onChange={e => setDocForm(p => ({ ...p, id_type: e.target.value }))}>
-                <option>Aadhar</option>
-                <option>PAN</option>
-                <option>Driving License</option>
-                <option>Passport</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Government ID (front) — max 2MB</label>
-              <input data-testid="doc-govt-id" type="file" accept="image/*,application/pdf" className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100 cursor-pointer"
-                onChange={e => handleFileChange("govt_id_base64", e)} />
-              {docForm.govt_id_base64 && <p className="text-xs text-green-600 mt-1">Loaded</p>}
-            </div>
-            <div>
-              <label className={labelClass}>Selfie with ID — max 2MB</label>
-              <input data-testid="doc-selfie" type="file" accept="image/*" className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100 cursor-pointer"
-                onChange={e => handleFileChange("selfie_base64", e)} />
-              {docForm.selfie_base64 && <p className="text-xs text-green-600 mt-1">Loaded</p>}
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setDocDialog(false)} className="flex-1 border-slate-200 text-slate-500">Cancel</Button>
-              <Button
-                data-testid="submit-doc-btn"
-                onClick={handleDocSubmit}
-                disabled={docSaving}
-                className="flex-1 font-display text-white"
-                style={{ background: "#3B82F6" }}
-              >
-                {docSaving ? "Submitting…" : "Submit"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* ── Verification Modal (shared) ──────────────────────────────────── */}
+      <VerificationModal
+        open={docDialog}
+        onClose={() => setDocDialog(false)}
+        onSuccess={() => {
+          setProfile(p => ({ ...p, verification_status: "pending" }));
+          refreshUser();
+        }}
+        api={api}
+        verificationStatus={profile?.verification_status || "not_submitted"}
+      />
     </Layout>
   );
 }
