@@ -115,12 +115,30 @@ export default function Gigs() {
             <h1 className="text-2xl font-semibold text-slate-900 font-display">Gigs</h1>
             <p className="text-slate-500 text-sm mt-0.5">Manage your bookings and invites</p>
           </div>
-          {user?.is_verified && (
+          {user?.is_verified ? (
             <Button data-testid="create-gig-btn" onClick={() => setShowCreate(true)} style={{ background: "#E05D26" }} className="font-display font-semibold gap-2 text-white">
               <Plus size={16} /> New Gig
             </Button>
+          ) : (
+            <Button data-testid="header-verify-btn" size="sm" onClick={() => setShowVerification(true)} className="font-display font-semibold gap-1.5 text-white" style={{ background: "#3B82F6" }}>
+              <Shield size={14} /> Get Verified
+            </Button>
           )}
         </div>
+
+        {/* Unverified banner */}
+        {!user?.is_verified && (
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+            <Shield size={16} className="text-blue-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-blue-800 font-display">Verification Required</p>
+              <p className="text-xs text-blue-600 mt-0.5">Submit your documents to create gigs and invite crew members.</p>
+            </div>
+            <Button size="sm" data-testid="banner-verify-btn" onClick={() => setShowVerification(true)} className="font-display text-white gap-1 flex-shrink-0" style={{ background: "#3B82F6" }}>
+              Verify Now
+            </Button>
+          </div>
+        )}
 
         {/* Gigs List */}
         {loading ? (
