@@ -444,12 +444,12 @@ export default function Wallet() {
             <h3 className="text-sm font-semibold text-slate-900 font-display mb-4">Transaction History</h3>
             <div className="space-y-2">
               {walletData.transactions.map(tx => (
-                <div key={tx.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0" data-testid={`transaction-${tx.id}`}>
-                  <div>
-                    <p className="text-xs text-slate-700 font-display">{tx.description}</p>
+                <div key={tx.id} className="flex items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-0" data-testid={`transaction-${tx.id}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-700 font-display truncate">{tx.description}</p>
                     <p className="text-[10px] text-slate-400">{new Date(tx.created_at).toLocaleDateString("en-IN")}</p>
                   </div>
-                  <span className={`text-sm font-bold font-mono ${tx.type === "credit" ? "text-emerald-500" : "text-red-500"}`}>
+                  <span className={`text-sm font-bold font-mono flex-shrink-0 ${tx.type === "credit" ? "text-emerald-500" : "text-red-500"}`}>
                     {tx.type === "credit" ? "+" : "-"}₹{tx.amount?.toFixed(2)}
                   </span>
                 </div>

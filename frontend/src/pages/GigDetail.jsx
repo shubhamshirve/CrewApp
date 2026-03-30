@@ -379,12 +379,12 @@ export default function GigDetail() {
       <div className="max-w-4xl mx-auto space-y-5">
         {/* Header */}
         <div className="p-5 rounded-2xl border border-slate-200 bg-white">
-          <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-start justify-between gap-2 mb-3">
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-semibold text-slate-900 font-display">{gig.title}</h1>
+              <h1 className="text-lg sm:text-xl font-semibold text-slate-900 font-display leading-tight">{gig.title}</h1>
               {gig.description && <p className="text-sm text-slate-500 mt-1">{gig.description}</p>}
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
               <span
                 className="text-xs px-2.5 py-1 rounded-full font-display"
                 style={{
@@ -403,7 +403,7 @@ export default function GigDetail() {
                     className="h-7 text-xs font-display border-slate-200 text-slate-600 gap-1"
                     onClick={() => { setEditGigForm({ title: gig.title, description: gig.description || "" }); setShowEditGig(true); }}
                   >
-                    <Pencil size={11} /> Edit
+                    <Pencil size={11} /> <span className="hidden sm:inline">Edit</span>
                   </Button>
                   <Button
                     size="sm"
@@ -412,7 +412,7 @@ export default function GigDetail() {
                     className="h-7 text-xs font-display border-red-200 text-red-500 hover:bg-red-50 gap-1"
                     onClick={() => setShowDeleteConfirm(true)}
                   >
-                    <Trash2 size={11} /> Delete
+                    <Trash2 size={11} /> <span className="hidden sm:inline">Delete</span>
                   </Button>
                 </>
               )}
@@ -426,14 +426,14 @@ export default function GigDetail() {
         </div>
 
         <Tabs defaultValue={initialTab} onValueChange={v => { setActiveTab(v); if (v === "ledger") loadLedger(); }}>
-          <TabsList className="bg-slate-100 border border-slate-200">
-            <TabsTrigger value="sessions" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
+          <TabsList className="bg-slate-100 border border-slate-200 overflow-x-auto flex w-full">
+            <TabsTrigger value="sessions" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600 flex-shrink-0">
               Sessions
             </TabsTrigger>
-            <TabsTrigger value="team" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
+            <TabsTrigger value="team" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600 flex-shrink-0">
               Team ({gig.invites?.length || 0})
             </TabsTrigger>
-            <TabsTrigger value="chat" data-testid="chat-tab" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600 relative">
+            <TabsTrigger value="chat" data-testid="chat-tab" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600 relative flex-shrink-0">
               <MessageSquare size={12} className="mr-1" />Chat
               {chatUnread > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
@@ -441,11 +441,11 @@ export default function GigDetail() {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="workspace" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
+            <TabsTrigger value="workspace" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600 flex-shrink-0">
               Workspace
             </TabsTrigger>
             {isLead && (
-              <TabsTrigger value="ledger" data-testid="ledger-tab" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600">
+              <TabsTrigger value="ledger" data-testid="ledger-tab" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white font-display text-xs text-slate-600 flex-shrink-0">
                 <IndianRupee size={12} className="mr-1" />Ledger
               </TabsTrigger>
             )}
@@ -759,7 +759,7 @@ export default function GigDetail() {
               ) : (
                 <div className="space-y-4">
                   {/* Summary */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { label: "Total Fees", value: `₹${ledger.summary.total_fee.toLocaleString("en-IN")}`, color: "text-slate-900" },
                       { label: "Advance Due", value: `₹${ledger.summary.total_advance.toLocaleString("en-IN")}`, color: "text-amber-600" },

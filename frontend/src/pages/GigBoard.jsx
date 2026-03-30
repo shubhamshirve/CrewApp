@@ -591,7 +591,7 @@ function GigCard({ gig, onApply }) {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+      <div className="flex flex-wrap gap-2 text-xs text-slate-400">
         <span className="flex items-center gap-1"><Calendar size={12} /> {gig.date}</span>
         <span className="flex items-center gap-1"><MapPin size={12} /> {gig.city}</span>
         <span className="flex items-center gap-1"><Eye size={12} /> {gig.view_count} views</span>
@@ -785,27 +785,27 @@ export default function GigBoard() {
   };
 
   const TABS = [
-    { id: "browse", label: "Browse Gigs", count: gigs.length },
-    { id: "my-posts", label: "My Posts", count: myPosts.length },
-    { id: "my-applications", label: "My Applications", count: myApps.length },
+    { id: "browse", label: "Browse Gigs", shortLabel: "Browse", count: gigs.length },
+    { id: "my-posts", label: "My Posts", shortLabel: "My Posts", count: myPosts.length },
+    { id: "my-applications", label: "My Applications", shortLabel: "Applied", count: myApps.length },
   ];
 
   return (
     <Layout>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-900 font-display">Gig Board</h1>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-4xl font-bold text-slate-900 font-display leading-tight">Gig Board</h1>
             <p className="text-slate-500 text-sm mt-1">Open gigs posted by leads — browse and bid</p>
           </div>
           <button
             data-testid="post-gig-btn"
             onClick={() => !hasAccess ? toast.error("Upgrade your plan to post gigs") : setShowPostModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90 flex-shrink-0"
             style={{ background: "#F97316" }}
           >
-            <Plus size={16} /> Post Gig
+            <Plus size={16} /> <span className="hidden sm:inline">Post Gig</span><span className="sm:hidden">Post</span>
           </button>
         </div>
 
@@ -834,13 +834,14 @@ export default function GigBoard() {
               key={t.id}
               data-testid={`tab-${t.id}`}
               onClick={() => setTab(t.id)}
-              className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-2 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-all flex items-center justify-center gap-1 sm:gap-2 ${
                 tab === t.id
                   ? "bg-orange-500 text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-900"
               }`}
             >
-              {t.label}
+              <span className="hidden sm:inline">{t.label}</span>
+              <span className="sm:hidden">{t.shortLabel}</span>
               {t.count > 0 && (
                 <span className={`text-xs px-1.5 py-0.5 rounded-full ${tab === t.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"}`}>
                   {t.count}

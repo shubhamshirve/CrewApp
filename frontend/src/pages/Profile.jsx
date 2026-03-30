@@ -687,7 +687,7 @@ export default function Profile() {
             {/* Basic Info */}
             <section>
               <p className="text-xs font-display text-slate-400 uppercase tracking-wide mb-3">Basic Info</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Full Name *</label>
                   <input data-testid="edit-full-name" className={inputClass} value={editForm.full_name || ""} onChange={e => setEditForm(p => ({ ...p, full_name: e.target.value }))} />
@@ -706,7 +706,7 @@ export default function Profile() {
             {/* Contact */}
             <section>
               <p className="text-xs font-display text-slate-400 uppercase tracking-wide mb-3">Contact</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Mobile Number *</label>
                   <input data-testid="edit-phone" className={inputClass} placeholder="9876543210" value={editForm.phone || ""} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} />
@@ -743,7 +743,7 @@ export default function Profile() {
             {/* Location */}
             <section>
               <p className="text-xs font-display text-slate-400 uppercase tracking-wide mb-3">Location</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Area / Neighbourhood</label>
                   <input data-testid="edit-area" className={inputClass} placeholder="Bandra West" value={editForm.area || ""} onChange={e => setEditForm(p => ({ ...p, area: e.target.value }))} />
@@ -787,7 +787,7 @@ export default function Profile() {
             {/* Roles & Rates */}
             <section>
               <p className="text-xs font-display text-slate-400 uppercase tracking-wide mb-3">Roles & Rates (max 2)</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Primary Role</label>
                   <RoleSelect value={editForm.primary_role || ""} onChange={v => setEditForm(p => ({ ...p, primary_role: v }))} api={api} inputClass={inputClass} />
@@ -1039,7 +1039,7 @@ export default function Profile() {
                   autoFocus
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Brand</label>
                   <input
@@ -1101,7 +1101,7 @@ export default function Profile() {
                   onChange={e => setGearForm(p => ({ ...p, name: e.target.value }))}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Brand</label>
                   <input data-testid="gear-brand" className={inputClass} placeholder="Sony, Canon…" value={gearForm.brand} onChange={e => setGearForm(p => ({ ...p, brand: e.target.value }))} />
