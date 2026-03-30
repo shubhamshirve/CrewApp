@@ -261,6 +261,30 @@ backend:
         agent: "testing"
         comment: "✅ VERIFIED: Profile picture upload working correctly. POST /api/uploads/profile-picture accepts JPEG files, processes them (sanitizes, resizes to 400x400), and returns image URL. GET /api/uploads/avatar/{filename} serves the uploaded images with proper content-type headers and caching."
 
+  - task: "Admin user profile gigs fix"
+    implemented: true
+    working: true
+    file: "backend/routers/admin.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Admin user profile gigs fix working correctly. GET /api/admin/users/{user_id}/profile now properly returns 'gigs' field (even if empty). Previously was querying wrong field 'lead_id' instead of 'lead_photographer_id'. Tested with admin@crewbook.in credentials."
+
+  - task: "User profile page load"
+    implemented: true
+    working: true
+    file: "backend/routers/users.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: User profile page load working correctly. GET /api/users/{own_user_id} returns HTTP 200 with proper profile data. Tested with testmobile@crewbook.in credentials."
+
 frontend:
   - task: "AdminSettings page — Pricing, Event Types, Roles tabs"
     implemented: true
@@ -301,7 +325,7 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 5
+  test_sequence: 6
   run_ui: false
 
 test_plan:
@@ -325,4 +349,6 @@ agent_communication:
     message: "SUBSCRIPTION PAGE & UPGRADE WALL TESTING (testmobile@crewbook.in - free user): ❌ TEST 1 FAIL: Plans NOT at top of /wallet page. Current order: (1) Wallet Balance, (2) Referral section, (3) Coupon input + Plan cards. Plans are at position 3, not at the top as requested. ✅ TEST 2 PASS: Upgrade wall correctly shows WITH navigation sidebar on both /dashboard and /gigs. Sidebar visible with 10 nav items, upgrade wall displays 'Subscription Required' message and 'View Plans & Subscribe' button. PlanGate component working as designed."
   - agent: "testing"
     message: "✅ BOTH FIXES VERIFIED (2/2 tests passed): TEST 1 - Subscription page (/wallet) now shows plans at the TOP: Visual order is (1) Coupon Input, (2) Plan Cards (Basic ₹69, Pro ₹99), (3) Wallet Balance, (4) Referral section. Coupon input box is correctly positioned above plan cards. TEST 2 - Upgrade wall shows navigation sidebar: Dashboard page displays left sidebar (220px width, 11 nav links) alongside 'Subscription Required' upgrade wall content. Both requested fixes are working correctly."
+  - agent: "testing"
+    message: "✅ QUICK VERIFICATION COMPLETE (5/5 tests passed): 1) Admin user profile gigs fix - GET /api/admin/users/{user_id}/profile correctly returns 'gigs' field (even if empty). Previously was querying wrong field 'lead_id' instead of 'lead_photographer_id'. 2) Profile page load - GET /api/users/{own_user_id} returns HTTP 200 with proper profile data. Both fixes verified working correctly at https://perf-tuner-9.preview.emergentagent.com/api"
 

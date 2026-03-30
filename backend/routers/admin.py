@@ -143,7 +143,7 @@ async def get_user_profile(user_id: str, admin: dict = Depends(get_admin_user)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    gigs = await db.gigs.find({"lead_id": user_id}).sort("created_at", -1).limit(50).to_list(50)
+    gigs = await db.gigs.find({"lead_photographer_id": user_id}).sort("created_at", -1).limit(50).to_list(50)
     for g in gigs:
         g["id"] = str(g.pop("_id"))
 

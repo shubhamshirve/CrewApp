@@ -397,7 +397,7 @@ export default function Profile() {
                   : <User size={32} className="text-slate-400" />
                 }
               </div>
-              {isOwnProfile && (
+              {isOwn && (
                 <label
                   htmlFor="avatar-upload"
                   className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-orange-500 hover:bg-orange-600 flex items-center justify-center cursor-pointer shadow-md transition-colors"
