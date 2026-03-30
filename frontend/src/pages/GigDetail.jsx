@@ -568,11 +568,6 @@ export default function GigDetail() {
                           <PackageCheck size={13} /> Mark Data Delivered
                         </Button>
                       )}
-                      {inv.status === "accepted" && (
-                        <Button size="sm" data-testid={`download-contract-btn-${inv.id}`} onClick={() => handleDownloadContract(inv.id)} variant="outline" className="border-blue-200 text-blue-600 text-xs hover:bg-blue-50 gap-1 mt-2 ml-2">
-                          <FileText size={13} /> Download Contract
-                        </Button>
-                      )}
                     </div>
                   );
                 })}
@@ -634,9 +629,7 @@ export default function GigDetail() {
                         </Button>
                       )}
                       {inv.status === "accepted" && (
-                        <Button size="sm" data-testid={`download-contract-${inv.id}`} onClick={() => handleDownloadContract(inv.id)} variant="outline" className="border-blue-200 text-blue-600 text-xs hover:bg-blue-50 gap-1">
-                          <FileText size={12} /> Contract
-                        </Button>
+                        <span className="text-xs text-emerald-600 font-medium">Accepted</span>
                       )}
                     </div>
                   </div>
