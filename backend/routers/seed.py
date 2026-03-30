@@ -41,6 +41,17 @@ def _ref(name: str) -> str:
 
 # ── Static seed data ──────────────────────────────────────────────────────────
 
+_ADMIN_USER = {
+    "full_name": "Shubham Admin",
+    "email": "shubham@crewbook.in",
+    "password": "Shubham@123",
+    "phone": "9999999999",
+    "location": "Mumbai",
+    "area": "Andheri",
+    "state": "Maharashtra",
+    "pincode": "400053",
+}
+
 _LEAD_USERS = [
     {
         "full_name": "Arjun Kapoor",
@@ -360,6 +371,7 @@ async def seed_database(force: bool = Query(False, description="Drop existing se
         await db.seed_markers.delete_one({"_id": _SEED_MARKER})
 
     summary = {
+        "admin": 0,
         "plans": 0,
         "leads": 0,
         "freelancers": 0,
@@ -368,6 +380,55 @@ async def seed_database(force: bool = Query(False, description="Drop existing se
         "connections": 0,
         "ratings": 0,
     }
+
+    # ── 0. Admin User ─────────────────────────────────────────────────────────
+    existing_admin = await db.users.find_one({"email": _ADMIN_USER["email"]})
+    if existing_admin:
+        # Update password in case it changed
+        await db.users.update_one(
+            {"_id": existing_admin["_id"]},
+            {"$set": {"password_hash": hash_password(_ADMIN_USER["password"]), "is_admin": True}},
+        )
+    else:
+        admin_id = _id()
+        await db.users.insert_one({
+            "_id": admin_id,
+            "_seed": True,
+            "email": _ADMIN_USER["email"],
+            "password_hash": hash_password(_ADMIN_USER["password"]),
+            "full_name": _ADMIN_USER["full_name"],
+            "phone": _ADMIN_USER["phone"],
+            "location": _ADMIN_USER["location"],
+            "area": _ADMIN_USER.get("area", ""),
+            "state": _ADMIN_USER.get("state", ""),
+            "country": "India",
+            "pincode": _ADMIN_USER["pincode"],
+            "bio": "Platform administrator",
+            "is_admin": True,
+            "is_verified": True,
+            "verification_status": "approved",
+            "is_suspended": False,
+            "is_ghost_mode": False,
+            "wallet_balance": 0,
+            "subscription_plan": "none",
+            "active_plan_id": None,
+            "active_plan_features": {},
+            "whatsapp_enabled": False,
+            "referral_code": _ref("Shubham"),
+            "referred_by": None,
+            "penalty_score": 0,
+            "average_rating": 0,
+            "rating_count": 0,
+            "style_tags": [],
+            "editing_ecosystem": [],
+            "gear_vault": [],
+            "primary_role": None,
+            "secondary_role": None,
+            "primary_rate": None,
+            "secondary_rate": None,
+            "created_at": _now(),
+        })
+        summary["admin"] += 1
 
     # ── 1. Plans ──────────────────────────────────────────────────────────────
     plan_ids = {}
@@ -655,6 +716,8 @@ async def seed_database(force: bool = Query(False, description="Drop existing se
         "summary": summary,
         "test_credentials": {
             "password": "Crewbook@123",
+            "admin": _ADMIN_USER["email"],
+            "admin_password": _ADMIN_USER["password"],
             "leads": [u["email"] for u in _LEAD_USERS],
             "freelancers": [u["email"] for u in _FREELANCER_USERS],
         },
