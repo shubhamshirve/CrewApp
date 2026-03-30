@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatform } from "@/contexts/PlatformContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,11 +20,11 @@ const inputClass = "bg-white border-slate-200 text-slate-900 placeholder:text-sl
 
 export default function Gigs() {
   const { user, api } = useAuth();
+  const { eventTypes } = usePlatform();
   const navigate = useNavigate();
   const [gigs, setGigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [eventTypes, setEventTypes] = useState(["Wedding"]);
   const [newGig, setNewGig] = useState({ title: "", description: "" });
   const [sessions, setSessions] = useState([{ date: "", start_time: "09:00", end_time: "18:00", location: "", venue_name: "", event_type: "Wedding" }]);
   const [creating, setCreating] = useState(false);
@@ -32,9 +33,6 @@ export default function Gigs() {
 
   useEffect(() => {
     load();
-    api.get("/platform/event-types").then(r => {
-      if (r.data?.event_types?.length) setEventTypes(r.data.event_types);
-    }).catch(() => {});
   }, []);
 
   const load = async () => {

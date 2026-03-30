@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatform } from "@/contexts/PlatformContext";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ const inputClass = "bg-white border-slate-200 text-slate-900 placeholder:text-sl
 export default function GigDetail() {
   const { id } = useParams();
   const { user, api } = useAuth();
+  const { eventTypes: platformEventTypes, roles: platformRoles } = usePlatform();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -45,7 +47,10 @@ export default function GigDetail() {
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [connections, setConnections] = useState([]);
-  const [rolesList, setRolesList] = useState(DEFAULT_ROLES);
+
+  // Use platform context instead of per-page API calls
+  const rolesList = platformRoles?.length ? platformRoles : DEFAULT_ROLES;
+  const eventTypes = platformEventTypes;
 
   const [inviteForm, setInviteForm] = useState({
     freelancer_id: "", session_id: "", session_date: "", role: DEFAULT_ROLES[0], proposed_fee: "",
@@ -78,18 +83,8 @@ export default function GigDetail() {
   const [showAddSession, setShowAddSession] = useState(false);
   const [newSession, setNewSession] = useState({ date: "", start_time: "09:00", end_time: "18:00", location: "", venue_name: "", event_type: "Wedding" });
   const [addingSession, setAddingSession] = useState(false);
-  const [eventTypes, setEventTypes] = useState(["Wedding", "Pre-Wedding Shoot", "Reception", "Corporate", "Birthday", "Other"]);
 
   useEffect(() => { load(); }, [id]);
-
-  useEffect(() => {
-    api.get("/platform/roles").then(r => {
-      if (r.data?.roles?.length) setRolesList(r.data.roles);
-    }).catch(() => {});
-    api.get("/platform/event-types").then(r => {
-      if (r.data?.event_types?.length) setEventTypes(r.data.event_types);
-    }).catch(() => {});
-  }, []);
 
   const load = async () => {
     try {

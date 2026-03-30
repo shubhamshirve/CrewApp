@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { PlatformProvider } from "@/contexts/PlatformContext";
 import "@/App.css";
 
 // User app pages
@@ -115,8 +116,10 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <RootRouter />
-        <Toaster position="top-right" richColors />
+        <PlatformProvider>
+          <RootRouter />
+          <Toaster position="top-right" richColors />
+        </PlatformProvider>
       </BrowserRouter>
     </AuthProvider>
   );

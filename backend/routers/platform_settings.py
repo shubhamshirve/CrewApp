@@ -11,6 +11,10 @@ import os
 
 from db import get_db
 from auth_utils import get_admin_user, get_current_user
+from cache import get_cached, invalidate_cache
+
+# Cache TTL: 5 minutes for event types/roles (rarely change)
+_PLATFORM_TTL = 300
 
 router = APIRouter(prefix="/platform")
 
@@ -69,7 +73,7 @@ DEFAULT_ROLES = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-async def _get_settings(db):
+async def _load_settings_from_db(db):
     doc = await db.platform_settings.find_one({"_id": "platform_settings"})
     if not doc:
         doc = DEFAULT_SETTINGS.copy()
@@ -77,7 +81,7 @@ async def _get_settings(db):
     return doc
 
 
-async def _get_event_types(db) -> List[str]:
+async def _load_event_types_from_db(db) -> List[str]:
     doc = await db.platform_meta.find_one({"_id": "event_types"})
     if not doc:
         doc = {"_id": "event_types", "items": DEFAULT_EVENT_TYPES}
@@ -85,12 +89,27 @@ async def _get_event_types(db) -> List[str]:
     return doc.get("items", DEFAULT_EVENT_TYPES)
 
 
-async def _get_roles(db) -> List[str]:
+async def _load_roles_from_db(db) -> List[str]:
     doc = await db.platform_meta.find_one({"_id": "role_categories"})
     if not doc:
         doc = {"_id": "role_categories", "items": DEFAULT_ROLES}
         await db.platform_meta.insert_one(doc)
     return doc.get("items", DEFAULT_ROLES)
+
+
+async def _get_settings(db):
+    """Cached platform settings (5-minute TTL)."""
+    return await get_cached("platform_settings", lambda: _load_settings_from_db(db), ttl=_PLATFORM_TTL)
+
+
+async def _get_event_types(db) -> List[str]:
+    """Cached event types list (5-minute TTL)."""
+    return await get_cached("event_types", lambda: _load_event_types_from_db(db), ttl=_PLATFORM_TTL)
+
+
+async def _get_roles(db) -> List[str]:
+    """Cached roles list (5-minute TTL)."""
+    return await get_cached("role_categories", lambda: _load_roles_from_db(db), ttl=_PLATFORM_TTL)
 
 
 # ── Pricing Settings ─────────────────────────────────────────────────────────
@@ -158,6 +177,7 @@ async def update_platform_settings(
         {"$set": update_fields},
         upsert=True
     )
+    invalidate_cache("platform_settings")
     return await get_platform_settings()
 
 
@@ -191,6 +211,7 @@ async def add_event_type(data: EventTypeRequest, admin: dict = Depends(get_admin
         {"$set": {"items": items}},
         upsert=True
     )
+    invalidate_cache("event_types")
     return {"event_types": items}
 
 
@@ -209,6 +230,7 @@ async def remove_event_type(name: str, admin: dict = Depends(get_admin_user)):
         {"$set": {"items": items}},
         upsert=True
     )
+    invalidate_cache("event_types")
     return {"event_types": items}
 
 
@@ -242,6 +264,7 @@ async def add_role(data: RoleRequest, admin: dict = Depends(get_admin_user)):
         {"$set": {"items": items}},
         upsert=True
     )
+    invalidate_cache("role_categories")
     return {"roles": items}
 
 
@@ -260,6 +283,7 @@ async def remove_role(name: str, admin: dict = Depends(get_admin_user)):
         {"$set": {"items": items}},
         upsert=True
     )
+    invalidate_cache("role_categories")
     return {"roles": items}
 
 

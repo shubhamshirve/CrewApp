@@ -7,18 +7,30 @@ import re
 
 from db import get_db
 from auth_utils import get_current_user, _clean_user
+from cache import get_cached
 
 router = APIRouter(prefix="/users")
 
-VALID_ROLES = [
-    "Lead Photographer", "Second Shooter", "Traditional Videographer",
-    "Cinematic Videographer", "Drone Operator", "Photo Assistant",
-    "Video Assistant", "Lighting Technician", "Photo Editor", "Video Editor",
-]
+# Static lists that don't need admin management
 STYLE_TAGS = ["Cinematic", "Candid", "Traditional", "Documentary", "Fine Art", "Dark & Moody", "Bright & Airy"]
 EDITING_TAGS = ["Lightroom", "Photoshop", "Final Cut Pro", "Premiere Pro", "DaVinci Resolve", "Capture One"]
 VALID_GEAR_CATEGORIES = ["Camera", "Lens", "Lighting", "Drone", "Audio", "Other"]
 VALID_ID_TYPES = ["Aadhar", "PAN", "Driving License"]
+
+# Default roles fallback (actual values come from DB via cache)
+_DEFAULT_ROLES = [
+    "Lead Photographer", "Second Shooter", "Traditional Videographer",
+    "Cinematic Videographer", "Drone Operator", "Photo Assistant",
+    "Video Assistant", "Lighting Technician", "Photo Editor", "Video Editor",
+]
+
+
+async def _get_valid_roles(db) -> List[str]:
+    """Return dynamic roles from cache, falling back to defaults."""
+    async def _load():
+        doc = await db.platform_meta.find_one({"_id": "role_categories"})
+        return doc.get("items", _DEFAULT_ROLES) if doc else _DEFAULT_ROLES
+    return await get_cached("role_categories", _load, ttl=300)
 
 _URL_RE = re.compile(
     r"^https?://(?:(?:[A-Z0-9](?:[A-Z0-9\-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}|"
@@ -47,8 +59,8 @@ class ProfileUpdate(BaseModel):
     country: Optional[str] = Field(None, max_length=60)
     pincode: Optional[str] = Field(None, max_length=10)
     bio: Optional[str] = Field(None, max_length=1000)
-    primary_role: Optional[str] = Field(None, max_length=60)
-    secondary_role: Optional[str] = Field(None, max_length=60)
+    primary_role: Optional[str] = Field(None, max_length=100)
+    secondary_role: Optional[str] = Field(None, max_length=100)
     primary_rate: Optional[float] = Field(None, ge=0, le=500000)
     secondary_rate: Optional[float] = Field(None, ge=0, le=500000)
     style_tags: Optional[List[str]] = None
@@ -59,13 +71,6 @@ class ProfileUpdate(BaseModel):
     website_url: Optional[str] = Field(None, max_length=300)
     upi_id: Optional[str] = Field(None, max_length=100)
     years_of_experience: Optional[int] = Field(None, ge=0, le=60)
-
-    @field_validator("primary_role", "secondary_role")
-    @classmethod
-    def validate_role(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in VALID_ROLES:
-            raise ValueError(f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}")
-        return v
 
     @field_validator("style_tags")
     @classmethod
@@ -152,7 +157,8 @@ async def search_users(
         safe_q = re.escape(q.strip()[:100])
         query["full_name"] = {"$regex": safe_q, "$options": "i"}
     if role:
-        if role not in VALID_ROLES:
+        valid_roles = await _get_valid_roles(db)
+        if role not in valid_roles:
             raise HTTPException(status_code=400, detail="Invalid role filter")
         query["$or"] = [{"primary_role": role}, {"secondary_role": role}]
     if location:
@@ -172,7 +178,9 @@ async def search_users(
 
 @router.get("/meta/options")
 async def get_meta_options():
-    return {"roles": VALID_ROLES, "style_tags": STYLE_TAGS, "editing_ecosystem": EDITING_TAGS}
+    db = get_db()
+    roles = await _get_valid_roles(db)
+    return {"roles": roles, "style_tags": STYLE_TAGS, "editing_ecosystem": EDITING_TAGS}
 
 
 @router.get("/available")
@@ -181,15 +189,16 @@ async def get_available_users(
     role: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    if role and role not in VALID_ROLES:
-        raise HTTPException(status_code=400, detail="Invalid role filter")
+    db = get_db()
+    if role:
+        valid_roles = await _get_valid_roles(db)
+        if role not in valid_roles:
+            raise HTTPException(status_code=400, detail="Invalid role filter")
     # Validate date format
     try:
         datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
         raise HTTPException(status_code=400, detail="date must be in YYYY-MM-DD format")
-
-    db = get_db()
     booked_ids = await db.gig_invites.distinct(
         "freelancer_id",
         {"status": "accepted", "session_date": date}
@@ -214,6 +223,13 @@ async def get_user(user_id: str, current_user: Optional[dict] = Depends(get_curr
 @router.put("/profile")
 async def update_profile(data: ProfileUpdate, current_user: dict = Depends(get_current_user)):
     db = get_db()
+    # Validate roles against DB-managed list
+    if data.primary_role or data.secondary_role:
+        valid_roles = await _get_valid_roles(db)
+        if data.primary_role and data.primary_role not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
+        if data.secondary_role and data.secondary_role not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     if data.whatsapp_same_as_mobile and data.phone:
         update_data["whatsapp_number"] = data.phone

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatform } from "@/contexts/PlatformContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,15 +20,14 @@ const DEFAULT_ROLES = ["Lead Photographer","Second Shooter","Traditional Videogr
 
 export default function Onboarding() {
   const { user, api, refreshUser } = useAuth();
+  const { roles: platformRoles } = usePlatform();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [rolesList, setRolesList] = useState(DEFAULT_ROLES);
+  // Use platform context roles, fall back to defaults
+  const rolesList = platformRoles?.length ? platformRoles : DEFAULT_ROLES;
 
   useEffect(() => {
-    api.get("/platform/roles").then(r => {
-      if (r.data?.roles?.length) setRolesList(r.data.roles);
-    }).catch(() => {});
     api.get("/platform/gear-catalogue").then(r => {
       setMasterGear(r.data?.items || []);
     }).catch(() => {});

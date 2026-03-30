@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatform } from "@/contexts/PlatformContext";
 import Layout from "@/components/Layout";
 import { toast } from "sonner";
 import {
@@ -693,6 +694,7 @@ function MyPostCard({ gig, onManage, onCancel, api }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function GigBoard() {
   const { api, user } = useAuth();
+  const { eventTypes: platformEventTypes, roles: platformRoles } = usePlatform();
   const [tab, setTab] = useState("browse");
   const [gigs, setGigs] = useState([]);
   const [myPosts, setMyPosts] = useState([]);
@@ -704,21 +706,13 @@ export default function GigBoard() {
   const [manageModal, setManageModal] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ role: "", city: "", event_type: "", budget_min: "", budget_max: "" });
-  const [dynamicRoles, setDynamicRoles] = useState(ROLES);
-  const [dynamicEventTypes, setDynamicEventTypes] = useState(EVENT_TYPES);
+
+  // Use platform context instead of per-page API calls
+  const dynamicRoles = platformRoles;
+  const dynamicEventTypes = platformEventTypes;
 
   // Check plan access — admins always have full access
   const hasAccess = user?.is_admin === true || user?.active_plan_features?.public_gig_enabled === true;
-
-  // Load dynamic roles and event types
-  useEffect(() => {
-    api.get("/platform/roles").then(r => {
-      if (r.data?.roles?.length) setDynamicRoles(r.data.roles);
-    }).catch(() => {});
-    api.get("/platform/event-types").then(r => {
-      if (r.data?.event_types?.length) setDynamicEventTypes(r.data.event_types);
-    }).catch(() => {});
-  }, []);
 
   const fetchBrowse = useCallback(async () => {
     setLoading(true);

@@ -8,22 +8,37 @@ import re
 from db import get_db
 from auth_utils import get_current_user, _clean_user
 from services.notifications_service import send_notification
+from cache import get_cached
 
 router = APIRouter(prefix="/public-gigs")
 
-EVENT_TYPES = ["Haldi", "Mehendi", "Sangam", "Sangeet", "Baraat", "Wedding",
+_DEFAULT_EVENT_TYPES = ["Haldi", "Mehendi", "Sangam", "Sangeet", "Baraat", "Wedding",
                "Reception", "Pre-Wedding Shoot", "Corporate", "Birthday", "Other"]
-VALID_ROLES = [
+_DEFAULT_ROLES = [
     "Lead Photographer", "Second Shooter", "Traditional Videographer",
     "Cinematic Videographer", "Drone Operator", "Photo Assistant",
     "Video Assistant", "Lighting Technician", "Photo Editor", "Video Editor",
 ]
 
 
+async def _get_valid_event_types(db) -> List[str]:
+    async def _load():
+        doc = await db.platform_meta.find_one({"_id": "event_types"})
+        return doc.get("items", _DEFAULT_EVENT_TYPES) if doc else _DEFAULT_EVENT_TYPES
+    return await get_cached("event_types", _load, ttl=300)
+
+
+async def _get_valid_roles(db) -> List[str]:
+    async def _load():
+        doc = await db.platform_meta.find_one({"_id": "role_categories"})
+        return doc.get("items", _DEFAULT_ROLES) if doc else _DEFAULT_ROLES
+    return await get_cached("role_categories", _load, ttl=300)
+
+
 # ── Models ──────────────────────────────────────────────────────────────────
 
 class RoleSpec(BaseModel):
-    role: str
+    role: str = Field(..., max_length=100)
     budget: float = Field(..., gt=0, le=500000)
     slots: int = Field(1, ge=1, le=20)
     verified_only: bool = False
@@ -31,18 +46,11 @@ class RoleSpec(BaseModel):
     style_tags: Optional[List[str]] = None
     gear_required: Optional[str] = Field(None, max_length=200)
 
-    @field_validator("role")
-    @classmethod
-    def validate_role(cls, v: str) -> str:
-        if v not in VALID_ROLES:
-            raise ValueError(f"role must be one of: {', '.join(VALID_ROLES)}")
-        return v
-
 
 class CreatePublicGig(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
-    event_type: str
+    event_type: str = Field(..., max_length=100)
     date: str = Field(..., max_length=10)
     city: str = Field(..., min_length=2, max_length=100)
     location: str = Field(..., min_length=2, max_length=300)
@@ -50,13 +58,6 @@ class CreatePublicGig(BaseModel):
     style_preference: Optional[str] = Field(None, max_length=60)
     roles: List[RoleSpec] = Field(..., min_length=1, max_length=10)
     expires_hours: int = Field(48, ge=1, le=168)  # 1 hour – 1 week
-
-    @field_validator("event_type")
-    @classmethod
-    def validate_event_type(cls, v: str) -> str:
-        if v not in EVENT_TYPES:
-            raise ValueError(f"event_type must be one of: {', '.join(EVENT_TYPES)}")
-        return v
 
     @field_validator("date")
     @classmethod
@@ -134,7 +135,8 @@ def _require_public_gig_access(user: dict):
 
 @router.get("/event-types")
 async def get_event_types():
-    return EVENT_TYPES
+    db = get_db()
+    return await _get_valid_event_types(db)
 
 
 @router.post("")
@@ -146,6 +148,14 @@ async def create_public_gig(data: CreatePublicGig, current_user: dict = Depends(
         raise HTTPException(status_code=400, detail="At least one role is required")
 
     db = get_db()
+    # Validate event_type and roles against DB-managed lists
+    valid_event_types = await _get_valid_event_types(db)
+    if data.event_type not in valid_event_types:
+        raise HTTPException(status_code=400, detail=f"Invalid event_type '{data.event_type}'. Must be one of: {', '.join(valid_event_types)}")
+    valid_roles = await _get_valid_roles(db)
+    for r in data.roles:
+        if r.role not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid role '{r.role}'. Must be one of: {', '.join(valid_roles)}")
     now = datetime.now(timezone.utc)
     roles = [{"id": str(uuid.uuid4()), **r.model_dump(), "filled_count": 0} for r in data.roles]
 

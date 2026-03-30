@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePlatform } from "@/contexts/PlatformContext";
 import Layout from "@/components/Layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ const STYLES = ["Cinematic","Candid","Traditional","Documentary","Fine Art","Dar
 export default function Search() {
   const navigate = useNavigate();
   const api = useApi();
+  const { roles: platformRoles } = usePlatform();
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("");
   const [style, setStyle] = useState("");
@@ -21,13 +23,8 @@ export default function Search() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [roles, setRoles] = useState(["Lead Photographer","Second Shooter","Traditional Videographer","Cinematic Videographer","Drone Operator","Photo Assistant","Video Assistant","Lighting Technician"]);
-
-  useEffect(() => {
-    api.get("/platform/roles").then(r => {
-      if (r.data?.roles?.length) setRoles(r.data.roles);
-    }).catch(() => {});
-  }, []);
+  // Use platform context roles instead of separate API call
+  const roles = platformRoles;
 
   const doSearch = useCallback(async () => {
     setLoading(true);

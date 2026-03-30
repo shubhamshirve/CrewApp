@@ -12,11 +12,13 @@ from services.notifications_service import send_notification
 from services.whatsapp_mock import send_gig_invite_whatsapp
 from services.email_service import send_invite_email, send_booking_confirmed_email, send_gig_completed_email
 from services.pdf_service import generate_contract_pdf
+from cache import get_cached
 
 router = APIRouter(prefix="/gigs")
 
-EVENT_TYPES = ["Haldi", "Mehendi", "Sangam", "Sangeet", "Baraat", "Wedding", "Reception", "Pre-Wedding Shoot", "Corporate", "Birthday", "Other"]
-VALID_ROLES = [
+# Keep static lists as fallback defaults only — actual values come from DB via cache
+_DEFAULT_EVENT_TYPES = ["Haldi", "Mehendi", "Sangam", "Sangeet", "Baraat", "Wedding", "Reception", "Pre-Wedding Shoot", "Corporate", "Birthday", "Other"]
+_DEFAULT_ROLES = [
     "Lead Photographer", "Second Shooter", "Traditional Videographer",
     "Cinematic Videographer", "Drone Operator", "Photo Assistant",
     "Video Assistant", "Lighting Technician", "Photo Editor", "Video Editor",
@@ -25,13 +27,29 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 
 
+async def _get_valid_event_types(db) -> List[str]:
+    """Return event types from cache (falls back to defaults)."""
+    async def _load():
+        doc = await db.platform_meta.find_one({"_id": "event_types"})
+        return doc.get("items", _DEFAULT_EVENT_TYPES) if doc else _DEFAULT_EVENT_TYPES
+    return await get_cached("event_types", _load, ttl=300)
+
+
+async def _get_valid_roles(db) -> List[str]:
+    """Return professional roles from cache (falls back to defaults)."""
+    async def _load():
+        doc = await db.platform_meta.find_one({"_id": "role_categories"})
+        return doc.get("items", _DEFAULT_ROLES) if doc else _DEFAULT_ROLES
+    return await get_cached("role_categories", _load, ttl=300)
+
+
 class GigSession(BaseModel):
     date: str = Field(..., max_length=10)
     start_time: str = Field(..., max_length=5)
     end_time: str = Field(..., max_length=5)
     location: str = Field(..., min_length=2, max_length=200)
     venue_name: Optional[str] = Field(None, max_length=200)
-    event_type: str
+    event_type: str = Field(..., max_length=100)
 
     @field_validator("date")
     @classmethod
@@ -51,13 +69,6 @@ class GigSession(BaseModel):
             raise ValueError("time must be HH:MM (24h)")
         return v
 
-    @field_validator("event_type")
-    @classmethod
-    def validate_event_type(cls, v: str) -> str:
-        if v not in EVENT_TYPES:
-            raise ValueError(f"event_type must be one of: {', '.join(EVENT_TYPES)}")
-        return v
-
 
 class CreateGigRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
@@ -69,16 +80,9 @@ class InviteRequest(BaseModel):
     freelancer_id: str = Field(..., min_length=1, max_length=50)
     session_id: str = Field(..., min_length=1, max_length=50)
     session_date: str = Field(..., max_length=10)
-    role: str
+    role: str = Field(..., max_length=100)
     proposed_fee: float = Field(..., gt=0, le=500000)
     notes: Optional[str] = Field(None, max_length=1000)
-
-    @field_validator("role")
-    @classmethod
-    def validate_role(cls, v: str) -> str:
-        if v not in VALID_ROLES:
-            raise ValueError(f"role must be one of: {', '.join(VALID_ROLES)}")
-        return v
 
     @field_validator("session_date")
     @classmethod
@@ -138,6 +142,7 @@ async def _check_90min_buffer(db, freelancer_id: str, new_date: str, new_start: 
     """
     Check if a new session conflicts (within 90-minute buffer) with freelancer's existing accepted sessions.
     Returns an error message string if conflict found, None otherwise.
+    Batch-fetches all relevant gigs to avoid N+1 queries.
     """
     new_s = _parse_dt(new_date, new_start)
     new_e = _parse_dt(new_date, new_end)
@@ -150,8 +155,16 @@ async def _check_90min_buffer(db, freelancer_id: str, new_date: str, new_start: 
         {"freelancer_id": freelancer_id, "status": "accepted"}
     ).to_list(200)
 
+    if not existing_invites:
+        return None
+
+    # Batch-fetch all referenced gigs in a single query (avoids N+1)
+    gig_ids = list({inv["gig_id"] for inv in existing_invites})
+    gigs_raw = await db.gigs.find({"_id": {"$in": gig_ids}}).to_list(len(gig_ids))
+    gig_map = {g["_id"]: g for g in gigs_raw}
+
     for inv in existing_invites:
-        gig = await db.gigs.find_one({"_id": inv["gig_id"]})
+        gig = gig_map.get(inv["gig_id"])
         if not gig:
             continue
         session = next((s for s in gig.get("sessions", []) if s.get("id") == inv.get("session_id")), None)
@@ -175,6 +188,10 @@ async def create_gig(data: CreateGigRequest, current_user: dict = Depends(get_cu
     if not current_user.get("is_verified"):
         raise HTTPException(status_code=403, detail="Only verified users can create gigs")
     db = get_db()
+    valid_event_types = await _get_valid_event_types(db)
+    for s in data.sessions:
+        if s.event_type not in valid_event_types:
+            raise HTTPException(status_code=400, detail=f"Invalid event_type '{s.event_type}'. Must be one of: {', '.join(valid_event_types)}")
     now = datetime.now(timezone.utc).isoformat()
     sessions = [{"id": str(uuid.uuid4()), **s.model_dump()} for s in data.sessions]
     gig = {
@@ -209,7 +226,8 @@ async def list_gigs(current_user: dict = Depends(get_current_user)):
 
 @router.get("/event-types")
 async def get_event_types():
-    return EVENT_TYPES
+    db = get_db()
+    return await _get_valid_event_types(db)
 
 
 @router.get("/invites/received")
@@ -515,6 +533,11 @@ async def send_invite(gig_id: str, data: InviteRequest, force: bool = False, cur
     gig = await db.gigs.find_one({"_id": gig_id, "lead_photographer_id": current_user["id"]})
     if not gig:
         raise HTTPException(status_code=404, detail="Gig not found or access denied")
+
+    # Validate role against DB values
+    valid_roles = await _get_valid_roles(db)
+    if data.role not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"Invalid role '{data.role}'. Must be one of: {', '.join(valid_roles)}")
 
     freelancer = await db.users.find_one({"_id": data.freelancer_id})
     if not freelancer:
