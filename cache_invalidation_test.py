@@ -6,7 +6,7 @@ import asyncio
 import aiohttp
 import json
 
-BASE_URL = "https://perf-tuner-9.preview.emergentagent.com/api"
+BASE_URL = "https://code-review-218.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@crewbook.in"
 ADMIN_PASSWORD = "Admin@123"
 
