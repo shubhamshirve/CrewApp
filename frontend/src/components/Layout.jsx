@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { path: "/gigs", icon: Briefcase, label: "Gigs" },
   { path: "/gig-board", icon: Globe, label: "Gig Board" },
   { path: "/calendar", icon: Calendar, label: "Calendar" },
-  { path: "/wallet", icon: Wallet, label: "Wallet" },
+  { path: "/wallet", icon: Wallet, label: "Subscription" },
   { path: "/reports", icon: BarChart2, label: "Reports" },
   { path: "/notifications", icon: Bell, label: "Alerts" },
 ];

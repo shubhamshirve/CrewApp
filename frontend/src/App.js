@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
+import PlanGate from "@/components/PlanGate";
 import "@/App.css";
 
 // User app pages
@@ -32,6 +33,7 @@ import AdminLogs from "@/pages/admin/AdminLogs";
 import AdminTemplates from "@/pages/admin/AdminTemplates";
 import AdminPlans from "@/pages/admin/AdminPlans";
 import AdminReports from "@/pages/admin/AdminReports";
+import AdminCoupons from "@/pages/admin/AdminCoupons";
 
 // ── Guards ────────────────────────────────────────────────────────────────────
 function ProtectedRoute({ children }) {
@@ -74,6 +76,7 @@ function AdminRoutes() {
       <Route path="/admin/settings" element={<AdminGuard><AdminSettings /></AdminGuard>} />
       <Route path="/admin/templates" element={<AdminGuard><AdminTemplates /></AdminGuard>} />
       <Route path="/admin/plans" element={<AdminGuard><AdminPlans /></AdminGuard>} />
+      <Route path="/admin/coupons" element={<AdminGuard><AdminCoupons /></AdminGuard>} />
       <Route path="/admin/reports" element={<AdminGuard><AdminReports /></AdminGuard>} />
       <Route path="/admin/users/:id" element={<AdminGuard><AdminUserProfile /></AdminGuard>} />
       <Route path="/admin/logs" element={<AdminGuard><AdminLogs /></AdminGuard>} />
@@ -89,17 +92,19 @@ function UserRoutes() {
     <Routes>
       <Route path="/" element={!user ? <Auth /> : user.is_admin ? <Navigate to="/admin/dashboard" replace /> : <Navigate to="/dashboard" replace />} />
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      {/* Pages always accessible (no plan required) */}
       <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-      <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
-      <Route path="/gigs" element={<ProtectedRoute><Gigs /></ProtectedRoute>} />
-      <Route path="/gigs/:id" element={<ProtectedRoute><GigDetail /></ProtectedRoute>} />
-      <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
       <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
-      <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-      <Route path="/gig-board" element={<ProtectedRoute><GigBoard /></ProtectedRoute>} />
-      <Route path="/reports" element={<ProtectedRoute><UserReports /></ProtectedRoute>} />
+      {/* Pages that require an active subscription */}
+      <Route path="/dashboard" element={<ProtectedRoute><PlanGate><Dashboard /></PlanGate></ProtectedRoute>} />
+      <Route path="/connections" element={<ProtectedRoute><PlanGate><Connections /></PlanGate></ProtectedRoute>} />
+      <Route path="/gigs" element={<ProtectedRoute><PlanGate><Gigs /></PlanGate></ProtectedRoute>} />
+      <Route path="/gigs/:id" element={<ProtectedRoute><PlanGate><GigDetail /></PlanGate></ProtectedRoute>} />
+      <Route path="/calendar" element={<ProtectedRoute><PlanGate><CalendarPage /></PlanGate></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute><PlanGate><Notifications /></PlanGate></ProtectedRoute>} />
+      <Route path="/gig-board" element={<ProtectedRoute><PlanGate><GigBoard /></PlanGate></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute><PlanGate><UserReports /></PlanGate></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

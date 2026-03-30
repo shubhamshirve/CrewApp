@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Add dynamic pricing rules (admin sets referral reward, plan prices), event type manager (add/remove wedding event types), and role category manager (add new professional roles) — all in the admin panel's respective tabs."
+user_problem_statement: "Test the following new features on CrewBook API: 1) Coupon CRUD (Admin) - create, list, toggle, delete coupons 2) Coupon Validation (User) - validate valid/invalid coupons 3) Plan Gate - authentication required for coupon validation 4) Profile Picture Upload - upload and retrieve profile images"
 
 backend:
   - task: "Platform Settings API — GET/PUT pricing"
@@ -213,6 +213,54 @@ backend:
         agent: "testing"
         comment: "✅ VERIFIED: MongoDB indexes working correctly. API starts cleanly and /api/health returns {\"status\": \"ok\"} consistently with fast response times."
 
+  - task: "Coupon CRUD API (Admin)"
+    implemented: true
+    working: true
+    file: "backend/routers/coupons.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: All coupon CRUD operations working correctly. Admin can create coupons (POST /api/coupons), list them (GET /api/coupons), toggle active state (PATCH /api/coupons/{code}/toggle), and delete them (DELETE /api/coupons/{code}). Tested with both percentage and rupees discount types, expiry dates, and redemption limits."
+
+  - task: "Coupon Validation API (User)"
+    implemented: true
+    working: true
+    file: "backend/routers/coupons.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Coupon validation working correctly. POST /api/coupons/validate returns proper discount information for valid coupons (20% off) and returns 404 for invalid coupon codes. Authentication is properly enforced."
+
+  - task: "Plan Gate - Coupon validation authentication"
+    implemented: true
+    working: true
+    file: "backend/routers/coupons.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Plan gate working correctly. /api/coupons/validate endpoint properly requires authentication and returns 401 when accessed without valid JWT token."
+
+  - task: "Profile Picture Upload API"
+    implemented: true
+    working: true
+    file: "backend/routers/uploads.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: Profile picture upload working correctly. POST /api/uploads/profile-picture accepts JPEG files, processes them (sanitizes, resizes to 400x400), and returns image URL. GET /api/uploads/avatar/{filename} serves the uploaded images with proper content-type headers and caching."
+
 frontend:
   - task: "AdminSettings page — Pricing, Event Types, Roles tabs"
     implemented: true
@@ -253,7 +301,7 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 4
+  test_sequence: 5
   run_ui: false
 
 test_plan:
@@ -271,4 +319,6 @@ agent_communication:
     message: "✅ MOBILE UX TESTING COMPLETE (390x844 viewport - iPhone 14): Tested all admin panel pages. RESULTS: ✓ Login page mobile-friendly ✓ Hamburger navigation working (opens 240px sidebar overlay) ✓ All admin pages responsive (Dashboard, Users, Gig Board, Verification, Settings, Penalties, Templates, Plans, Reports, Logs) ✓ No horizontal scroll on any page ✓ Settings tabs fit viewport (356px < 390px) ✓ Card layouts work well on mobile. MINOR NOTES: Admin Users filter buttons are small but functional, Settings tabs close to viewport limit (5 tabs). LIMITATION: Cannot test user pages (/gigs, /search, /profile, /wallet, /notifications) with admin account due to route guards - would need regular user credentials."
   - agent: "testing"
     message: "✅ MOBILE UX TESTING - USER PAGES COMPLETE (390x844 viewport - iPhone 14): Registered test user (testmobile@crewbook.in) and tested all user pages. RESULTS: ✓ Registration form mobile-friendly (all fields visible, proper sizing) ✓ Dashboard page responsive (header 'Welcome back, Test' properly sized, cards well-spaced) ✓ Gig Board shows upgrade wall for free users (expected behavior) ✓ Wallet page excellent (balance card ₹0.00 prominent, referral section with code TESDEU5U well-organized) ✓ Search page clean (search bar + filters button visible, shows 2 professionals) ✓ Mobile navigation working (hamburger opens sidebar with all nav items) ✓ No horizontal scroll on any page ✓ All text properly sized and readable ✓ Buttons/actions not cramped. LIMITATION: Could not capture profile page screenshot in second test run due to session loss, but profile link in mobile nav is functional. Overall mobile UX is good - all core pages are responsive and usable at 390x844 viewport."
+  - agent: "testing"
+    message: "✅ NEW FEATURES TESTING COMPLETE (25/25 tests passed): 1) Coupon CRUD (Admin) - All operations working: create, list, toggle active state, delete coupons with percentage/rupees discounts, expiry dates, redemption limits 2) Coupon Validation (User) - Valid coupons return proper discount info (20% off), invalid coupons return 404 3) Plan Gate - Authentication properly enforced on coupon validation endpoint (401 without token) 4) Profile Picture Upload - File upload, processing (sanitize, resize to 400x400), and retrieval all working correctly with proper content-type headers. All new coupon and upload features are fully functional."
 

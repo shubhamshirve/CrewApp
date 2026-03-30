@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Wallet as WalletIcon, Check, Crown, MessageSquare,
   Gift, CreditCard, Copy, Share2, Users, Globe, Loader2,
-  RefreshCw, ArrowUpCircle, ArrowDownCircle, Calendar, AlertCircle,
+  RefreshCw, ArrowUpCircle, ArrowDownCircle, Calendar, AlertCircle, Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +23,11 @@ export default function Wallet() {
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [referralStats, setReferralStats] = useState(null);
+  // Coupon state
+  const [couponInput, setCouponInput] = useState("");
+  const [couponResult, setCouponResult] = useState(null);   // { code, discount_type, discount_value, discount_amount, original_price, final_price }
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [selectedPlanForCoupon, setSelectedPlanForCoupon] = useState(null);
 
   const loadWallet = useCallback(async () => {
     try {
@@ -37,11 +42,33 @@ export default function Wallet() {
 
   useEffect(() => {
     loadWallet();
-    // Load plans from DB
     api.get("/plans").then(r => {
       setPlans(r.data.plans || []);
     }).catch(() => {}).finally(() => setPlansLoading(false));
   }, [loadWallet, api]);
+
+  const handleValidateCoupon = async (planId) => {
+    if (!couponInput.trim()) return;
+    setCouponLoading(true);
+    setCouponResult(null);
+    try {
+      const r = await api.post("/coupons/validate", { code: couponInput.trim(), plan_id: planId || null });
+      setCouponResult(r.data);
+      setSelectedPlanForCoupon(planId);
+      toast.success(`Coupon applied! You save ${r.data.discount_type === "percentage" ? r.data.discount_value + "%" : "₹" + r.data.discount_value}`);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Invalid coupon");
+      setCouponResult(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponInput("");
+    setCouponResult(null);
+    setSelectedPlanForCoupon(null);
+  };
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -56,18 +83,26 @@ export default function Wallet() {
 
   const handleSubscribe = async (plan) => {
     setSubscribing(plan.id);
+    const appliedCoupon = (couponResult && selectedPlanForCoupon === plan.id) ? couponResult.code : null;
     try {
-      const res = await api.post("/wallet/subscribe/create-order", { plan_id: plan.id });
+      const res = await api.post("/wallet/subscribe/create-order", {
+        plan_id: plan.id,
+        coupon_code: appliedCoupon,
+      });
       if (res.data.full_wallet_cover) {
-        await api.post("/wallet/subscribe/activate-wallet", { plan_id: plan.id });
+        await api.post("/wallet/subscribe/activate-wallet", {
+          plan_id: plan.id,
+          coupon_code: appliedCoupon,
+        });
         toast.success("Subscription activated using your wallet balance!");
         await refreshUser();
         await loadWallet();
+        handleRemoveCoupon();
         return;
       }
       const loaded = await loadRazorpayScript();
       if (!loaded) { toast.error("Failed to load payment gateway"); return; }
-      const { order, key_id, wallet_deducted } = res.data;
+      const { order, key_id, wallet_deducted, coupon_code, discount_amount } = res.data;
       const options = {
         key: key_id,
         amount: order.amount,
@@ -83,10 +118,13 @@ export default function Wallet() {
               razorpay_signature: response.razorpay_signature,
               plan_id: plan.id,
               wallet_deducted: wallet_deducted || 0,
+              coupon_code: coupon_code || null,
+              discount_amount: discount_amount || 0,
             });
             toast.success("Subscription activated!");
             await refreshUser();
             await loadWallet();
+            handleRemoveCoupon();
           } catch { toast.error("Payment verification failed"); }
         },
         prefill: { name: user?.full_name, contact: user?.phone },
@@ -163,7 +201,7 @@ export default function Wallet() {
     <Layout>
       <div className="max-w-3xl mx-auto space-y-5">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 font-display">Wallet & Subscription</h1>
+          <h1 className="text-2xl font-semibold text-slate-900 font-display">Subscription</h1>
           <p className="text-slate-500 text-sm mt-0.5">Manage your plan, wallet balance, and referrals</p>
         </div>
 
@@ -349,7 +387,46 @@ export default function Wallet() {
             <p className="text-xs text-slate-400 mt-1">Check back soon — plans will be published by the admin</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            {/* Coupon Input */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 mb-2 font-display uppercase tracking-wide">Have a Coupon Code?</p>
+              {couponResult ? (
+                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                  <div>
+                    <p className="text-sm font-bold text-emerald-700 font-mono">{couponResult.code}</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">
+                      {couponResult.discount_type === "percentage"
+                        ? `${couponResult.discount_value}% off`
+                        : `₹${couponResult.discount_value} off`}
+                      {couponResult.discount_amount ? ` — saves ₹${couponResult.discount_amount.toFixed(0)}` : ""}
+                    </p>
+                  </div>
+                  <button onClick={handleRemoveCoupon} className="text-xs text-red-500 hover:text-red-700 font-medium">Remove</button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal focus:border-orange-400 outline-none"
+                    placeholder="Enter code (e.g. SAVE20)"
+                    value={couponInput}
+                    onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === "Enter") handleValidateCoupon(selectedPlanForCoupon); }}
+                  />
+                  <button
+                    onClick={() => handleValidateCoupon(null)}
+                    disabled={couponLoading || !couponInput.trim()}
+                    className="px-4 py-2 rounded-xl text-sm font-medium text-white disabled:opacity-50"
+                    style={{ background: "#F97316" }}
+                  >
+                    {couponLoading ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Plan Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {plans.map(plan => {
               const isActive = activePlanId === plan.id;
               const currentPlanObj = plans.find(p => p.id === activePlanId);
@@ -421,20 +498,32 @@ export default function Wallet() {
                         subscribing === plan.id + "_downgrade" ? "Scheduling..." : "Downgrade at Renewal"}
                     </Button>
                   ) : (
-                    <Button
-                      data-testid={`subscribe-plan-btn-${plan.id}`}
-                      onClick={() => handleSubscribe(plan)}
-                      disabled={!!subscribing}
-                      className="w-full font-display font-semibold gap-2 text-white"
-                      style={{ background: "#E05D26" }}
-                    >
-                      <CreditCard size={14} />
-                      {subscribing === plan.id ? "Processing..." : "Subscribe"}
-                    </Button>
+                    <div className="space-y-2">
+                      {/* Coupon discount preview on this card */}
+                      {couponResult && (couponResult.applicable_plan_id === plan.id || !couponResult.applicable_plan_id) && (
+                        <div className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 flex items-center justify-between">
+                          <span>Coupon: <strong>{couponResult.code}</strong></span>
+                          <span className="font-bold">
+                            {couponResult.final_price !== null ? `₹${couponResult.final_price.toFixed(0)}` : `-${couponResult.discount_value}${couponResult.discount_type === "percentage" ? "%" : "₹"}`}
+                          </span>
+                        </div>
+                      )}
+                      <Button
+                        data-testid={`subscribe-plan-btn-${plan.id}`}
+                        onClick={() => handleSubscribe(plan)}
+                        disabled={!!subscribing}
+                        className="w-full font-display font-semibold gap-2 text-white"
+                        style={{ background: "#E05D26" }}
+                      >
+                        <CreditCard size={14} />
+                        {subscribing === plan.id ? "Processing..." : "Subscribe"}
+                      </Button>
+                    </div>
                   )}
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 

@@ -21,7 +21,7 @@ from rate_limit import limiter
 from routers import (
     auth, users, admin, gigs, connections, wallet, notifications,
     ratings, ai_routes, public_gigs, platform_settings, templates,
-    calendar_sync, notes, push, plans, reports, chat,
+    calendar_sync, notes, push, plans, reports, chat, coupons, uploads,
 )
 from db import client, db
 
@@ -84,6 +84,8 @@ async def lifespan(app: FastAPI):
     await db.custom_gear_submissions.create_index([("status", 1), ("created_at", -1)])
     await db.otp_verifications.create_index("expires_at", expireAfterSeconds=0)  # TTL auto-delete
     await db.gig_messages.create_index([("gig_id", 1), ("created_at", 1)])
+    await db.coupons.create_index([("is_active", 1)])
+    await db.coupon_redemptions.create_index([("coupon_code", 1), ("user_id", 1)])
 
     cors_origins = os.environ.get("CORS_ORIGINS", "*")
     if cors_origins == "*":
@@ -186,6 +188,8 @@ api_router.include_router(push.router, tags=["push"])
 api_router.include_router(plans.router, tags=["plans"])
 api_router.include_router(reports.router, tags=["reports"])
 api_router.include_router(chat.router, tags=["chat"])
+api_router.include_router(coupons.router, tags=["coupons"])
+api_router.include_router(uploads.router, tags=["uploads"])
 
 
 @api_router.get("/health")

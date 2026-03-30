@@ -389,11 +389,46 @@ export default function Profile() {
         {/* Header Card */}
         <div className="p-6 rounded-2xl border border-slate-200 bg-white" data-testid="profile-header">
           <div className="flex items-start gap-5">
-            <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden bg-slate-100 border-2 border-slate-200">
-              {profile.profile_image
-                ? <img src={profile.profile_image} alt={profile.full_name} className="w-full h-full object-cover" />
-                : <User size={32} className="text-slate-400" />
-              }
+            {/* Avatar — clickable upload for own profile */}
+            <div className="relative flex-shrink-0">
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden bg-slate-100 border-2 border-slate-200">
+                {profile.profile_image
+                  ? <img src={profile.profile_image} alt={profile.full_name} className="w-full h-full object-cover" />
+                  : <User size={32} className="text-slate-400" />
+                }
+              </div>
+              {isOwnProfile && (
+                <label
+                  htmlFor="avatar-upload"
+                  className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-orange-500 hover:bg-orange-600 flex items-center justify-center cursor-pointer shadow-md transition-colors"
+                  title="Change profile picture"
+                >
+                  <Camera size={13} className="text-white" />
+                  <input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      try {
+                        const res = await api.post("/uploads/profile-picture", formData, {
+                          headers: { "Content-Type": "multipart/form-data" },
+                        });
+                        await refreshUser();
+                        setProfile(p => ({ ...p, profile_image: res.data.url }));
+                        toast.success("Profile picture updated!");
+                      } catch (err) {
+                        toast.error(err.response?.data?.detail || "Upload failed");
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">

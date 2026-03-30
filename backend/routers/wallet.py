@@ -37,6 +37,53 @@ async def _get_platform_settings(db):
     return doc
 
 
+async def _apply_coupon(db, code: str, user_id: str, original_price: float, plan_id: Optional[str]) -> tuple[float, Optional[str]]:
+    """
+    Validate and apply coupon. Returns (discounted_price, coupon_code_used).
+    Raises HTTPException on invalid coupon.
+    """
+    code = code.strip().upper()
+    coupon = await db.coupons.find_one({"_id": code})
+    if not coupon or not coupon.get("is_active"):
+        raise HTTPException(status_code=400, detail="Invalid or inactive coupon code")
+
+    if coupon.get("valid_until"):
+        from datetime import datetime, timezone
+        expiry = datetime.strptime(coupon["valid_until"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expiry:
+            raise HTTPException(status_code=400, detail="Coupon has expired")
+
+    if coupon["redemption_count"] >= coupon["max_redemptions"]:
+        raise HTTPException(status_code=400, detail="Coupon has reached its maximum redemption limit")
+
+    user_uses = await db.coupon_redemptions.count_documents({"coupon_code": code, "user_id": user_id})
+    if user_uses >= coupon["per_user_limit"]:
+        raise HTTPException(status_code=400, detail="You have already used this coupon the maximum number of times")
+
+    if coupon.get("applicable_plan_id") and plan_id and coupon["applicable_plan_id"] != plan_id:
+        raise HTTPException(status_code=400, detail="This coupon is not valid for the selected plan")
+
+    if coupon["discount_type"] == "percentage":
+        discount = round(original_price * coupon["discount_value"] / 100, 2)
+    else:
+        discount = min(coupon["discount_value"], original_price)
+
+    return max(0.0, original_price - discount), code
+
+
+async def _record_coupon_redemption(db, code: str, user_id: str, plan_id: Optional[str], discount_amount: float):
+    """Record a coupon use and bump the redemption counter."""
+    await db.coupon_redemptions.insert_one({
+        "_id": str(uuid.uuid4()),
+        "coupon_code": code,
+        "user_id": user_id,
+        "plan_id": plan_id,
+        "discount_amount": discount_amount,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await db.coupons.update_one({"_id": code}, {"$inc": {"redemption_count": 1}})
+
+
 def get_razorpay_client():
     return razorpay.Client(auth=(
         os.environ.get("RAZORPAY_KEY_ID"),
@@ -45,8 +92,9 @@ def get_razorpay_client():
 
 
 class SubscribeRequest(BaseModel):
-    plan_id: Optional[str] = None   # UUID from DB plans collection (new flow)
-    plan: Optional[str] = None      # "base" / "premium" (legacy fallback)
+    plan_id: Optional[str] = None
+    plan: Optional[str] = None
+    coupon_code: Optional[str] = None   # ← NEW
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -56,6 +104,8 @@ class VerifyPaymentRequest(BaseModel):
     plan_id: Optional[str] = None   # UUID (new flow)
     plan: Optional[str] = None      # legacy
     wallet_deducted: float
+    coupon_code: Optional[str] = None
+    discount_amount: float = 0.0
 
 
 async def _resolve_plan(db, data, cfg: dict) -> dict:
@@ -170,6 +220,15 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
     plan_info = await _resolve_plan(db, data, cfg)
 
     bill_rs = plan_info["plan_price"]
+    coupon_code_used = None
+    discount_amount = 0.0
+
+    # Apply coupon if provided
+    if data.coupon_code:
+        discounted, coupon_code_used = await _apply_coupon(db, data.coupon_code, current_user["id"], bill_rs, plan_info["plan_id"])
+        discount_amount = round(bill_rs - discounted, 2)
+        bill_rs = discounted
+
     wallet_balance = current_user.get("wallet_balance", 0.0)
     wallet_deducted = min(wallet_balance, bill_rs)
     remaining_rs = bill_rs - wallet_deducted
@@ -182,7 +241,9 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
             "remaining_to_pay": 0,
             "plan_id": plan_info["plan_id"],
             "plan": plan_info["plan_key"],
-            "order": None
+            "order": None,
+            "coupon_code": coupon_code_used,
+            "discount_amount": discount_amount,
         }
 
     rp = get_razorpay_client()
@@ -194,6 +255,7 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
             "user_id": current_user["id"],
             "plan": plan_info["plan_key"],
             "plan_id": plan_info["plan_id"] or "",
+            "coupon_code": coupon_code_used or "",
         }
     })
     try:
@@ -206,6 +268,8 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
             "amount_paise": remaining_paise,
             "plan": plan_info["plan_key"],
             "plan_id": plan_info["plan_id"],
+            "coupon_code": coupon_code_used,
+            "discount_amount": discount_amount,
             "status": "pending",
             "detail": "Razorpay order created",
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -219,17 +283,26 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
         "plan_id": plan_info["plan_id"],
         "plan": plan_info["plan_key"],
         "order": order,
-        "key_id": os.environ.get("RAZORPAY_KEY_ID")
+        "key_id": os.environ.get("RAZORPAY_KEY_ID"),
+        "coupon_code": coupon_code_used,
+        "discount_amount": discount_amount,
     }
 
 
 @router.post("/subscribe/activate-wallet")
 async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depends(get_current_user)):
-    """Activate subscription when fully covered by wallet."""
+    """Activate subscription when fully covered by wallet (+ optional coupon)."""
     db = get_db()
     cfg = await _get_platform_settings(db)
     plan_info = await _resolve_plan(db, data, cfg)
     bill_rs = plan_info["plan_price"]
+    coupon_code_used = None
+    discount_amount = 0.0
+
+    if data.coupon_code:
+        discounted, coupon_code_used = await _apply_coupon(db, data.coupon_code, current_user["id"], bill_rs, plan_info["plan_id"])
+        discount_amount = round(bill_rs - discounted, 2)
+        bill_rs = discounted
 
     wallet_balance = current_user.get("wallet_balance", 0.0)
     if wallet_balance < bill_rs:
@@ -256,16 +329,25 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
         user_update["active_plan_id"] = plan_info["plan_id"]
 
     await db.users.update_one({"_id": current_user["id"]}, {"$set": user_update})
+
+    desc = f"Subscription: {plan_info['plan_name']}"
+    if coupon_code_used:
+        desc += f" (Coupon: {coupon_code_used}, saved ₹{discount_amount:.0f})"
+
     tx = {
         "_id": str(uuid.uuid4()),
         "user_id": current_user["id"],
         "type": "debit",
         "amount": bill_rs,
-        "description": f"Subscription: {plan_info['plan_name']}",
+        "description": desc,
         "balance_after": new_balance,
         "created_at": now.isoformat(),
     }
     await db.wallet_transactions.insert_one(tx)
+
+    if coupon_code_used:
+        await _record_coupon_redemption(db, coupon_code_used, current_user["id"], plan_info["plan_id"], discount_amount)
+
     try:
         await db.payment_logs.insert_one({
             "_id": str(uuid.uuid4()),
@@ -276,6 +358,8 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
             "amount_paise": int(bill_rs * 100),
             "plan": plan_info["plan_key"],
             "plan_id": plan_info["plan_id"],
+            "coupon_code": coupon_code_used,
+            "discount_amount": discount_amount,
             "status": "success",
             "detail": f"Full wallet cover: ₹{bill_rs:.2f}",
             "created_at": now.isoformat(),
@@ -339,17 +423,23 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
         user_update["active_plan_id"] = plan_info["plan_id"]
 
     await db.users.update_one({"_id": current_user["id"]}, {"$set": user_update})
+
+    desc = f"Subscription: {plan_info['plan_name']} (via Razorpay)"
+    if data.coupon_code:
+        desc += f" (Coupon: {data.coupon_code}, saved ₹{data.discount_amount:.0f})"
     tx = {
         "_id": str(uuid.uuid4()),
         "user_id": current_user["id"],
         "type": "debit",
         "amount": plan_info["plan_price"],
-        "description": f"Subscription: {plan_info['plan_name']} (via Razorpay)",
+        "description": desc,
         "reference": data.razorpay_payment_id,
         "balance_after": new_balance,
         "created_at": now.isoformat(),
     }
     await db.wallet_transactions.insert_one(tx)
+    if data.coupon_code:
+        await _record_coupon_redemption(db, data.coupon_code, current_user["id"], plan_info["plan_id"], data.discount_amount)
     await _check_and_reward_referrer(db, current_user)
     await send_notification(
         db, current_user["id"], "subscription",
