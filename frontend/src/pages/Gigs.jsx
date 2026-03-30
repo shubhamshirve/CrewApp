@@ -9,6 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, ChevronRight, Calendar, Briefcase, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { sanitizeText, validateFutureDate, validateTimeRange, minLength, maxLength } from "@/utils/validation";
+
+const FieldError = ({ msg }) =>
+  msg ? <p className="text-xs text-red-500 mt-0.5">{msg}</p> : null;
 const STATUS_COLORS = {
   draft: { bg: "rgba(107,114,128,0.15)", color: "#9CA3AF" },
   active: { bg: "rgba(16,185,129,0.15)", color: "#10B981" },
@@ -30,6 +34,8 @@ export default function Gigs() {
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // gig object to confirm delete
   const [deleting, setDeleting] = useState(false);
+  const [gigErrors, setGigErrors] = useState({});
+  const [sessionErrors, setSessionErrors] = useState([]);
 
   useEffect(() => {
     load();
@@ -42,12 +48,39 @@ export default function Gigs() {
     } catch { } finally { setLoading(false); }
   };
 
-  const addSession = () => setSessions(p => [...p, { date: "", start_time: "09:00", end_time: "18:00", location: "", venue_name: "", event_type: "Wedding" }]);
-  const updateSession = (i, k, v) => setSessions(p => p.map((s, idx) => idx === i ? { ...s, [k]: v } : s));
-  const removeSession = (i) => setSessions(p => p.filter((_, idx) => idx !== i));
+  const addSession = () => {
+    setSessions(p => [...p, { date: "", start_time: "09:00", end_time: "18:00", location: "", venue_name: "", event_type: "Wedding" }]);
+    setSessionErrors(p => [...p, {}]);
+  };
+  const updateSession = (i, k, v) => {
+    setSessions(p => p.map((s, idx) => idx === i ? { ...s, [k]: v } : s));
+    setSessionErrors(p => p.map((e, idx) => idx === i ? { ...e, [k]: "" } : e));
+  };
+  const removeSession = (i) => {
+    setSessions(p => p.filter((_, idx) => idx !== i));
+    setSessionErrors(p => p.filter((_, idx) => idx !== i));
+  };
 
   const handleCreate = async () => {
-    if (!newGig.title) { toast.error("Enter gig title"); return; }
+    // Validate title
+    const titleErr = minLength(newGig.title, 3, "Title") || maxLength(newGig.title, 200, "Title");
+    if (!newGig.title.trim()) {
+      setGigErrors({ title: "Gig title is required" });
+      return;
+    }
+    if (titleErr) { setGigErrors({ title: titleErr }); return; }
+    setGigErrors({});
+
+    // Validate sessions
+    const sErrs = sessions.map(s => ({
+      date: validateFutureDate(s.date, "Date"),
+      location: !s.location.trim() ? "Location is required" : "",
+      time: validateTimeRange(s.start_time, s.end_time),
+    }));
+    setSessionErrors(sErrs);
+    const hasSessionErr = sErrs.some(e => e.date || e.location || e.time);
+    if (hasSessionErr) { toast.error("Fix session errors before creating"); return; }
+
     const validSessions = sessions.filter(s => s.date && s.location);
     if (!validSessions.length) { toast.error("Add at least one complete session"); return; }
     setCreating(true);
@@ -159,11 +192,25 @@ export default function Gigs() {
           <div className="space-y-4 mt-2">
             <div>
               <Label className="text-slate-700 text-sm font-display">Gig Title *</Label>
-              <Input data-testid="gig-title-input" className={`mt-1 ${inputClass}`} placeholder="e.g. Sharma Wedding - Dec 2025" value={newGig.title} onChange={e => setNewGig(p => ({ ...p, title: e.target.value }))} />
+              <Input data-testid="gig-title-input" className={`mt-1 ${inputClass} ${gigErrors.title ? "border-red-400" : ""}`} placeholder="e.g. Sharma Wedding - Dec 2025" value={newGig.title}
+                onChange={e => { setNewGig(p => ({ ...p, title: e.target.value })); setGigErrors({}); }}
+                onBlur={e => {
+                  const v = e.target.value;
+                  if (!v.trim()) setGigErrors({ title: "Gig title is required" });
+                  else if (v.trim().length < 3) setGigErrors({ title: "Title must be at least 3 characters" });
+                }}
+              />
+              <FieldError msg={gigErrors.title} />
             </div>
             <div>
               <Label className="text-slate-700 text-sm font-display">Description</Label>
-              <textarea data-testid="gig-desc-input" className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border resize-none h-16`} placeholder="Brief overview of the event..." value={newGig.description} onChange={e => setNewGig(p => ({ ...p, description: e.target.value }))} />
+              <textarea data-testid="gig-desc-input" className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border resize-none h-16`} placeholder="Brief overview of the event..." value={newGig.description}
+                onChange={e => setNewGig(p => ({ ...p, description: sanitizeText(e.target.value) }))}
+                maxLength={2000}
+              />
+              {newGig.description.length > 1800 && (
+                <p className="text-xs text-amber-500 mt-0.5">{2000 - newGig.description.length} characters remaining</p>
+              )}
             </div>
 
             {/* Sessions */}
@@ -186,7 +233,14 @@ export default function Gigs() {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label className="text-slate-500 text-xs font-display">Date *</Label>
-                        <Input type="date" className={`mt-1 ${inputClass} text-xs`} value={s.date} onChange={e => updateSession(i, "date", e.target.value)} />
+                        <Input type="date" className={`mt-1 ${inputClass} text-xs ${sessionErrors[i]?.date ? "border-red-400" : ""}`} value={s.date}
+                          onChange={e => updateSession(i, "date", e.target.value)}
+                          onBlur={e => {
+                            const err = validateFutureDate(e.target.value, "Date");
+                            setSessionErrors(p => p.map((se, idx) => idx === i ? { ...se, date: err } : se));
+                          }}
+                        />
+                        <FieldError msg={sessionErrors[i]?.date} />
                       </div>
                       <div>
                         <Label className="text-slate-500 text-xs font-display">Event Type</Label>
@@ -196,15 +250,31 @@ export default function Gigs() {
                       </div>
                       <div>
                         <Label className="text-slate-500 text-xs font-display">Start Time</Label>
-                        <Input type="time" className={`mt-1 ${inputClass} text-xs`} value={s.start_time} onChange={e => updateSession(i, "start_time", e.target.value)} />
+                        <Input type="time" className={`mt-1 ${inputClass} text-xs`} value={s.start_time}
+                          onChange={e => updateSession(i, "start_time", e.target.value)}
+                        />
                       </div>
                       <div>
                         <Label className="text-slate-500 text-xs font-display">End Time</Label>
-                        <Input type="time" className={`mt-1 ${inputClass} text-xs`} value={s.end_time} onChange={e => updateSession(i, "end_time", e.target.value)} />
+                        <Input type="time" className={`mt-1 ${inputClass} text-xs ${sessionErrors[i]?.time ? "border-red-400" : ""}`} value={s.end_time}
+                          onChange={e => updateSession(i, "end_time", e.target.value)}
+                          onBlur={() => {
+                            const err = validateTimeRange(s.start_time, s.end_time);
+                            setSessionErrors(p => p.map((se, idx) => idx === i ? { ...se, time: err } : se));
+                          }}
+                        />
+                        <FieldError msg={sessionErrors[i]?.time} />
                       </div>
                       <div className="col-span-2">
                         <Label className="text-slate-500 text-xs font-display">Location *</Label>
-                        <Input className={`mt-1 ${inputClass} text-xs`} placeholder="City / Area" value={s.location} onChange={e => updateSession(i, "location", e.target.value)} />
+                        <Input className={`mt-1 ${inputClass} text-xs ${sessionErrors[i]?.location ? "border-red-400" : ""}`} placeholder="City / Area" value={s.location}
+                          onChange={e => updateSession(i, "location", e.target.value)}
+                          onBlur={e => {
+                            const err = !e.target.value.trim() ? "Location is required" : "";
+                            setSessionErrors(p => p.map((se, idx) => idx === i ? { ...se, location: err } : se));
+                          }}
+                        />
+                        <FieldError msg={sessionErrors[i]?.location} />
                       </div>
                       <div className="col-span-2">
                         <Label className="text-slate-500 text-xs font-display">Venue Name</Label>

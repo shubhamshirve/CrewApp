@@ -48,19 +48,44 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
   const [roles, setRoles] = useState([
     { role: "Second Shooter", budget: 5000, slots: 1, verified_only: false, min_rating: null, gear_required: "" }
   ]);
+  const [step1Errors, setStep1Errors] = useState({});
+  const [roleErrors, setRoleErrors] = useState([]);
+
+  const ic = "w-full bg-white border rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400";
 
   const rolesList = propRoles?.length ? propRoles : ROLES;
   const eventTypesList = propEventTypes?.length ? propEventTypes : EVENT_TYPES;
 
-  const addRole = () => setRoles(r => [...r, { role: rolesList[0] || "Videographer", budget: 6000, slots: 1, verified_only: false, min_rating: null, gear_required: "" }]);
-  const removeRole = (i) => setRoles(r => r.filter((_, idx) => idx !== i));
-  const updateRole = (i, field, val) => setRoles(r => r.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
+  const addRole = () => {
+    setRoles(r => [...r, { role: rolesList[0] || "Videographer", budget: 6000, slots: 1, verified_only: false, min_rating: null, gear_required: "" }]);
+    setRoleErrors(p => [...p, {}]);
+  };
+  const removeRole = (i) => {
+    setRoles(r => r.filter((_, idx) => idx !== i));
+    setRoleErrors(p => p.filter((_, idx) => idx !== i));
+  };
+  const updateRole = (i, field, val) => {
+    setRoles(r => r.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
+    setRoleErrors(p => p.map((e, idx) => idx === i ? { ...e, [field]: "" } : e));
+  };
+
+  const validateStep1 = () => {
+    const errors = {
+      title: !form.title.trim() ? "Gig title is required" : form.title.trim().length < 5 ? "Title must be at least 5 characters" : "",
+      date: !form.date ? "Date is required" : new Date(form.date) < new Date(new Date().toDateString()) ? "Date cannot be in the past" : "",
+      city: !form.city.trim() ? "City is required" : "",
+      location: !form.location.trim() ? "Location / Area is required" : "",
+    };
+    setStep1Errors(errors);
+    return !Object.values(errors).some(Boolean);
+  };
 
   const handleSubmit = async () => {
-    if (!form.title || !form.date || !form.city || !form.location) {
-      toast.error("Fill in all required fields");
-      return;
-    }
+    const rErrs = roles.map(r => ({
+      budget: r.budget <= 0 ? "Enter a valid budget" : "",
+    }));
+    setRoleErrors(rErrs);
+    if (rErrs.some(e => e.budget)) return;
     setLoading(true);
     try {
       await api.post("/public-gigs", { ...form, roles });
@@ -95,17 +120,19 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
                 <label className="text-xs text-slate-500 mb-1.5 block">Gig Title *</label>
                 <input
                   data-testid="post-gig-title"
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
+                  className={`${ic} ${step1Errors.title ? "border-red-400" : "border-slate-200"}`}
                   placeholder="e.g. Weekend Wedding Coverage — Delhi"
                   value={form.title}
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  onChange={e => { setForm(f => ({ ...f, title: e.target.value })); setStep1Errors(p => ({ ...p, title: "" })); }}
+                  onBlur={e => !e.target.value.trim() && setStep1Errors(p => ({ ...p, title: "Gig title is required" }))}
                 />
+                {step1Errors.title && <p className="text-xs text-red-500 mt-0.5">{step1Errors.title}</p>}
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1.5 block">Event Type *</label>
                 <select
                   data-testid="post-gig-event-type"
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
+                  className={`${ic} border-slate-200`}
                   value={form.event_type}
                   onChange={e => setForm(f => ({ ...f, event_type: e.target.value }))}
                 >
@@ -117,35 +144,44 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
                 <input
                   data-testid="post-gig-date"
                   type="date"
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
+                  className={`${ic} ${step1Errors.date ? "border-red-400" : "border-slate-200"}`}
                   value={form.date}
-                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                  onChange={e => { setForm(f => ({ ...f, date: e.target.value })); setStep1Errors(p => ({ ...p, date: "" })); }}
+                  onBlur={e => {
+                    if (!e.target.value) setStep1Errors(p => ({ ...p, date: "Date is required" }));
+                    else if (new Date(e.target.value) < new Date(new Date().toDateString())) setStep1Errors(p => ({ ...p, date: "Date cannot be in the past" }));
+                  }}
                 />
+                {step1Errors.date && <p className="text-xs text-red-500 mt-0.5">{step1Errors.date}</p>}
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1.5 block">City *</label>
                 <input
                   data-testid="post-gig-city"
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
+                  className={`${ic} ${step1Errors.city ? "border-red-400" : "border-slate-200"}`}
                   placeholder="Mumbai"
                   value={form.city}
-                  onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                  onChange={e => { setForm(f => ({ ...f, city: e.target.value })); setStep1Errors(p => ({ ...p, city: "" })); }}
+                  onBlur={e => !e.target.value.trim() && setStep1Errors(p => ({ ...p, city: "City is required" }))}
                 />
+                {step1Errors.city && <p className="text-xs text-red-500 mt-0.5">{step1Errors.city}</p>}
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1.5 block">Location / Area *</label>
                 <input
                   data-testid="post-gig-location"
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
+                  className={`${ic} ${step1Errors.location ? "border-red-400" : "border-slate-200"}`}
                   placeholder="Bandra West"
                   value={form.location}
-                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                  onChange={e => { setForm(f => ({ ...f, location: e.target.value })); setStep1Errors(p => ({ ...p, location: "" })); }}
+                  onBlur={e => !e.target.value.trim() && setStep1Errors(p => ({ ...p, location: "Location is required" }))}
                 />
+                {step1Errors.location && <p className="text-xs text-red-500 mt-0.5">{step1Errors.location}</p>}
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1.5 block">Venue Name</label>
                 <input
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
+                  className={`${ic} border-slate-200`}
                   placeholder="The Taj Mahal Palace"
                   value={form.venue_name}
                   onChange={e => setForm(f => ({ ...f, venue_name: e.target.value }))}
@@ -154,7 +190,7 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
               <div>
                 <label className="text-xs text-slate-500 mb-1.5 block">Style Preference</label>
                 <input
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
+                  className={`${ic} border-slate-200`}
                   placeholder="Dark & Moody"
                   value={form.style_preference}
                   onChange={e => setForm(f => ({ ...f, style_preference: e.target.value }))}
@@ -164,8 +200,9 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
                 <label className="text-xs text-slate-500 mb-1.5 block">Description</label>
                 <textarea
                   rows={3}
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400 resize-none"
+                  className={`${ic} border-slate-200 resize-none`}
                   placeholder="Brief about the event, expectations, deliverables..."
+                  maxLength={2000}
                   value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 />
@@ -173,7 +210,7 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
               <div>
                 <label className="text-xs text-slate-500 mb-1.5 block">Listing Expires In</label>
                 <select
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
+                  className={`${ic} border-slate-200`}
                   value={form.expires_hours}
                   onChange={e => setForm(f => ({ ...f, expires_hours: Number(e.target.value) }))}
                 >
@@ -187,13 +224,7 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
             <div className="flex justify-end pt-2">
               <button
                 data-testid="post-gig-next"
-                onClick={() => {
-                  if (!form.title || !form.date || !form.city || !form.location) {
-                    toast.error("Fill all required fields");
-                    return;
-                  }
-                  setStep(2);
-                }}
+                onClick={() => validateStep1() && setStep(2)}
                 className="px-5 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
                 style={{ background: "#E05D26" }}
               >
@@ -221,7 +252,7 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
                       <label className="text-xs text-slate-500 mb-1 block">Role *</label>
                       <select
                         data-testid={`role-select-${i}`}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
+                        className={`${ic} border-slate-200`}
                         value={r.role}
                         onChange={e => updateRole(i, "role", e.target.value)}
                       >
@@ -233,16 +264,22 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
                       <input
                         data-testid={`role-budget-${i}`}
                         type="number"
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
+                        min="1"
+                        className={`${ic} ${roleErrors[i]?.budget ? "border-red-400" : "border-slate-200"}`}
                         value={r.budget}
                         onChange={e => updateRole(i, "budget", Number(e.target.value))}
+                        onBlur={e => {
+                          if (!e.target.value || Number(e.target.value) <= 0)
+                            setRoleErrors(p => p.map((re, idx) => idx === i ? { ...re, budget: "Enter a valid budget" } : re));
+                        }}
                       />
+                      {roleErrors[i]?.budget && <p className="text-xs text-red-500 mt-0.5">{roleErrors[i].budget}</p>}
                     </div>
                     <div>
                       <label className="text-xs text-slate-500 mb-1 block">Slots</label>
                       <input
                         type="number" min={1} max={5}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
+                        className={`${ic} border-slate-200`}
                         value={r.slots}
                         onChange={e => updateRole(i, "slots", Number(e.target.value))}
                       />
@@ -251,7 +288,7 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
                       <label className="text-xs text-slate-500 mb-1 block">Min Rating</label>
                       <input
                         type="number" min={1} max={5} step={0.5}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-orange-400"
+                        className={`${ic} border-slate-200`}
                         placeholder="None"
                         value={r.min_rating || ""}
                         onChange={e => updateRole(i, "min_rating", e.target.value ? Number(e.target.value) : null)}
@@ -260,7 +297,7 @@ function PostGigModal({ onClose, onSuccess, api, eventTypes: propEventTypes, rol
                     <div className="col-span-2">
                       <label className="text-xs text-slate-500 mb-1 block">Gear Required</label>
                       <input
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
+                        className={`${ic} border-slate-200`}
                         placeholder="e.g. Mirrorless body, 2 primes"
                         value={r.gear_required}
                         onChange={e => updateRole(i, "gear_required", e.target.value)}

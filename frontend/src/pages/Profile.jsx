@@ -12,6 +12,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchPincodeData } from "@/utils/pincode";
+import {
+  validateName, validateIndianPhone, validateUrl, validateUpi,
+  validateBio, validateFee, sanitizeText,
+} from "@/utils/validation";
+
+const FieldError = ({ msg }) =>
+  msg ? <p className="text-xs text-red-500 mt-0.5">{msg}</p> : null;
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -100,6 +107,7 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [profileErrors, setProfileErrors] = useState({});
   const [pincodeStatus, setPincodeStatus] = useState("idle"); // "idle"|"loading"|"valid"|"invalid"
 
   // Change Password state
@@ -110,6 +118,8 @@ export default function Profile() {
   const handleChangePassword = async () => {
     if (!changePassForm.current) { toast.error("Enter your current password"); return; }
     if (changePassForm.newPass.length < 8) { toast.error("New password must be at least 8 characters"); return; }
+    if (!/[A-Za-z]/.test(changePassForm.newPass)) { toast.error("New password must contain at least one letter"); return; }
+    if (!/\d/.test(changePassForm.newPass)) { toast.error("New password must contain at least one number"); return; }
     if (changePassForm.newPass !== changePassForm.confirm) { toast.error("Passwords don't match"); return; }
     setChangePassLoading(true);
     try {
@@ -226,9 +236,28 @@ export default function Profile() {
   };
 
   const handleSaveProfile = async () => {
+    const errors = {
+      full_name: validateName(editForm.full_name, "Full name"),
+      phone: editForm.phone ? validateIndianPhone(editForm.phone) : "",
+      instagram_url: validateUrl(editForm.instagram_url),
+      linkedin_url: validateUrl(editForm.linkedin_url),
+      website_url: validateUrl(editForm.website_url),
+      upi_id: validateUpi(editForm.upi_id),
+      bio: validateBio(editForm.bio),
+      primary_rate: editForm.primary_rate ? validateFee(editForm.primary_rate, "Primary day rate") : "",
+      secondary_rate: editForm.secondary_rate ? validateFee(editForm.secondary_rate, "Secondary day rate") : "",
+    };
+    setProfileErrors(errors);
+    if (Object.values(errors).some(Boolean)) {
+      toast.error("Please fix the errors before saving");
+      return;
+    }
     setSaving(true);
     try {
-      const payload = { ...editForm };
+      const payload = {
+        ...editForm,
+        full_name: editForm.full_name ? sanitizeText(editForm.full_name) : undefined,
+      };
       if (payload.whatsapp_same_as_mobile) payload.whatsapp_number = payload.phone;
       Object.keys(payload).forEach(k => { if (payload[k] === "") delete payload[k]; });
       if (payload.primary_rate) payload.primary_rate = parseFloat(payload.primary_rate);
@@ -238,6 +267,7 @@ export default function Profile() {
       setProfile(res.data);
       await refreshUser();
       setEditing(false);
+      setProfileErrors({});
       toast.success("Profile updated!");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to save");
@@ -725,7 +755,13 @@ export default function Profile() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Full Name *</label>
-                  <input data-testid="edit-full-name" className={inputClass} value={editForm.full_name || ""} onChange={e => setEditForm(p => ({ ...p, full_name: e.target.value }))} />
+                  <input data-testid="edit-full-name"
+                    className={`${inputClass} ${profileErrors.full_name ? "border-red-400" : ""}`}
+                    value={editForm.full_name || ""}
+                    onChange={e => { setEditForm(p => ({ ...p, full_name: e.target.value })); setProfileErrors(p => ({ ...p, full_name: "" })); }}
+                    onBlur={e => setProfileErrors(p => ({ ...p, full_name: validateName(e.target.value, "Full name") }))}
+                  />
+                  <FieldError msg={profileErrors.full_name} />
                 </div>
                 <div>
                   <label className={labelClass}>Years of Experience</label>
@@ -734,7 +770,17 @@ export default function Profile() {
               </div>
               <div className="mt-3">
                 <label className={labelClass}>Short Bio</label>
-                <textarea data-testid="edit-bio" className={`${inputClass} resize-none h-20`} placeholder="Tell others about your work style…" value={editForm.bio || ""} onChange={e => setEditForm(p => ({ ...p, bio: e.target.value }))} />
+                <textarea data-testid="edit-bio"
+                  className={`${inputClass} resize-none h-20 ${profileErrors.bio ? "border-red-400" : ""}`}
+                  placeholder="Tell others about your work style…"
+                  maxLength={1000}
+                  value={editForm.bio || ""}
+                  onChange={e => { setEditForm(p => ({ ...p, bio: e.target.value })); setProfileErrors(p => ({ ...p, bio: "" })); }}
+                />
+                {(editForm.bio || "").length > 900 && (
+                  <p className="text-xs text-amber-500 mt-0.5">{1000 - (editForm.bio || "").length} characters remaining</p>
+                )}
+                <FieldError msg={profileErrors.bio} />
               </div>
             </section>
 
@@ -744,7 +790,14 @@ export default function Profile() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Mobile Number *</label>
-                  <input data-testid="edit-phone" className={inputClass} placeholder="9876543210" value={editForm.phone || ""} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} />
+                  <input data-testid="edit-phone"
+                    className={`${inputClass} ${profileErrors.phone ? "border-red-400" : ""}`}
+                    placeholder="9876543210"
+                    value={editForm.phone || ""}
+                    onChange={e => { setEditForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })); setProfileErrors(p => ({ ...p, phone: "" })); }}
+                    onBlur={e => setProfileErrors(p => ({ ...p, phone: e.target.value ? validateIndianPhone(e.target.value) : "" }))}
+                  />
+                  <FieldError msg={profileErrors.phone} />
                 </div>
                 <div>
                   <label className={labelClass}>WhatsApp Number</label>
@@ -770,7 +823,14 @@ export default function Profile() {
               </div>
               <div className="mt-3">
                 <label className={labelClass}>UPI ID</label>
-                <input data-testid="edit-upi" className={inputClass} placeholder="yourname@upi" value={editForm.upi_id || ""} onChange={e => setEditForm(p => ({ ...p, upi_id: e.target.value }))} />
+                <input data-testid="edit-upi"
+                  className={`${inputClass} ${profileErrors.upi_id ? "border-red-400" : ""}`}
+                  placeholder="yourname@upi"
+                  value={editForm.upi_id || ""}
+                  onChange={e => { setEditForm(p => ({ ...p, upi_id: e.target.value })); setProfileErrors(p => ({ ...p, upi_id: "" })); }}
+                  onBlur={e => setProfileErrors(p => ({ ...p, upi_id: validateUpi(e.target.value) }))}
+                />
+                <FieldError msg={profileErrors.upi_id} />
                 <p className="text-xs text-slate-400 mt-1">Others can send payments directly to you via UPI apps</p>
               </div>
             </section>
@@ -829,7 +889,13 @@ export default function Profile() {
                 </div>
                 <div>
                   <label className={labelClass}>Primary Day Rate (₹)</label>
-                  <input data-testid="edit-primary-rate" type="number" className={inputClass} placeholder="15000" value={editForm.primary_rate || ""} onChange={e => setEditForm(p => ({ ...p, primary_rate: e.target.value }))} />
+                  <input data-testid="edit-primary-rate" type="number" min="0"
+                    className={`${inputClass} ${profileErrors.primary_rate ? "border-red-400" : ""}`}
+                    placeholder="15000" value={editForm.primary_rate || ""}
+                    onChange={e => { setEditForm(p => ({ ...p, primary_rate: e.target.value })); setProfileErrors(p => ({ ...p, primary_rate: "" })); }}
+                    onBlur={e => setProfileErrors(p => ({ ...p, primary_rate: e.target.value ? validateFee(e.target.value, "Primary day rate") : "" }))}
+                  />
+                  <FieldError msg={profileErrors.primary_rate} />
                 </div>
                 <div>
                   <label className={labelClass}>Secondary Role (optional)</label>
@@ -837,7 +903,13 @@ export default function Profile() {
                 </div>
                 <div>
                   <label className={labelClass}>Secondary Day Rate (₹)</label>
-                  <input data-testid="edit-secondary-rate" type="number" className={inputClass} placeholder="10000" value={editForm.secondary_rate || ""} onChange={e => setEditForm(p => ({ ...p, secondary_rate: e.target.value }))} />
+                  <input data-testid="edit-secondary-rate" type="number" min="0"
+                    className={`${inputClass} ${profileErrors.secondary_rate ? "border-red-400" : ""}`}
+                    placeholder="10000" value={editForm.secondary_rate || ""}
+                    onChange={e => { setEditForm(p => ({ ...p, secondary_rate: e.target.value })); setProfileErrors(p => ({ ...p, secondary_rate: "" })); }}
+                    onBlur={e => setProfileErrors(p => ({ ...p, secondary_rate: e.target.value ? validateFee(e.target.value, "Secondary day rate") : "" }))}
+                  />
+                  <FieldError msg={profileErrors.secondary_rate} />
                 </div>
               </div>
             </section>
@@ -848,15 +920,36 @@ export default function Profile() {
               <div className="space-y-3">
                 <div>
                   <label className={labelClass}><Instagram size={11} className="inline mr-1" />Instagram URL</label>
-                  <input data-testid="edit-instagram" className={inputClass} placeholder="https://instagram.com/yourhandle" value={editForm.instagram_url || ""} onChange={e => setEditForm(p => ({ ...p, instagram_url: e.target.value }))} />
+                  <input data-testid="edit-instagram"
+                    className={`${inputClass} ${profileErrors.instagram_url ? "border-red-400" : ""}`}
+                    placeholder="https://instagram.com/yourhandle"
+                    value={editForm.instagram_url || ""}
+                    onChange={e => { setEditForm(p => ({ ...p, instagram_url: e.target.value })); setProfileErrors(p => ({ ...p, instagram_url: "" })); }}
+                    onBlur={e => setProfileErrors(p => ({ ...p, instagram_url: validateUrl(e.target.value) }))}
+                  />
+                  <FieldError msg={profileErrors.instagram_url} />
                 </div>
                 <div>
                   <label className={labelClass}><Globe size={11} className="inline mr-1" />Website / Portfolio URL</label>
-                  <input data-testid="edit-website" className={inputClass} placeholder="https://yoursite.com" value={editForm.website_url || ""} onChange={e => setEditForm(p => ({ ...p, website_url: e.target.value }))} />
+                  <input data-testid="edit-website"
+                    className={`${inputClass} ${profileErrors.website_url ? "border-red-400" : ""}`}
+                    placeholder="https://yoursite.com"
+                    value={editForm.website_url || ""}
+                    onChange={e => { setEditForm(p => ({ ...p, website_url: e.target.value })); setProfileErrors(p => ({ ...p, website_url: "" })); }}
+                    onBlur={e => setProfileErrors(p => ({ ...p, website_url: validateUrl(e.target.value) }))}
+                  />
+                  <FieldError msg={profileErrors.website_url} />
                 </div>
                 <div>
                   <label className={labelClass}><Link2 size={11} className="inline mr-1" />LinkedIn URL</label>
-                  <input data-testid="edit-linkedin" className={inputClass} placeholder="https://linkedin.com/in/yourprofile" value={editForm.linkedin_url || ""} onChange={e => setEditForm(p => ({ ...p, linkedin_url: e.target.value }))} />
+                  <input data-testid="edit-linkedin"
+                    className={`${inputClass} ${profileErrors.linkedin_url ? "border-red-400" : ""}`}
+                    placeholder="https://linkedin.com/in/yourprofile"
+                    value={editForm.linkedin_url || ""}
+                    onChange={e => { setEditForm(p => ({ ...p, linkedin_url: e.target.value })); setProfileErrors(p => ({ ...p, linkedin_url: "" })); }}
+                    onBlur={e => setProfileErrors(p => ({ ...p, linkedin_url: validateUrl(e.target.value) }))}
+                  />
+                  <FieldError msg={profileErrors.linkedin_url} />
                 </div>
               </div>
             </section>

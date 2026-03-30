@@ -10,6 +10,13 @@ import { Eye, EyeOff, ArrowLeft, CheckCircle2, Loader2, MapPin } from "lucide-re
 import InstallAppButton from "@/components/InstallAppButton";
 import NotificationPermissionModal from "@/components/NotificationPermissionModal";
 import { fetchPincodeData } from "@/utils/pincode";
+import {
+  validateEmail, validateIndianPhone, validatePassword,
+  validatePincode, validateName, sanitizeText, sanitizeEmail,
+} from "@/utils/validation";
+
+const FieldError = ({ msg }) =>
+  msg ? <p className="text-xs text-red-500 mt-0.5">{msg}</p> : null;
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL;
 
@@ -53,6 +60,15 @@ export default function Auth() {
 
   // ── Pincode state ──────────────────────────────────────────────────────────
   const [pincodeStatus, setPincodeStatus] = useState("idle"); // "idle"|"loading"|"valid"|"invalid"
+
+  // ── Inline field errors ────────────────────────────────────────────────────
+  const [loginErrors, setLoginErrors] = useState({});
+  const [regErrors, setRegErrors] = useState({});
+
+  const setLoginErr = (field, msg) => setLoginErrors(p => ({ ...p, [field]: msg }));
+  const clearLoginErr = (field) => setLoginErrors(p => ({ ...p, [field]: "" }));
+  const setRegErr = (field, msg) => setRegErrors(p => ({ ...p, [field]: msg }));
+  const clearRegErr = (field) => setRegErrors(p => ({ ...p, [field]: "" }));
 
   // ── Countdown timer for resend ─────────────────────────────────────────────
   useEffect(() => {
@@ -195,9 +211,13 @@ export default function Auth() {
   // ── Login ──────────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
+    const emailErr = validateEmail(loginData.email);
+    const passErr = !loginData.password ? "Password is required" : "";
+    setLoginErrors({ email: emailErr, password: passErr });
+    if (emailErr || passErr) return;
     setLoading(true);
     try {
-      const user = await login(loginData.email, loginData.password);
+      const user = await login(sanitizeEmail(loginData.email), loginData.password);
       const dismissedUntil = localStorage.getItem("crewbook_notification_dismissed");
       const shouldShowModal = !dismissedUntil || new Date() >= new Date(dismissedUntil);
       if (shouldShowModal) {
@@ -217,8 +237,17 @@ export default function Auth() {
   // ── Register ───────────────────────────────────────────────────────────────
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!regData.email || !regData.password || !regData.full_name || !regData.phone) {
-      toast.error("Please fill all required fields");
+    const errors = {
+      full_name: validateName(regData.full_name, "Full name"),
+      phone: validateIndianPhone(regData.phone),
+      email: validateEmail(regData.email),
+      password: validatePassword(regData.password),
+      pincode: validatePincode(regData.pincode),
+      location: !regData.location.trim() ? "City is required" : "",
+    };
+    setRegErrors(errors);
+    if (Object.values(errors).some(Boolean)) {
+      toast.error("Please fix the errors before continuing");
       return;
     }
     if (!emailVerifiedToken) {
@@ -231,7 +260,13 @@ export default function Auth() {
     }
     setLoading(true);
     try {
-      const payload = { ...regData, email_verified_token: emailVerifiedToken };
+      const payload = {
+        ...regData,
+        full_name: sanitizeText(regData.full_name),
+        email: sanitizeEmail(regData.email),
+        location: sanitizeText(regData.location),
+        email_verified_token: emailVerifiedToken,
+      };
       if (payload.whatsapp_same_as_mobile) payload.whatsapp_number = payload.phone;
       delete payload.whatsapp_same_as_mobile;
       await register(payload);
@@ -296,16 +331,24 @@ export default function Auth() {
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
                     <Label className="text-slate-700 text-sm font-display">Email</Label>
-                    <Input data-testid="login-email" className={`mt-1 ${ic}`} type="email" placeholder="you@example.com" value={loginData.email} onChange={e => setLoginData(p => ({ ...p, email: e.target.value }))} />
+                    <Input data-testid="login-email" className={`mt-1 ${ic} ${loginErrors.email ? "border-red-400" : ""}`} type="email" placeholder="you@example.com" value={loginData.email}
+                      onChange={e => { setLoginData(p => ({ ...p, email: e.target.value })); clearLoginErr("email"); }}
+                      onBlur={e => setLoginErr("email", validateEmail(e.target.value))}
+                    />
+                    <FieldError msg={loginErrors.email} />
                   </div>
                   <div>
                     <Label className="text-slate-700 text-sm font-display">Password</Label>
                     <div className="relative mt-1">
-                      <Input data-testid="login-password" className={ic} type={showPass ? "text" : "password"} placeholder="••••••••" value={loginData.password} onChange={e => setLoginData(p => ({ ...p, password: e.target.value }))} />
+                      <Input data-testid="login-password" className={`${ic} ${loginErrors.password ? "border-red-400" : ""}`} type={showPass ? "text" : "password"} placeholder="••••••••" value={loginData.password}
+                        onChange={e => { setLoginData(p => ({ ...p, password: e.target.value })); clearLoginErr("password"); }}
+                        onBlur={e => setLoginErr("password", !e.target.value ? "Password is required" : "")}
+                      />
                       <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                         {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
+                    <FieldError msg={loginErrors.password} />
                   </div>
                   <button
                     type="button"
@@ -424,11 +467,19 @@ export default function Auth() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-slate-700 text-xs font-display">Full Name *</Label>
-                    <Input data-testid="reg-name" className={`mt-1 ${ic}`} placeholder="Raj Sharma" value={regData.full_name} onChange={e => setRegData(p => ({ ...p, full_name: e.target.value }))} />
+                    <Input data-testid="reg-name" className={`mt-1 ${ic} ${regErrors.full_name ? "border-red-400" : ""}`} placeholder="Raj Sharma" value={regData.full_name}
+                      onChange={e => { setRegData(p => ({ ...p, full_name: e.target.value })); clearRegErr("full_name"); }}
+                      onBlur={e => setRegErr("full_name", validateName(e.target.value, "Full name"))}
+                    />
+                    <FieldError msg={regErrors.full_name} />
                   </div>
                   <div>
                     <Label className="text-slate-700 text-xs font-display">Mobile *</Label>
-                    <Input data-testid="reg-phone" className={`mt-1 ${ic}`} placeholder="9876543210" value={regData.phone} onChange={e => setRegData(p => ({ ...p, phone: e.target.value }))} />
+                    <Input data-testid="reg-phone" className={`mt-1 ${ic} ${regErrors.phone ? "border-red-400" : ""}`} placeholder="9876543210" value={regData.phone}
+                      onChange={e => { setRegData(p => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })); clearRegErr("phone"); }}
+                      onBlur={e => setRegErr("phone", validateIndianPhone(e.target.value))}
+                    />
+                    <FieldError msg={regErrors.phone} />
                   </div>
                 </div>
 
@@ -529,7 +580,11 @@ export default function Auth() {
                 {/* Password */}
                 <div>
                   <Label className="text-slate-700 text-xs font-display">Password *</Label>
-                  <Input data-testid="reg-password" className={`mt-1 ${ic}`} type="password" placeholder="Min 8 chars, letter + number" value={regData.password} onChange={e => setRegData(p => ({ ...p, password: e.target.value }))} />
+                  <Input data-testid="reg-password" className={`mt-1 ${ic} ${regErrors.password ? "border-red-400" : ""}`} type="password" placeholder="Min 8 chars, letter + number" value={regData.password}
+                    onChange={e => { setRegData(p => ({ ...p, password: e.target.value })); clearRegErr("password"); }}
+                    onBlur={e => setRegErr("password", validatePassword(e.target.value))}
+                  />
+                  <FieldError msg={regErrors.password} />
                 </div>
 
                 {/* Pincode → auto-fill City + State */}
@@ -571,7 +626,11 @@ export default function Auth() {
                       City *
                       {pincodeStatus === "valid" && <MapPin size={10} className="text-green-500" />}
                     </Label>
-                    <Input data-testid="reg-location" className={`mt-1 ${ic}`} placeholder="Mumbai" value={regData.location} onChange={e => setRegData(p => ({ ...p, location: e.target.value }))} />
+                    <Input data-testid="reg-location" className={`mt-1 ${ic} ${regErrors.location ? "border-red-400" : ""}`} placeholder="Mumbai" value={regData.location}
+                      onChange={e => { setRegData(p => ({ ...p, location: e.target.value })); clearRegErr("location"); }}
+                      onBlur={e => setRegErr("location", !e.target.value.trim() ? "City is required" : "")}
+                    />
+                    <FieldError msg={regErrors.location} />
                   </div>
                   <div>
                     <Label className="text-slate-700 text-xs font-display">Area</Label>

@@ -1,0 +1,75 @@
+{
+  "summary": "Full frontend validation testing for CrewBook SaaS. All 17+ validation scenarios tested across Login, Register, Create Gig, GigBoard Post Gig, Profile Edit, and GigDetail Invite forms. All validations PASS. One critical seed data bug found (subscription_expires_at not set), workaround applied via admin API.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "validation_test_results": {
+    "login_form": {
+      "empty_email": "PASS - 'Email is required' shown",
+      "empty_password": "PASS - 'Password is required' shown",
+      "invalid_email": "PASS - 'Enter a valid email address' shown"
+    },
+    "register_form": {
+      "empty_full_name": "PASS - 'Full name is required' shown",
+      "invalid_phone_9digit": "PASS - 'Enter a valid 10-digit mobile number' shown",
+      "short_password": "PASS - 'Password must be at least 8 characters' shown",
+      "password_no_number": "PASS - 'Password must contain at least one number' shown"
+    },
+    "create_gig_dialog": {
+      "empty_title": "PASS - 'Gig title is required' shown",
+      "past_session_date": "PASS - 'Date cannot be in the past' shown on submit",
+      "end_before_start": "PASS - 'End time must be after start time' shown on submit",
+      "empty_location": "PASS - 'Location is required' shown on submit"
+    },
+    "gigboard_post_public_gig": {
+      "empty_title_on_next": "PASS - 'Gig title is required' shown on Next click",
+      "past_date": "PASS - 'Date cannot be in the past' shown on Next click"
+    },
+    "profile_edit": {
+      "invalid_instagram_url": "PASS - 'Enter a valid URL (e.g. https://example.com)' shown on Tab blur",
+      "invalid_upi": "PASS - 'Invalid UPI ID (e.g. name@upi or 9876543210@ybl)' shown on Tab blur",
+      "negative_day_rate": "PASS - 'Primary day rate must be a positive number' shown on Tab blur"
+    },
+    "gig_detail_invite_form": {
+      "no_freelancer_selected": "PASS - 'Please select a freelancer' shown on submit",
+      "fee_zero": "PASS - 'Proposed fee must be a positive number' shown on submit"
+    }
+  },
+  "critical_code_review_comments": [
+    "CRITICAL BUG: /app/backend/routers/seed.py does not set subscription_expires_at when creating seed users with subscription_plan='premium' or 'base'. PlanGate component checks `user?.subscription_plan && user?.subscription_expires_at && new Date(subscription_expires_at) > new Date()`. Since subscription_expires_at is null/undefined in seeded users, ALL gated pages (/gigs, /gig-board, /gigs/:id) are blocked for seed users in fresh environments. Fix: add `subscription_expires_at: (datetime.now(UTC) + timedelta(days=365)).isoformat()` to seed user documents for users with subscription_plan != 'none'. Workaround applied for this test run via admin API: assigned Premium Plan to arjun.kapoor@crewbook.in with 30-day expiry.",
+    "NOTE: Session validations in Create Gig (past date, end-before-start, empty location) only trigger via submit button, not on individual field blur in the initial test. After submit, blur events persist the error state. This is acceptable UX behavior (errors shown on submit, then persist)."
+  ],
+  "test_report_links": [
+    "/app/tests/test_validations.py"
+  ],
+  "action_items": [
+    "FIX CRITICAL: Add subscription_expires_at to seed users in /app/backend/routers/seed.py for users with subscription_plan != 'none' - all gated pages blocked for seeded users in fresh environments"
+  ],
+  "updated_files": [
+    "/app/tests/test_validations.py"
+  ],
+  "success_rate": {
+    "frontend": "100% (17/17 validation scenarios passed)"
+  },
+  "test_credentials": {
+    "lead_login": "arjun.kapoor@crewbook.in / Crewbook@123",
+    "freelancer_login": "kavya.nair@crewbook.in / Crewbook@123",
+    "admin_login": "shubham@crewbook.in / Shubham@123"
+  },
+  "seed_data_creation": "Used admin API to assign Premium Plan with 365-day expiry to arjun.kapoor@crewbook.in (user ID: 5c8a8dfa-e8ce-4eff-a093-5d077ac66c30) and Base Plan to priya.sharma@crewbook.in and kavya.nair@crewbook.in",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All form validations (Login, Register, Create Gig dialog, GigBoard Post Public Gig, Profile Edit, GigDetail Invite) are working correctly. The PlanGate subscription_expires_at seed bug has been reported. Arjun Kapoor's account has an active plan with expiry 2026-04-29. All validation errors use FieldError component (p.text-xs.text-red-500) and are inline below their respective fields.",
+  "rca_of_seed_issue": {
+    "bug": "PlanGate blocks all seeded users from /gigs, /gig-board, /gigs/:id in fresh environments",
+    "root_cause": "seed.py creates users with subscription_plan='premium' but does NOT set subscription_expires_at. PlanGate checks: user?.subscription_plan && user?.subscription_expires_at && new Date(subscription_expires_at) > new Date(). Without subscription_expires_at, this evaluates to false and shows 'Subscription Required'.",
+    "reproduction": "Fresh seed + login as arjun.kapoor@crewbook.in + navigate to /gigs => 'Subscription Required' shown",
+    "fix": "In seed.py lead/freelancer user document creation, add: subscription_expires_at=(datetime.now(timezone.utc) + timedelta(days=365)).isoformat() when subscription_plan != 'none'"
+  }
+}

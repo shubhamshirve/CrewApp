@@ -14,6 +14,10 @@ import {
   Pencil, Trash2, Plus, Eye, EyeOff, Bell, BellOff, MessageSquare, Send,
 } from "lucide-react";
 import { toast } from "sonner";
+import { validateFee, validateFutureDate, validateTimeRange, sanitizeText } from "@/utils/validation";
+
+const FieldError = ({ msg }) =>
+  msg ? <p className="text-xs text-red-500 mt-0.5">{msg}</p> : null;
 
 const DEFAULT_ROLES = [
   "Second Shooter", "Traditional Videographer", "Cinematic Videographer",
@@ -55,8 +59,13 @@ export default function GigDetail() {
   const [inviteForm, setInviteForm] = useState({
     freelancer_id: "", session_id: "", session_date: "", role: DEFAULT_ROLES[0], proposed_fee: "",
   });
+  const [inviteErrors, setInviteErrors] = useState({});
   const [workspaceForm, setWorkspaceForm] = useState({ type: "moodboard", title: "", content: "" });
+  const [workspaceErrors, setWorkspaceErrors] = useState({});
   const [counterFee, setCounterFee] = useState({});
+  const [counterFeeError, setCounterFeeError] = useState({});
+  const [paymentErrors, setPaymentErrors] = useState({});
+  const [addSessionErrors, setAddSessionErrors] = useState({});
   const [snoozing, setSnoozing] = useState(false);
   const [conflictDialog, setConflictDialog] = useState(null); // { message, pendingForm }
 
@@ -116,7 +125,9 @@ export default function GigDetail() {
 
   const handleRecordPayment = async () => {
     if (!paymentDialog) return;
-    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) { toast.error("Enter a valid amount"); return; }
+    const amtErr = validateFee(paymentForm.amount, "Amount");
+    if (amtErr) { setPaymentErrors({ amount: amtErr }); return; }
+    setPaymentErrors({});
     setPaymentSubmitting(true);
     try {
       if (paymentDialog.mode === "edit") {
@@ -169,7 +180,13 @@ export default function GigDetail() {
   };
 
   const handleAddSession = async () => {
-    if (!newSession.date || !newSession.location) { toast.error("Date and location are required"); return; }
+    const errors = {
+      date: validateFutureDate(newSession.date, "Date"),
+      location: !newSession.location.trim() ? "Location is required" : "",
+      time: validateTimeRange(newSession.start_time, newSession.end_time),
+    };
+    setAddSessionErrors(errors);
+    if (errors.date || errors.location || errors.time) return;
     setAddingSession(true);
     try {
       await api.post(`/gigs/${id}/sessions`, newSession);
@@ -191,10 +208,13 @@ export default function GigDetail() {
   const myInvites = gig?.invites?.filter(i => i.freelancer_id === user?.id) ?? [];
 
   const handleInvite = async (force = false) => {
-    if (!inviteForm.freelancer_id || !inviteForm.session_id || !inviteForm.proposed_fee) {
-      toast.error("Fill all invite fields");
-      return;
-    }
+    const errors = {
+      freelancer_id: !inviteForm.freelancer_id ? "Please select a freelancer" : "",
+      session_id: !inviteForm.session_id ? "Please select a session" : "",
+      proposed_fee: validateFee(inviteForm.proposed_fee, "Proposed fee"),
+    };
+    setInviteErrors(errors);
+    if (Object.values(errors).some(Boolean)) return;
     try {
       const url = `/gigs/${id}/invites${force ? "?force=true" : ""}`;
       await api.post(url, { ...inviteForm, proposed_fee: parseFloat(inviteForm.proposed_fee) });
@@ -303,7 +323,12 @@ export default function GigDetail() {
   };
 
   const handleAddWorkspace = async () => {
-    if (!workspaceForm.title || !workspaceForm.content) { toast.error("Fill title and content"); return; }
+    const errors = {
+      title: !workspaceForm.title.trim() ? "Title is required" : workspaceForm.title.length > 200 ? "Title too long (max 200 chars)" : "",
+      content: !workspaceForm.content.trim() ? "Content is required" : workspaceForm.content.length > 2000 ? "Content too long (max 2000 chars)" : "",
+    };
+    setWorkspaceErrors(errors);
+    if (errors.title || errors.content) return;
     try {
       await api.post(`/gigs/${id}/workspace`, workspaceForm);
       toast.success("Added to workspace!");
@@ -876,25 +901,27 @@ export default function GigDetail() {
               <Label className="text-slate-700 text-sm font-display">Select Freelancer *</Label>
               <select
                 data-testid="invite-freelancer-select"
-                className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`}
+                className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border ${inviteErrors.freelancer_id ? "border-red-400" : ""}`}
                 value={inviteForm.freelancer_id}
-                onChange={e => setInviteForm(p => ({ ...p, freelancer_id: e.target.value }))}
+                onChange={e => { setInviteForm(p => ({ ...p, freelancer_id: e.target.value })); setInviteErrors(p => ({ ...p, freelancer_id: "" })); }}
               >
                 <option value="">Choose from connections...</option>
                 {connections.map(c => (
                   <option key={c.user?.id} value={c.user?.id}>{c.user?.full_name} – {c.user?.primary_role}</option>
                 ))}
               </select>
+              <FieldError msg={inviteErrors.freelancer_id} />
             </div>
             <div>
               <Label className="text-slate-700 text-sm font-display">Session *</Label>
               <select
                 data-testid="invite-session-select"
-                className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border`}
+                className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border ${inviteErrors.session_id ? "border-red-400" : ""}`}
                 value={inviteForm.session_id}
                 onChange={e => {
                   const sess = gig.sessions.find(s => s.id === e.target.value);
                   setInviteForm(p => ({ ...p, session_id: e.target.value, session_date: sess?.date || "" }));
+                  setInviteErrors(p => ({ ...p, session_id: "" }));
                 }}
               >
                 <option value="">Select session...</option>
@@ -902,6 +929,7 @@ export default function GigDetail() {
                   <option key={s.id} value={s.id}>{s.event_type} – {s.date}</option>
                 ))}
               </select>
+              <FieldError msg={inviteErrors.session_id} />
             </div>
             <div>
               <Label className="text-slate-700 text-sm font-display">Role *</Label>
@@ -918,12 +946,15 @@ export default function GigDetail() {
               <Label className="text-slate-700 text-sm font-display">Proposed Fee (₹) *</Label>
               <Input
                 data-testid="invite-fee-input"
-                className={`mt-1 ${inputClass}`}
+                className={`mt-1 ${inputClass} ${inviteErrors.proposed_fee ? "border-red-400" : ""}`}
                 type="number"
+                min="1"
                 placeholder="e.g. 8000"
                 value={inviteForm.proposed_fee}
-                onChange={e => setInviteForm(p => ({ ...p, proposed_fee: e.target.value }))}
+                onChange={e => { setInviteForm(p => ({ ...p, proposed_fee: e.target.value })); setInviteErrors(p => ({ ...p, proposed_fee: "" })); }}
+                onBlur={e => setInviteErrors(p => ({ ...p, proposed_fee: validateFee(e.target.value, "Proposed fee") }))}
               />
+              <FieldError msg={inviteErrors.proposed_fee} />
             </div>
             <div className="flex gap-3 pt-1">
               <Button variant="outline" onClick={() => setShowInvite(false)} className="flex-1 border-slate-200 text-slate-500">
@@ -960,20 +991,22 @@ export default function GigDetail() {
             <div>
               <Label className="text-slate-700 text-sm font-display">Title *</Label>
               <Input
-                className={`mt-1 ${inputClass}`}
+                className={`mt-1 ${inputClass} ${workspaceErrors.title ? "border-red-400" : ""}`}
                 placeholder="e.g. Venue entrance shots"
                 value={workspaceForm.title}
-                onChange={e => setWorkspaceForm(p => ({ ...p, title: e.target.value }))}
+                onChange={e => { setWorkspaceForm(p => ({ ...p, title: e.target.value })); setWorkspaceErrors(p => ({ ...p, title: "" })); }}
               />
+              <FieldError msg={workspaceErrors.title} />
             </div>
             <div>
               <Label className="text-slate-700 text-sm font-display">Content *</Label>
               <textarea
-                className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border resize-none h-20`}
+                className={`mt-1 w-full px-3 py-2 rounded-lg text-sm ${inputClass} border resize-none h-20 ${workspaceErrors.content ? "border-red-400" : ""}`}
                 placeholder="URL, text description, or WhatsApp location link"
                 value={workspaceForm.content}
-                onChange={e => setWorkspaceForm(p => ({ ...p, content: e.target.value }))}
+                onChange={e => { setWorkspaceForm(p => ({ ...p, content: e.target.value })); setWorkspaceErrors(p => ({ ...p, content: "" })); }}
               />
+              <FieldError msg={workspaceErrors.content} />
             </div>
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setShowWorkspace(false)} className="flex-1 border-slate-200 text-slate-500">
@@ -1069,10 +1102,12 @@ export default function GigDetail() {
                 <input
                   data-testid="new-session-date"
                   type="date"
-                  className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                  className={`w-full px-3 py-2 rounded-lg text-sm border bg-white text-slate-900 focus:border-orange-400 outline-none ${addSessionErrors.date ? "border-red-400" : "border-slate-200"}`}
                   value={newSession.date}
-                  onChange={e => setNewSession(p => ({ ...p, date: e.target.value }))}
+                  onChange={e => { setNewSession(p => ({ ...p, date: e.target.value })); setAddSessionErrors(p => ({ ...p, date: "" })); }}
+                  onBlur={e => setAddSessionErrors(p => ({ ...p, date: validateFutureDate(e.target.value, "Date") }))}
                 />
+                <FieldError msg={addSessionErrors.date} />
               </div>
               <div>
                 <label className="text-xs font-display text-slate-600 mb-1 block">Event Type</label>
@@ -1092,19 +1127,25 @@ export default function GigDetail() {
               </div>
               <div>
                 <label className="text-xs font-display text-slate-600 mb-1 block">End Time</label>
-                <input type="time" className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
-                  value={newSession.end_time} onChange={e => setNewSession(p => ({ ...p, end_time: e.target.value }))} />
+                <input type="time" className={`w-full px-3 py-2 rounded-lg text-sm border bg-white text-slate-900 focus:border-orange-400 outline-none ${addSessionErrors.time ? "border-red-400" : "border-slate-200"}`}
+                  value={newSession.end_time}
+                  onChange={e => setNewSession(p => ({ ...p, end_time: e.target.value }))}
+                  onBlur={() => setAddSessionErrors(p => ({ ...p, time: validateTimeRange(newSession.start_time, newSession.end_time) }))}
+                />
+                <FieldError msg={addSessionErrors.time} />
               </div>
             </div>
             <div>
               <label className="text-xs font-display text-slate-600 mb-1 block">Location / City *</label>
               <input
                 data-testid="new-session-location"
-                className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                className={`w-full px-3 py-2 rounded-lg text-sm border bg-white text-slate-900 focus:border-orange-400 outline-none ${addSessionErrors.location ? "border-red-400" : "border-slate-200"}`}
                 placeholder="Mumbai"
                 value={newSession.location}
-                onChange={e => setNewSession(p => ({ ...p, location: e.target.value }))}
+                onChange={e => { setNewSession(p => ({ ...p, location: e.target.value })); setAddSessionErrors(p => ({ ...p, location: "" })); }}
+                onBlur={e => setAddSessionErrors(p => ({ ...p, location: !e.target.value.trim() ? "Location is required" : "" }))}
               />
+              <FieldError msg={addSessionErrors.location} />
             </div>
             <div>
               <label className="text-xs font-display text-slate-600 mb-1 block">Venue Name</label>
@@ -1168,11 +1209,14 @@ export default function GigDetail() {
                 <input
                   data-testid="payment-amount-input"
                   type="number"
-                  className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 focus:border-orange-400 outline-none"
+                  min="1"
+                  className={`w-full px-3 py-2 rounded-lg text-sm border bg-white text-slate-900 focus:border-orange-400 outline-none ${paymentErrors.amount ? "border-red-400" : "border-slate-200"}`}
                   placeholder={`Suggested: ₹${paymentDialog.suggested_amount?.toLocaleString("en-IN")}`}
                   value={paymentForm.amount}
-                  onChange={e => setPaymentForm(p => ({ ...p, amount: e.target.value }))}
+                  onChange={e => { setPaymentForm(p => ({ ...p, amount: e.target.value })); setPaymentErrors({}); }}
+                  onBlur={e => setPaymentErrors({ amount: validateFee(e.target.value, "Amount") })}
                 />
+                <FieldError msg={paymentErrors.amount} />
               </div>
               <div>
                 <label className="text-xs font-display text-slate-600 mb-1 block">Notes (optional)</label>
