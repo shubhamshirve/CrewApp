@@ -512,6 +512,7 @@ async def seed_database(force: bool = Query(False, description="Drop existing se
             "penalty_score": 0,
             "average_rating": round(random.uniform(4.2, 5.0), 1),
             "rating_count": random.randint(5, 30),
+            "subscription_expires_at": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat() if tier != "none" else None,
             "created_at": _dt(-random.randint(30, 180)),
         }
         await db.users.insert_one(doc)
@@ -574,6 +575,7 @@ async def seed_database(force: bool = Query(False, description="Drop existing se
             "penalty_score": 0,
             "average_rating": round(random.uniform(3.8, 5.0), 1),
             "rating_count": random.randint(2, 20),
+            "subscription_expires_at": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat() if tier != "none" else None,
             "created_at": _dt(-random.randint(10, 120)),
         }
         await db.users.insert_one(doc)
