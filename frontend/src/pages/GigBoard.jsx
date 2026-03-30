@@ -5,9 +5,9 @@ import Layout from "@/components/Layout";
 import { toast } from "sonner";
 import {
   MapPin, Calendar, IndianRupee, Users, Star, CheckCircle,
-  Plus, Filter, ChevronDown, X, Briefcase, Clock, Eye,
+  Plus, Filter, ChevronDown, ChevronUp, X, Briefcase, Clock, Eye,
   FileText, Search, SlidersHorizontal, Loader2, BadgeCheck,
-  ArrowUpDown, Send, ChevronRight, Globe, CreditCard
+  ArrowUpDown, Send, ChevronRight, Globe, CreditCard, User, ExternalLink
 } from "lucide-react";
 
 const ROLES = [
@@ -477,9 +477,107 @@ function ApplyModal({ gig, onClose, onSuccess, api }) {
 }
 
 // ── Manage Applications Modal ─────────────────────────────────────────────────
+function ApplicantProfilePreview({ applicant }) {
+  if (!applicant) return null;
+  return (
+    <div className="mt-3 p-3 rounded-xl bg-white border border-slate-200 space-y-2.5">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-bold text-orange-600">
+              {(applicant.full_name || "?")[0].toUpperCase()}
+            </span>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-900">{applicant.full_name}</p>
+            <p className="text-xs text-slate-500">{applicant.primary_role || "—"}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {applicant.is_verified && (
+            <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+              <BadgeCheck size={10} /> Verified
+            </span>
+          )}
+          {applicant.avg_rating > 0 && (
+            <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              <Star size={10} fill="currentColor" /> {Number(applicant.avg_rating).toFixed(1)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Bio */}
+      {applicant.bio && (
+        <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 italic border-l-2 border-orange-200 pl-2">
+          "{applicant.bio}"
+        </p>
+      )}
+
+      {/* Stats row */}
+      <div className="flex flex-wrap gap-2">
+        {applicant.location && (
+          <span className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
+            <MapPin size={9} /> {applicant.location}
+          </span>
+        )}
+        {applicant.years_of_experience > 0 && (
+          <span className="text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
+            {applicant.years_of_experience} yr exp
+          </span>
+        )}
+        {applicant.secondary_role && (
+          <span className="text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
+            Also: {applicant.secondary_role}
+          </span>
+        )}
+      </div>
+
+      {/* Gear */}
+      {applicant.gear_vault?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {applicant.gear_vault.slice(0, 4).map((g, i) => (
+            <span key={i} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              {g.name}
+            </span>
+          ))}
+          {applicant.gear_vault.length > 4 && (
+            <span className="text-xs text-slate-400">+{applicant.gear_vault.length - 4} more</span>
+          )}
+        </div>
+      )}
+
+      {/* Style tags */}
+      {applicant.style_tags?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {applicant.style_tags.slice(0, 3).map(tag => (
+            <span key={tag} className="text-xs bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded-full">{tag}</span>
+          ))}
+        </div>
+      )}
+
+      {/* Full profile link */}
+      <a
+        data-testid={`view-full-profile-${applicant.id}`}
+        href={`/profile/${applicant.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1 text-xs font-medium text-orange-500 hover:text-orange-700 transition-colors"
+      >
+        View Full Profile <ExternalLink size={11} />
+      </a>
+    </div>
+  );
+}
+
 function ManageModal({ gig, onClose, onUpdate, api }) {
   const [applications, setApplications] = useState(gig.applications || []);
   const [loading, setLoading] = useState({});
+  const [expandedProfiles, setExpandedProfiles] = useState({});
+
+  const toggleProfile = (appId) =>
+    setExpandedProfiles(p => ({ ...p, [appId]: !p[appId] }));
 
   const handle = async (appId, action) => {
     setLoading(l => ({ ...l, [appId]: true }));
@@ -543,7 +641,23 @@ function ManageModal({ gig, onClose, onUpdate, api }) {
                   {app.cover_note && (
                     <p className="text-xs text-slate-500 italic mb-3 border-l-2 border-orange-300 pl-2">"{app.cover_note}"</p>
                   )}
-                  <div className="flex gap-2">
+
+                  {/* View Profile toggle */}
+                  <button
+                    data-testid={`toggle-profile-${app.id}`}
+                    onClick={() => toggleProfile(app.id)}
+                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-orange-500 transition-colors mb-3"
+                  >
+                    <User size={11} />
+                    {expandedProfiles[app.id] ? "Hide Profile" : "View Profile"}
+                    {expandedProfiles[app.id] ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                  </button>
+
+                  {expandedProfiles[app.id] && app.applicant && (
+                    <ApplicantProfilePreview applicant={app.applicant} />
+                  )}
+
+                  <div className="flex gap-2 mt-2">
                     <button
                       data-testid={`accept-app-${app.id}`}
                       onClick={() => handle(app.id, "accept")}
@@ -574,17 +688,34 @@ function ManageModal({ gig, onClose, onUpdate, api }) {
             <p className="text-xs font-medium text-slate-400 mb-3 uppercase tracking-wide">Processed ({processed.length})</p>
             <div className="space-y-2">
               {processed.map(app => (
-                <div key={app.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50">
-                  <div>
-                    <p className="text-sm text-slate-900">{app.applicant?.full_name || app.applicant_name}</p>
-                    <p className="text-xs text-slate-400">{app.role_name}</p>
+                <div key={app.id} className="rounded-lg border border-slate-100 bg-slate-50">
+                  <div className="flex items-center justify-between p-3">
+                    <div>
+                      <p className="text-sm text-slate-900">{app.applicant?.full_name || app.applicant_name}</p>
+                      <p className="text-xs text-slate-400">{app.role_name}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-slate-400">₹{app.offer_price?.toLocaleString()}</span>
+                      <span className={`text-xs px-2 py-1 rounded-full ${APP_STATUS_COLORS[app.status]}`}>
+                        {app.status}
+                      </span>
+                      {app.applicant && (
+                        <button
+                          data-testid={`toggle-profile-processed-${app.id}`}
+                          onClick={() => toggleProfile(app.id)}
+                          className="text-xs text-slate-400 hover:text-orange-500 transition-colors flex items-center gap-1"
+                        >
+                          <User size={11} />
+                          {expandedProfiles[app.id] ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400">₹{app.offer_price?.toLocaleString()}</span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${APP_STATUS_COLORS[app.status]}`}>
-                      {app.status}
-                    </span>
-                  </div>
+                  {expandedProfiles[app.id] && app.applicant && (
+                    <div className="px-3 pb-3">
+                      <ApplicantProfilePreview applicant={app.applicant} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
