@@ -253,7 +253,7 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 3
+  test_sequence: 4
   run_ui: false
 
 test_plan:
@@ -267,3 +267,5 @@ agent_communication:
     message: "Optimization pass complete. Changes: 1) New async TTL cache (cache.py) for platform data — 5-min TTL with immediate invalidation on admin write. 2) Removed hardcoded event_type/role validators in gigs.py, users.py, public_gigs.py — now DB-driven. 3) Fixed N+1 in _check_90min_buffer by batch-fetching gigs. 4) Added 11 missing MongoDB indexes (gigs, wallet_transactions, public_gigs, etc.). 5) Created PlatformContext.js — one fetch on app mount replaces 4+ duplicate per-page calls. Admin creds: admin@crewbook.in / Admin@123"
   - agent: "testing"
     message: "✅ ALL OPTIMIZATION TESTS PASSED (8/8): 1) TTL cache working with proper invalidation 2) Dynamic event types/roles from DB 3) N+1 fix verified (health < 1s) 4) MongoDB indexes working 5) Admin CRUD operations successful. Created admin user via /api/admin/seed-admin. All performance optimizations are working correctly."
+  - agent: "testing"
+    message: "✅ MOBILE UX TESTING COMPLETE (390x844 viewport - iPhone 14): Tested all admin panel pages. RESULTS: ✓ Login page mobile-friendly ✓ Hamburger navigation working (opens 240px sidebar overlay) ✓ All admin pages responsive (Dashboard, Users, Gig Board, Verification, Settings, Penalties, Templates, Plans, Reports, Logs) ✓ No horizontal scroll on any page ✓ Settings tabs fit viewport (356px < 390px) ✓ Card layouts work well on mobile. MINOR NOTES: Admin Users filter buttons are small but functional, Settings tabs close to viewport limit (5 tabs). LIMITATION: Cannot test user pages (/gigs, /search, /profile, /wallet, /notifications) with admin account due to route guards - would need regular user credentials."
