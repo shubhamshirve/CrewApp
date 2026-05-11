@@ -31,13 +31,19 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      # Override localhost values from .env with Docker-internal hostnames
       MONGO_URL: mongodb://mongodb:27017
       ENV: production
+      # Uploads directory inside the container (mounted as named volume below)
+      UPLOADS_DIR: /app/uploads
     depends_on:
       mongodb:
         condition: service_healthy
     ports:
-      - "8002:8001"
+      - "8001:8001"
+    volumes:
+      # Persist user-uploaded profile pictures across container restarts
+      - uploads_data:/app/uploads
     networks:
       - crewbook-net
     healthcheck:
@@ -62,7 +68,7 @@ services:
     container_name: crewbook-frontend
     restart: unless-stopped
     ports:
-      - "3002:80"
+      - "3000:80"
     depends_on:
       backend:
         condition: service_healthy
@@ -80,6 +86,8 @@ services:
 volumes:
   mongodb_data:
     name: crewbook_mongodb_data
+  uploads_data:
+    name: crewbook_uploads_data
   caddy_data:
     name: crewbook_caddy_data
   caddy_config:

@@ -23,6 +23,9 @@ pytest.ini
 .mypy_cache/
 .flake8
 
+# Uploaded user files (persisted via Docker named volume, not in image)
+uploads/
+
 # IDE
 .vscode/
 .idea/
