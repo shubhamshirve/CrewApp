@@ -10,7 +10,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # API Configuration
-BASE_URL = "https://code-review-218.preview.emergentagent.com/api"
+BASE_URL = "https://syntax-scanner-7.preview.emergentagent.com/api"
 
 # Test Credentials
 ADMIN_CREDENTIALS = {
