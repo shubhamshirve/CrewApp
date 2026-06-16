@@ -6,7 +6,7 @@ import asyncio
 import aiohttp
 import json
 
-BASE_URL = "https://syntax-scanner-7.preview.emergentagent.com/api"
+BASE_URL = "https://photo-crew-pro.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@crewbook.in"
 ADMIN_PASSWORD = "Admin@123"
 
