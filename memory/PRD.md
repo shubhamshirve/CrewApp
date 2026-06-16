@@ -111,14 +111,32 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ `AdminTemplates.jsx` — **NEW** Notification template management (In-App + WhatsApp + Email tabs)
 - ✅ `Layout.jsx` — Collapsible sidebar, mobile menu
 
-## Docker Setup (Added)
+## Docker Setup (Updated — MongoDB 4.4 + pnpm + Caddy)
 - ✅ `backend/Dockerfile` — Python 3.11-slim, installs requirements, runs uvicorn
-- ✅ `frontend/Dockerfile` — Multi-stage: Node 20 build → nginx:alpine serve
-- ✅ `frontend/nginx.conf` — Proxies `/api` to `backend:8001`, serves React SPA
-- ✅ `docker-compose.yml` — 3 services: mongodb, backend, frontend with health checks
-- ✅ `backend/.dockerignore` / `frontend/.dockerignore` / `.dockerignore`
-- ✅ `backend/.env.example` / `frontend/.env.example` — Templates without secrets
-- ✅ `README.docker.md` — Complete setup guide with commands, architecture diagram, troubleshooting
+- ✅ `frontend/Dockerfile` — Multi-stage: **pnpm** (via corepack) build → caddy:2-alpine serve
+- ✅ `frontend/Caddyfile` — Proxies `/api` to `backend:8001`, gzip, security headers, SPA fallback
+- ✅ `docker-compose.yml` — 3 services: **mongo:4.4** (tuned for 1GB VPS), backend, frontend
+- ✅ `frontend/pnpm-lock.yaml` — Generated from yarn.lock via `pnpm import`
+- ✅ `backend/.env.example` / `frontend/.dockerignore` — Templates with all env vars documented
+- ✅ `README.docker.md` — Setup guide
+
+### CI/CD — GHCR (Added)
+- ✅ `.github/workflows/ci.yml` — Builds & pushes to GHCR on `main`/`develop` push, PR builds only
+  - Backend: `ghcr.io/shubhamshirve/crewapp-backend`
+  - Frontend: `ghcr.io/shubhamshirve/crewapp-frontend`
+  - Tags: `latest` (main only) + `sha-<short>` + branch name
+  - Layer caching via GitHub Actions cache (`type=gha`)
+
+### Security & Logic Hardening (Added)
+- ✅ **Rating membership validation**: `submit_rating()` now verifies rater AND rated user are both on the same gig (as lead or accepted freelancer). Gig must be completed. Self-rating blocked. Rate-limited 10/min.
+- ✅ **Rating score range**: Pydantic `ge=1, le=5` constraints on all score fields
+- ✅ **Admin seed protected**: `POST /api/admin/seed-admin` requires `ADMIN_SEED_SECRET` env var + `X-Seed-Secret` header. Disabled by default. Password no longer returned in response.
+
+### PWA (Enhanced)
+- ✅ `sw.js` v3 — Cache-first for `/static/` (CRA hashed assets), network-first for navigation, offline.html fallback. Old cache cleanup on activate.
+- ✅ `public/offline.html` — Dark-themed offline page matching app brand
+- ✅ `manifest.json` — Added `display_override`, 3rd shortcut (My Gigs), fixed gig-board URL
+- ✅ `index.html` — `black-translucent` iOS status bar, msapplication meta tags
 
 ### P0 (Critical - Next Sprint)
 - [x] **PDF contract auto-generation** on booking acceptance ✅ DONE (reportlab)
