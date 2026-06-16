@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime, timezone
 import uuid
@@ -7,6 +7,8 @@ import uuid
 from db import get_db
 from auth_utils import get_current_user
 from services.notifications_service import send_notification
+from rate_limit import limiter
+from fastapi import Request
 
 router = APIRouter(prefix="/ratings")
 
@@ -14,10 +16,10 @@ router = APIRouter(prefix="/ratings")
 class RatingSubmit(BaseModel):
     gig_id: str
     rated_user_id: str
-    punctuality: int  # 1-5
-    gear_handling: int
-    teamwork: int
-    notes: Optional[str] = None  # Private lead notes
+    punctuality: int = Field(..., ge=1, le=5, description="Rating 1–5")
+    gear_handling: int = Field(..., ge=1, le=5, description="Rating 1–5")
+    teamwork: int = Field(..., ge=1, le=5, description="Rating 1–5")
+    notes: Optional[str] = Field(None, max_length=1000)  # Private, never returned publicly
 
 
 class AppealRequest(BaseModel):
@@ -110,12 +112,49 @@ async def get_pending_ratings(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("")
-async def submit_rating(data: RatingSubmit, current_user: dict = Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def submit_rating(request: Request, data: RatingSubmit, current_user: dict = Depends(get_current_user)):
     db = get_db()
+    rater_id = current_user["id"]
+
+    # ── Self-rating guard ──────────────────────────────────────────────────────
+    if rater_id == data.rated_user_id:
+        raise HTTPException(status_code=400, detail="Cannot rate yourself")
+
+    # ── Gig existence & completion check ──────────────────────────────────────
     gig = await db.gigs.find_one({"_id": data.gig_id})
     if not gig:
         raise HTTPException(status_code=404, detail="Gig not found")
-    existing = await db.ratings.find_one({"gig_id": data.gig_id, "rater_id": current_user["id"], "rated_user_id": data.rated_user_id})
+    if gig.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="Ratings are only allowed after a gig is completed")
+
+    # ── Same-booking membership validation ────────────────────────────────────
+    # Rater must be the lead OR an accepted freelancer on this gig
+    if gig["lead_photographer_id"] == rater_id:
+        rater_is_member = True
+    else:
+        rater_invite = await db.gig_invites.find_one({
+            "gig_id": data.gig_id, "freelancer_id": rater_id, "status": "accepted"
+        })
+        rater_is_member = rater_invite is not None
+    if not rater_is_member:
+        raise HTTPException(status_code=403, detail="You were not part of this booking")
+
+    # Rated user must also be on the same gig (lead or accepted freelancer)
+    if gig["lead_photographer_id"] == data.rated_user_id:
+        rated_is_member = True
+    else:
+        rated_invite = await db.gig_invites.find_one({
+            "gig_id": data.gig_id, "freelancer_id": data.rated_user_id, "status": "accepted"
+        })
+        rated_is_member = rated_invite is not None
+    if not rated_is_member:
+        raise HTTPException(status_code=403, detail="That user was not part of this booking")
+
+    # ── Duplicate prevention ───────────────────────────────────────────────────
+    existing = await db.ratings.find_one({
+        "gig_id": data.gig_id, "rater_id": rater_id, "rated_user_id": data.rated_user_id
+    })
     if existing:
         raise HTTPException(status_code=400, detail="Already rated this user for this gig")
 
@@ -125,7 +164,7 @@ async def submit_rating(data: RatingSubmit, current_user: dict = Depends(get_cur
         "_id": str(uuid.uuid4()),
         "gig_id": data.gig_id,
         "gig_title": gig.get("title", ""),
-        "rater_id": current_user["id"],
+        "rater_id": rater_id,
         "rated_user_id": data.rated_user_id,
         "punctuality": data.punctuality,
         "gear_handling": data.gear_handling,

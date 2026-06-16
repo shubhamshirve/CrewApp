@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 import uuid
+import os
 
 from db import get_db
 from auth_utils import get_admin_user, _clean_user, create_impersonation_token
@@ -520,19 +521,31 @@ async def review_appeal(appeal_id: str, data: AppealReviewRequest, admin: dict =
 
 
 @router.post("/seed-admin")
-async def seed_admin():
-    """Creates default admin account if none exists."""
+async def seed_admin(request: Request):
+    """Creates default admin account if none exists.
+    Protected by ADMIN_SEED_SECRET env var — must pass X-Seed-Secret header.
+    """
+    seed_secret = os.environ.get("ADMIN_SEED_SECRET", "")
+    if not seed_secret:
+        raise HTTPException(
+            status_code=403,
+            detail="Seed endpoint disabled — set ADMIN_SEED_SECRET env var to enable",
+        )
+    provided = request.headers.get("X-Seed-Secret", "")
+    if provided != seed_secret:
+        raise HTTPException(status_code=403, detail="Invalid seed secret")
+
     from auth_utils import hash_password
-    import uuid
     db = get_db()
     existing = await db.users.find_one({"is_admin": True})
     if existing:
         return {"message": "Admin already exists"}
     now = datetime.now(timezone.utc).isoformat()
+    admin_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "Admin@123")
     admin_doc = {
         "_id": str(uuid.uuid4()),
         "email": "admin@crewbook.in",
-        "password_hash": hash_password("Admin@123"),
+        "password_hash": hash_password(admin_password),
         "full_name": "CrewBook Admin",
         "phone": "9999999999",
         "location": "Mumbai",
@@ -557,7 +570,7 @@ async def seed_admin():
         "updated_at": now,
     }
     await db.users.insert_one(admin_doc)
-    return {"message": "Admin created", "email": "admin@crewbook.in", "password": "Admin@123"}
+    return {"message": "Admin created", "email": "admin@crewbook.in"}
 
 
 # ── Log Read Endpoints ─────────────────────────────────────────────────────────

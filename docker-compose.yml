@@ -1,7 +1,7 @@
 services:
-  # ── MongoDB ─────────────────────────────────────────────────────────────
+  # ── MongoDB 4.4 ──────────────────────────────────────────────────────────────
   mongodb:
-    image: mongo:7.0
+    image: mongo:4.4
     container_name: crewbook-mongodb
     restart: unless-stopped
     environment:
@@ -11,7 +11,8 @@ services:
     networks:
       - crewbook-net
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      # mongo:4.4 ships with the legacy `mongo` shell (not `mongosh`)
+      test: ["CMD", "mongo", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -19,9 +20,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 256m   # tuned for 1 GB VPS
 
-  # ── Backend (FastAPI) ────────────────────────────────────────────────────
+  # ── Backend (FastAPI) ────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -55,9 +56,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 384m
 
-  # ── Frontend (React → Caddy) ─────────────────────────────────────────────
+  # ── Frontend (React → Caddy) ─────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend

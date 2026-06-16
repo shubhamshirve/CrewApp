@@ -322,10 +322,40 @@ frontend:
         agent: "main"
         comment: "All pages now use usePlatform() context hook. Removed individual api.get calls for roles/event-types from each page."
 
+  - task: "Rating membership validation + score range fix"
+    implemented: true
+    working: true
+    file: "backend/routers/ratings.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added ge=1,le=5 Pydantic constraints on punctuality/gear_handling/teamwork. Added same-booking membership check - rater AND rated user must both be gig lead or accepted freelancer. Added self-rating guard. Added gig completion check. Added 10/minute rate limit."
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL TESTS PASSED (6/6): Score validation working correctly - punctuality=10 returns 422, punctuality=0 returns 422, non-existent gig returns 404. Membership validation working correctly - rater not on gig returns 403 'You were not part of this booking', self-rating returns 400 'Cannot rate yourself', non-completed gig returns 400 'Ratings are only allowed after a gig is completed'. All validation logic is functioning as expected."
+
+  - task: "Admin seed-admin endpoint protection"
+    implemented: true
+    working: true
+    file: "backend/routers/admin.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint now requires ADMIN_SEED_SECRET env var. Returns 403 if not set or if X-Seed-Secret header doesn't match. Admin password no longer hardcoded - reads ADMIN_DEFAULT_PASSWORD env var. Password no longer returned in response."
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL TESTS PASSED (3/3): Endpoint protection working correctly - call without header returns 403 'Seed endpoint disabled', call with wrong secret returns 403 'Seed endpoint disabled' (since ADMIN_SEED_SECRET is empty in .env). Endpoint is completely locked down as expected."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 6
+  test_sequence: 8
   run_ui: false
 
 test_plan:
@@ -349,6 +379,8 @@ agent_communication:
     message: "SUBSCRIPTION PAGE & UPGRADE WALL TESTING (testmobile@crewbook.in - free user): ❌ TEST 1 FAIL: Plans NOT at top of /wallet page. Current order: (1) Wallet Balance, (2) Referral section, (3) Coupon input + Plan cards. Plans are at position 3, not at the top as requested. ✅ TEST 2 PASS: Upgrade wall correctly shows WITH navigation sidebar on both /dashboard and /gigs. Sidebar visible with 10 nav items, upgrade wall displays 'Subscription Required' message and 'View Plans & Subscribe' button. PlanGate component working as designed."
   - agent: "testing"
     message: "✅ BOTH FIXES VERIFIED (2/2 tests passed): TEST 1 - Subscription page (/wallet) now shows plans at the TOP: Visual order is (1) Coupon Input, (2) Plan Cards (Basic ₹69, Pro ₹99), (3) Wallet Balance, (4) Referral section. Coupon input box is correctly positioned above plan cards. TEST 2 - Upgrade wall shows navigation sidebar: Dashboard page displays left sidebar (220px width, 11 nav links) alongside 'Subscription Required' upgrade wall content. Both requested fixes are working correctly."
+  - agent: "main"
+    message: "Security & Logic fixes: 1) ratings.py - score range (ge=1,le=5), membership validation (rater+rated must be on same gig), self-rating guard, gig must be completed, 10/min rate limit. 2) admin.py - seed-admin now requires ADMIN_SEED_SECRET env var, password from env, not returned in response. 3) Docker: MongoDB 4.4, pnpm in frontend Dockerfile. 4) CI/CD: .github/workflows/ci.yml for GHCR (ghcr.io/shubhamshirve/crewapp-backend + frontend). 5) PWA: improved sw.js (cache-first for /static/, offline.html fallback), offline.html, better manifest.json. Admin creds: admin@crewbook.in / Admin@123"
   - agent: "testing"
-    message: "✅ QUICK VERIFICATION COMPLETE (5/5 tests passed): 1) Admin user profile gigs fix - GET /api/admin/users/{user_id}/profile correctly returns 'gigs' field (even if empty). Previously was querying wrong field 'lead_id' instead of 'lead_photographer_id'. 2) Profile page load - GET /api/users/{own_user_id} returns HTTP 200 with proper profile data. Both fixes verified working correctly at https://photo-crew-pro.preview.emergentagent.com/api"
+    message: "✅ RATING VALIDATION & ADMIN SEED PROTECTION TESTING COMPLETE (9/9 tests passed): Tested 2 new backend fixes. TEST SUITE 1 - Rating Score Validation (3/3 PASS): punctuality=10 returns 422, punctuality=0 returns 422, non-existent gig returns 404. TEST SUITE 2 - Rating Membership Validation (3/3 PASS): rater not on gig returns 403 'You were not part of this booking', self-rating returns 400 'Cannot rate yourself', non-completed gig returns 400 'Ratings are only allowed after a gig is completed'. TEST SUITE 3 - Admin Seed Endpoint Protection (3/3 PASS): no header returns 403 'Seed endpoint disabled', wrong secret returns 403 'Seed endpoint disabled', endpoint completely locked down. All security and validation fixes are working correctly."
 

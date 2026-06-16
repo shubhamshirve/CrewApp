@@ -1,53 +1,111 @@
-/* CrewBook Service Worker — handles push notifications and basic caching */
+/* CrewBook Service Worker v3 — PWA caching + push notifications */
 
-const CACHE_NAME = "crewbook-v1";
-const STATIC_ASSETS = ["/", "/static/js/bundle.js", "/manifest.json"];
+const CACHE_VERSION = "crewbook-v3";
+const STATIC_CACHE  = `${CACHE_VERSION}-static`;
+const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
-// ── Install ───────────────────────────────────────────────────────────────────
+// Assets to precache on SW install
+const PRECACHE_ASSETS = [
+  "/",
+  "/offline.html",
+  "/manifest.json",
+  "/icon-192.png",
+  "/icon-512.png",
+];
+
+// ── Install ──────────────────────────────────────────────────────────────────────
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch(() => {
-        // Non-fatal — assets may not exist yet during dev
-      });
-    })
+    caches.open(STATIC_CACHE).then((cache) =>
+      cache.addAll(PRECACHE_ASSETS).catch(() => {
+        // Non-fatal — assets may not exist yet in dev
+      })
+    )
   );
 });
 
-// ── Activate ──────────────────────────────────────────────────────────────────
+// ── Activate ────────────────────────────────────────────────────────────────────
 self.addEventListener("activate", (event) => {
+  const KEEP = [STATIC_CACHE, DYNAMIC_CACHE];
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+        Promise.all(keys.filter((k) => !KEEP.includes(k)).map((k) => caches.delete(k)))
       )
       .then(() => self.clients.claim())
   );
 });
 
-// ── Fetch (network-first, cache fallback for navigations) ─────────────────────
+// ── Fetch routing strategy ────────────────────────────────────────────────────────
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  if (event.request.url.includes("/api/")) return; // Never cache API calls
 
-  event.respondWith(
-    fetch(event.request)
-      .then((res) => {
-        if (res && res.status === 200 && event.request.destination === "document") {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
-        }
+  const url = new URL(event.request.url);
+
+  // Never intercept API calls or cross-origin requests
+  if (url.pathname.startsWith("/api/")) return;
+  if (url.origin !== self.location.origin) return;
+
+  // ── Cache-first for CRA static assets (content-hashed → immutable) ─────
+  if (url.pathname.startsWith("/static/")) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(async (cache) => {
+        const hit = await cache.match(event.request);
+        if (hit) return hit;
+        const res = await fetch(event.request);
+        if (res.ok) cache.put(event.request, res.clone());
         return res;
       })
-      .catch(() => caches.match(event.request))
-  );
+    );
+    return;
+  }
+
+  // ── Cache-first for icons / manifest (rarely change) ─────────────────
+  if (
+    url.pathname.endsWith(".png") ||
+    url.pathname.endsWith(".ico") ||
+    url.pathname === "/manifest.json"
+  ) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(async (cache) => {
+        const hit = await cache.match(event.request);
+        if (hit) return hit;
+        const res = await fetch(event.request);
+        if (res.ok) cache.put(event.request, res.clone());
+        return res;
+      })
+    );
+    return;
+  }
+
+  // ── Network-first for HTML navigation; fallback → offline.html ────────
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          if (res.ok) {
+            caches.open(DYNAMIC_CACHE).then((c) => c.put(event.request, res.clone()));
+          }
+          return res;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          return cached || caches.match("/offline.html");
+        })
+    );
+    return;
+  }
 });
 
-// ── Push Notification ─────────────────────────────────────────────────────────
+// ── Push Notification ────────────────────────────────────────────────────────────
 self.addEventListener("push", (event) => {
-  let data = { title: "CrewBook", body: "You have a new notification", url: "/notifications" };
+  let data = {
+    title: "CrewBook",
+    body: "You have a new notification",
+    url: "/notifications",
+  };
 
   if (event.data) {
     try {
@@ -72,15 +130,12 @@ self.addEventListener("push", (event) => {
     ],
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
-// ── Notification Click ────────────────────────────────────────────────────────
+// ── Notification Click ───────────────────────────────────────────────────────────
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-
   if (event.action === "dismiss") return;
 
   const targetUrl = event.notification.data?.url || "/notifications";

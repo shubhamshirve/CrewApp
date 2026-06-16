@@ -5,11 +5,14 @@
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#1C1917",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#0A0A0A",
   "theme_color": "#E05D26",
   "orientation": "portrait-primary",
   "categories": ["business", "productivity"],
   "lang": "en-IN",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",
@@ -41,7 +44,7 @@
       "name": "Gig Board",
       "short_name": "Gigs",
       "description": "Browse available gigs",
-      "url": "/gigboard",
+      "url": "/gig-board",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
@@ -49,6 +52,13 @@
       "short_name": "Home",
       "description": "Your CrewBook dashboard",
       "url": "/dashboard",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Gigs",
+      "short_name": "My Gigs",
+      "description": "Manage your gigs",
+      "url": "/gigs",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],

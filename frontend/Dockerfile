@@ -1,11 +1,14 @@
-# ── Stage 1: Build React app ────────────────────────────────────────────────
+# ── Stage 1: Build React app (pnpm) ────────────────────────────────────────────
 FROM node:20-alpine AS builder
+
+# Enable corepack and activate pnpm
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 WORKDIR /app
 
-# Install dependencies with yarn (frozen lockfile = reproducible builds)
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+# Install dependencies (frozen lockfile = reproducible builds)
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Copy source and build
 COPY . .
@@ -17,7 +20,7 @@ ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL \
     GENERATE_SOURCEMAP=false \
     INLINE_RUNTIME_CHUNK=false
 
-RUN yarn build
+RUN pnpm run build
 
 # ── Stage 2: Serve with Caddy ────────────────────────────────────────────────
 FROM caddy:2-alpine
