@@ -5,6 +5,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.0] — 2025-07-17 — Security Hardening · Docker 4.4 · CI/CD GHCR · PWA v3
+
+### Added
+
+**Security & Logic Fixes**
+- `backend/routers/ratings.py` — **Rating score range validation**: `punctuality`, `gear_handling`, `teamwork` now have `ge=1, le=5` Pydantic field constraints; invalid values return HTTP 422
+- `backend/routers/ratings.py` — **Same-booking membership check**: `submit_rating()` now verifies both the rater and the rated user are actually on the same gig (as lead or accepted freelancer). Previously any authenticated user could rate any user on any gig by knowing the `gig_id`. Returns HTTP 403 if not a member.
+- `backend/routers/ratings.py` — **Self-rating guard**: Returns HTTP 400 when rater == rated user
+- `backend/routers/ratings.py` — **Gig completion check**: Ratings are only accepted after `gig.status == "completed"` (HTTP 400 otherwise)
+- `backend/routers/ratings.py` — **Rate limiting**: 10 requests/minute per user on `POST /api/ratings`
+- `backend/routers/admin.py` — **Seed endpoint protection**: `POST /api/admin/seed-admin` now requires `ADMIN_SEED_SECRET` env var + `X-Seed-Secret` header; endpoint is **completely disabled** (HTTP 403) when env var is unset
+- `backend/routers/admin.py` — Admin default password moved to `ADMIN_DEFAULT_PASSWORD` env var (no longer hardcoded); password no longer returned in the response body
+- `backend/routers/gigs.py` — **90-min buffer for lead**: `add_session()` now validates the 90-minute booking buffer for the lead photographer when adding a new session to an existing gig
+
+**Performance**
+- `backend/routers/ratings.py` — Rating aggregate rewritten with MongoDB `$group + $avg` pipeline; replaces `to_list(1000)` Python-side loop that would scan all ratings on every submit
+
+**Infrastructure — Docker**
+- `docker-compose.yml` — MongoDB version `7.0` → **`4.4`** (tuned for 1 GB VPS); healthcheck updated from `mongosh` → `mongo` shell; memory limits: MongoDB 256 MB · backend 384 MB · frontend 128 MB
+- `frontend/Dockerfile` — Migrated from yarn to **pnpm** via `corepack enable && corepack prepare pnpm@9 --activate`; uses `pnpm install --frozen-lockfile` for reproducible builds
+- `frontend/pnpm-lock.yaml` — Generated from existing `yarn.lock` via `pnpm import`
+- `frontend/.dockerignore` — Updated: excludes `yarn.lock`, keeps `pnpm-lock.yaml`
+- `backend/.env.example` — Comprehensive env var template with inline documentation
+
+**CI/CD — GHCR**
+- `.github/workflows/ci.yml` — GitHub Actions pipeline:
+  - Triggers: push to `main`/`develop`, PR builds to `main`
+  - Builds backend + frontend Docker images in parallel
+  - Pushes to `ghcr.io/shubhamshirve/crewapp-backend` and `ghcr.io/shubhamshirve/crewapp-frontend`
+  - Tags: `latest` (main only), `sha-<short>`, branch name
+  - GitHub Actions cache (`type=gha`) for layer caching
+  - PRs build but do not push (validation only)
+
+**PWA v3**
+- `frontend/public/sw.js` — Service Worker rewritten (v3):
+  - Cache-first for `/static/*` (CRA content-hashed assets — immutable)
+  - Cache-first for icons + manifest
+  - Network-first for SPA navigation with `offline.html` fallback
+  - Old cache cleanup on `activate` event
+  - Proper `skipWaiting()` + `clients.claim()` for instant takeover
+- `frontend/public/offline.html` — New dark-themed offline fallback page matching app brand
+- `frontend/public/manifest.json` — Added `display_override: ["window-controls-overlay", ...]`, third shortcut (My Gigs), fixed gig-board URL
+- `frontend/public/index.html` — `apple-mobile-web-app-status-bar-style` → `black-translucent`; added `msapplication-TileColor` + `msapplication-TileImage` meta tags
+
+**Developer Experience**
+- `scripts/seed_data.py` — Inserts realistic demo data: 6 users (admin + 5 crew), 2 plans, 2 gigs (1 completed with ratings, 1 active), invites, connections, coupons, chat messages, notifications. Fully idempotent (skips existing records). Works locally and inside Docker.
+- `scripts/reset_db.py` — Drops all 30 collections with confirmation prompt. Supports `--yes`, `--seed`, `--collections`, `--list` flags. Calls `seed_data.py` when `--seed` is passed.
+- `Makefile` — Developer convenience targets: `make up/down/logs/build`, `make seed/reset/reset-seed`, `make health`, `make test-backend/lint-backend/lint-frontend`
+- `README.md` — Fully rewritten for GitHub: feature table, tech stack, quick start, scripts docs, env var reference table, CI/CD section, ASCII architecture diagram, project structure tree
+
+---
+
 ## [1.8] — 2026-03-29 — Light, Minimal, Rounded UI Overhaul
 
 ### Changed

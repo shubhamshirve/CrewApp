@@ -491,13 +491,28 @@ async def delete_gig(gig_id: str, current_user: dict = Depends(get_current_user)
 
 @router.post("/{gig_id}/sessions")
 async def add_session(gig_id: str, data: GigSession, current_user: dict = Depends(get_current_user)):
-    """Add a new session to an existing gig."""
+    """Add a new session to an existing gig.
+    Validates the 90-min buffer for the lead photographer's existing bookings.
+    """
     db = get_db()
     gig = await db.gigs.find_one({"_id": gig_id})
     if not gig:
         raise HTTPException(status_code=404, detail="Gig not found")
     if gig["lead_photographer_id"] != current_user["id"]:
         raise HTTPException(status_code=403, detail="Only the lead photographer can add sessions")
+
+    # ── 90-min buffer check for the lead ──────────────────────────────────────
+    conflict = await _check_90min_buffer(
+        db,
+        current_user["id"],
+        data.date,
+        data.start_time,
+        data.end_time,
+        gig_id,          # exclude current gig from conflict check
+    )
+    if conflict:
+        raise HTTPException(status_code=409, detail=conflict)
+
     new_session = {"id": str(uuid.uuid4()), **data.model_dump()}
     await db.gigs.update_one(
         {"_id": gig_id},

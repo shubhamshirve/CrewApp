@@ -175,13 +175,23 @@ async def submit_rating(request: Request, data: RatingSubmit, current_user: dict
     }
     await db.ratings.insert_one(rating_doc)
 
-    # Update user's aggregate rating
-    all_ratings = await db.ratings.find({"rated_user_id": data.rated_user_id}).to_list(1000)
-    if all_ratings:
-        total_avg = round(sum(r["avg_score"] for r in all_ratings) / len(all_ratings), 2)
+    # ── Aggregate avg_rating via MongoDB pipeline (efficient, no to_list scan) ──
+    pipeline = [
+        {"$match": {"rated_user_id": data.rated_user_id}},
+        {"$group": {
+            "_id": "$rated_user_id",
+            "avg_rating":    {"$avg": "$avg_score"},
+            "total_ratings": {"$sum": 1},
+        }},
+    ]
+    agg = await db.ratings.aggregate(pipeline).to_list(1)
+    if agg:
         await db.users.update_one(
             {"_id": data.rated_user_id},
-            {"$set": {"avg_rating": total_avg, "total_ratings": len(all_ratings)}}
+            {"$set": {
+                "avg_rating":    round(agg[0]["avg_rating"], 2),
+                "total_ratings": agg[0]["total_ratings"],
+            }},
         )
     return {"message": "Rating submitted", "avg_score": avg}
 

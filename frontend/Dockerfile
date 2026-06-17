@@ -1,7 +1,9 @@
 # ── Stage 1: Build React app (pnpm) ────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
-# Enable corepack and activate pnpm
+# Enable corepack and activate pnpm.
+# Note: The dev server uses yarn; packageManager field is NOT set in package.json
+# to avoid breaking yarn 1.x. This Dockerfile handles pnpm explicitly.
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
 WORKDIR /app
