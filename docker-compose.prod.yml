@@ -8,9 +8,14 @@
 
 services:
   backend:
-    # Remove host port binding — backend is only accessed by frontend via Docker internal DNS
-    ports: []
+    # Compose v2.24+ "reset" tag: clears the inherited `ports` list so the
+    # backend container is reachable only via the Docker network (not the host).
+    # Older Compose versions silently treat `ports: []` as a merge-no-op, leaving
+    # 8001 exposed on the host — using !reset makes the intent explicit and
+    # actually drops the port binding.
+    ports: !reset null
 
   frontend:
-    ports:
-      - "127.0.0.1:3000:80"   # localhost-only bind; host Caddy proxies app.photoo.in here
+    # Same reset, then re-declare the host bind we *do* want (localhost only).
+    ports: !reset
+      - "127.0.0.1:3000:80"
