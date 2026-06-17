@@ -230,6 +230,19 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - [ ] Event workspace: photo upload for mood boards
 - [ ] Mobile app (React Native)
 - [ ] Referral leaderboard
+- [ ] No-Show penalty (30-day suspension) — explicitly deferred by user
+
+### Deployment & Infrastructure (Done — Feb 2026)
+- ✅ MongoDB downgraded to 4.4 (1 GB VPS memory constraint)
+- ✅ Frontend build switched to **pnpm 9** (corepack)
+- ✅ Frontend served by **Caddy** (replaces nginx) — gzip + SPA fallback
+- ✅ PWA support — `manifest.json`, `sw.js`, offline page, `InstallAppButton`
+- ✅ CI/CD via GitHub Actions → GHCR (`.github/workflows/ci.yml`)
+- ✅ DB helper scripts: `scripts/seed_data.py`, `scripts/reset_db.py`
+- ✅ **Unified multi-app VPS deploy** (`deploy/deploy.sh`) — non-destructive co-hosting of CrewBook (`crew.mmpf.in`) + JVSapp (`app.mmpf.in`) on `45.196.196.114`:
+  - Host Caddy terminates TLS for both domains
+  - JVSapp port re-mapping via `docker-compose.override.yml` with `!override` tag (no edits to JVSapp's repo files)
+  - Trivial decommission path when either app moves to a dedicated server (just delete the override + Caddy block)
 
 ## Environment Notes
 - Backend: PORT 8001, MongoDB via MONGO_URL

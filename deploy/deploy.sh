@@ -1,62 +1,70 @@
 #!/usr/bin/env bash
 # =============================================================================
-# CrewBook — Production Deployment Script
-# Repo:   https://github.com/shubhamshirve/CrewApp
-# Domain: crew.mmpf.in
-# VPS:    45.196.196.114 (root)
+# CrewBook + JVSapp — Unified VPS Deployment Script
 #
-# What this script does:
-#   1. Installs Caddy on the VPS host (if not already installed)
-#   2. Patches /opt/jvsapp so it no longer owns port 80/443
-#      (moves it to localhost:8080 — app.mmpf.in still works via host Caddy)
-#   3. Clones/updates CrewBook to /opt/crewbook
-#   4. Creates backend/.env with a generated JWT_SECRET
-#   5. Builds and starts Docker Compose (prod profile)
-#   6. Installs the unified Caddy config and reloads Caddy
-#   7. Optionally seeds demo data
+# What this script does (idempotent, re-runnable):
+#   1.  Installs Caddy on the host (if missing)
+#   2.  Clones / updates JVSapp at  /opt/jvsapp
+#   3.  Clones / updates CrewBook at /opt/crewbook
+#   4.  Creates a NON-DESTRUCTIVE docker-compose.override.yml inside JVSapp
+#       that remaps host 80→8080 and 443→8443 (so host Caddy can own 80/443).
+#       JVSapp's own files are NEVER edited — the override is a separate file
+#       that can be deleted to restore single-server defaults.
+#   5.  Generates CrewBook backend/.env with random JWT_SECRET + ADMIN_SEED_SECRET
+#   6.  Builds + starts both stacks with Docker Compose
+#   7.  Writes a fresh /etc/caddy/Caddyfile that terminates TLS for both:
+#         crew.mmpf.in  → 127.0.0.1:3000  (CrewBook frontend)
+#         app.mmpf.in   → 127.0.0.1:8080  (JVSapp)
+#   8.  Validates + reloads Caddy
 #
-# Usage:
-#   scp deploy/deploy.sh root@45.196.196.114:/tmp/
-#   ssh root@45.196.196.114 "bash /tmp/deploy.sh"
+# Run on the VPS as root:
+#     curl -fsSL https://raw.githubusercontent.com/shubhamshirve/CrewApp/main/deploy/deploy.sh -o /tmp/deploy.sh
+#     bash /tmp/deploy.sh
 #
-# Or one-liner from the VPS:
-#   curl -sSL https://raw.githubusercontent.com/shubhamshirve/CrewApp/main/deploy/deploy.sh | bash
+# Re-running is safe — every step checks before acting.
 # =============================================================================
 
 set -euo pipefail
 
 # ── Config ──────────────────────────────────────────────────────────────────
-REPO="https://github.com/shubhamshirve/CrewApp.git"
-DEPLOY_DIR="/opt/crewbook"
-JVSAPP_DIR="/opt/jvsapp"
+CREW_REPO="https://github.com/shubhamshirve/CrewApp.git"
+JVS_REPO="https://github.com/shubhamshirve/JVSapp.git"
+CREW_DIR="/opt/crewbook"
+JVS_DIR="/opt/jvsapp"
 CREW_DOMAIN="crew.mmpf.in"
 JVS_DOMAIN="app.mmpf.in"
 CADDY_CONF="/etc/caddy/Caddyfile"
 
 # ── Colours ─────────────────────────────────────────────────────────────────
 GREEN="\033[92m"; YELLOW="\033[93m"; CYAN="\033[96m"; RED="\033[91m"; BOLD="\033[1m"; RESET="\033[0m"
-ok()   { echo -e "  ${GREEN}✓${RESET}  $*"; }
-info() { echo -e "  ${CYAN}→${RESET}  $*"; }
-warn() { echo -e "  ${YELLOW}⚠${RESET}  $*"; }
-err()  { echo -e "  ${RED}✗${RESET}  $*"; }
+ok()   { echo -e "  ${GREEN}OK${RESET}    $*"; }
+info() { echo -e "  ${CYAN}->${RESET}    $*"; }
+warn() { echo -e "  ${YELLOW}WARN${RESET}  $*"; }
+err()  { echo -e "  ${RED}FAIL${RESET}  $*"; }
 step() { echo -e "\n${BOLD}${CYAN}── $* ${RESET}"; }
 
 # ── Root check ──────────────────────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then err "Run as root (sudo or su -)"; exit 1; fi
 
-echo -e "\n${BOLD}${CYAN}╔══════════════════════════════════════════════════╗${RESET}"
-echo -e "${BOLD}${CYAN}║  CrewBook — Production Deployment               ║${RESET}"
-echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════╝${RESET}"
-echo -e "  Domain:  ${BOLD}${CREW_DOMAIN}${RESET}"
-echo -e "  Dir:     ${BOLD}${DEPLOY_DIR}${RESET}"
+echo -e "\n${BOLD}${CYAN}=================================================${RESET}"
+echo -e "${BOLD}${CYAN} CrewBook + JVSapp  —  Unified VPS Deployment    ${RESET}"
+echo -e "${BOLD}${CYAN}=================================================${RESET}"
+echo -e "  Host Caddy domains:"
+echo -e "    ${BOLD}${CREW_DOMAIN}${RESET} -> 127.0.0.1:3000  (CrewBook)"
+echo -e "    ${BOLD}${JVS_DOMAIN}${RESET}  -> 127.0.0.1:8080  (JVSapp)"
+
+# Ensure prerequisites
+command -v git    >/dev/null || { apt-get update -qq && apt-get install -y git; }
+command -v docker >/dev/null || { err "Docker is required but not installed. Aborting."; exit 1; }
+command -v python3 >/dev/null || { apt-get install -y python3; }
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 1/7 — Install Caddy on host"
+step "Step 1/8  Install Caddy (host)"
 # ─────────────────────────────────────────────────────────────────────────────
 if command -v caddy &>/dev/null; then
-    ok "Caddy already installed: $(caddy version)"
+    ok "Caddy already installed: $(caddy version | head -n1)"
 else
-    info "Installing Caddy via official apt repo…"
+    info "Installing Caddy via official apt repo..."
     apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl gnupg lsb-release
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
         | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
@@ -64,209 +72,306 @@ else
         | tee /etc/apt/sources.list.d/caddy-stable.list
     apt-get update -qq && apt-get install -y caddy
     systemctl enable caddy
-    ok "Caddy installed: $(caddy version)"
+    ok "Caddy installed: $(caddy version | head -n1)"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 2/7 — Migrate jvsapp to port 8080 (free up port 80)"
+step "Step 2/8  Clone / update JVSapp"
 # ─────────────────────────────────────────────────────────────────────────────
-if [ ! -d "$JVSAPP_DIR" ]; then
-    warn "$JVSAPP_DIR not found — skipping jvsapp migration"
+if [ -d "$JVS_DIR/.git" ]; then
+    info "Pulling latest in $JVS_DIR"
+    git -C "$JVS_DIR" pull --rebase --autostash
+    ok "JVSapp updated"
 else
-    cd "$JVSAPP_DIR"
+    info "Cloning $JVS_REPO -> $JVS_DIR"
+    git clone "$JVS_REPO" "$JVS_DIR"
+    ok "JVSapp cloned"
+fi
 
-    # Determine which compose file is active
-    COMPOSE_FILE="docker-compose.yml"
-    [ -f docker-compose.prod.yml ] && COMPOSE_FILE="docker-compose.yml -f docker-compose.prod.yml"
+# ─────────────────────────────────────────────────────────────────────────────
+step "Step 3/8  Generate docker-compose.override.yml for JVSapp (non-destructive)"
+# Compose merges this with the repo's docker-compose.yml at runtime; deleting
+# the override restores the original (host 80/443) single-server behaviour.
+# ─────────────────────────────────────────────────────────────────────────────
+cd "$JVS_DIR"
 
-    # Back up before modifying
-    cp docker-compose.yml docker-compose.yml.bak
-    ok "Backup: ${JVSAPP_DIR}/docker-compose.yml.bak"
+# Stop any currently-running JVSapp containers before rewriting ports
+if docker compose ps -q 2>/dev/null | grep -q . ; then
+    info "Stopping existing JVSapp containers..."
+    docker compose down --remove-orphans 2>/dev/null || true
+fi
 
-    # Replace any "80:80" or "0.0.0.0:80:80" with "127.0.0.1:8080:80"
-    # Also handle "443:443" → remove (host Caddy does TLS now)
-    python3 - <<'PYEOF'
-import re, sys
-with open("docker-compose.yml") as f:
-    content = f.read()
-# Port 80 → 8080 (localhost bind)
-content = re.sub(r'["\']?(?:0\.0\.0\.0:|\*:)?80:80["\']?', '"127.0.0.1:8080:80"', content)
-# Remove 443:443 (host Caddy handles TLS)
-content = re.sub(r'\s*-\s*["\']?(?:0\.0\.0\.0:|\*:)?443:443["\']?\n?', '\n', content)
-with open("docker-compose.yml", "w") as f:
-    f.write(content)
-print("  docker-compose.yml patched")
+# Make sure PyYAML is available for the generator
+python3 -c "import yaml" 2>/dev/null || pip3 install --quiet --break-system-packages pyyaml 2>/dev/null || apt-get install -y python3-yaml
+
+python3 - <<'PYEOF'
+import yaml, os, sys
+
+src = "docker-compose.yml"
+if not os.path.exists(src):
+    print(f"  {src} not found in {os.getcwd()} — skipping override generation")
+    sys.exit(0)
+
+with open(src) as f:
+    data = yaml.safe_load(f) or {}
+
+services = data.get("services") or {}
+to_remap = {}  # service_name -> [new port strings]
+
+def remap_port(ps):
+    """Return (new_port_str, did_remap)."""
+    parts = ps.split(":")
+    if len(parts) == 2:
+        host, cont = parts
+    elif len(parts) == 3:
+        _, host, cont = parts
+    elif len(parts) == 1:
+        host = cont = parts[0]
+    else:
+        return ps, False
+    if host == "80":
+        return f"127.0.0.1:8080:{cont}", True
+    if host == "443":
+        return f"127.0.0.1:8443:{cont}", True
+    return ps, False
+
+for name, svc in services.items():
+    if not isinstance(svc, dict):
+        continue
+    raw_ports = svc.get("ports") or []
+    new_ports = []
+    remapped = False
+    for p in raw_ports:
+        if isinstance(p, dict):
+            # long-form port mapping
+            hp = str(p.get("published", ""))
+            cp = str(p.get("target", ""))
+            if hp == "80":
+                new_ports.append(f"127.0.0.1:8080:{cp}")
+                remapped = True
+            elif hp == "443":
+                new_ports.append(f"127.0.0.1:8443:{cp}")
+                remapped = True
+            else:
+                new_ports.append(p)
+        else:
+            ps = str(p).strip()
+            new_p, did = remap_port(ps)
+            new_ports.append(new_p)
+            if did:
+                remapped = True
+    if remapped:
+        to_remap[name] = new_ports
+
+if not to_remap:
+    print("  No service binds host 80/443 in JVSapp — no override needed.")
+    # If a stale override exists from a previous run, leave it alone (idempotent).
+    sys.exit(0)
+
+header = [
+    "# AUTO-GENERATED by CrewBook deploy.sh",
+    "# Purpose:  free host ports 80 + 443 so the host Caddy can terminate TLS",
+    "#           for both crew.mmpf.in and app.mmpf.in.",
+    "# Safe to delete this file later if JVSapp is moved to its own server —",
+    "# the original docker-compose.yml will then take over 80/443 again.",
+    "#",
+    "# Requires Docker Compose v2.24+ for the !override tag (Jan 2024).",
+    "",
+    "services:",
+]
+body = []
+for svc, ports in to_remap.items():
+    body.append(f"  {svc}:")
+    body.append("    ports: !override")
+    for p in ports:
+        body.append(f'      - "{p}"')
+
+with open("docker-compose.override.yml", "w") as f:
+    f.write("\n".join(header + body) + "\n")
+
+print(f"  Wrote docker-compose.override.yml — remapped services: {list(to_remap.keys())}")
 PYEOF
 
-    ok "jvsapp docker-compose.yml updated (80:80 → 127.0.0.1:8080:80)"
+ok "JVSapp override file ready (host 80->8080, 443->8443; original compose untouched)"
 
-    # Restart jvsapp on new port
-    info "Restarting jvsapp containers…"
-    docker compose -f docker-compose.yml down --remove-orphans 2>/dev/null || true
-    docker compose -f docker-compose.yml up -d
-    ok "jvsapp restarted on localhost:8080"
+# Verify the user has a Compose version that supports !override (2.24+)
+COMPOSE_VER=$(docker compose version --short 2>/dev/null || echo "0.0.0")
+MAJOR=$(echo "$COMPOSE_VER" | cut -d. -f1)
+MINOR=$(echo "$COMPOSE_VER" | cut -d. -f2)
+if [ "${MAJOR:-0}" -lt 2 ] || { [ "${MAJOR:-0}" -eq 2 ] && [ "${MINOR:-0}" -lt 24 ]; }; then
+    warn "Docker Compose $COMPOSE_VER may not support the !override tag (need >= 2.24)."
+    warn "If 'docker compose up' fails, upgrade Docker, or remove the override and"
+    warn "manually edit JVSapp's docker-compose.yml to bind ports 8080/8443."
 fi
 
+info "Starting JVSapp on 127.0.0.1:8080 + 127.0.0.1:8443 ..."
+docker compose up -d
+ok "JVSapp running"
+
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 3/7 — Clone / update CrewBook repository"
+step "Step 4/8  Clone / update CrewBook"
 # ─────────────────────────────────────────────────────────────────────────────
-if [ -d "$DEPLOY_DIR/.git" ]; then
-    info "Updating existing clone in $DEPLOY_DIR…"
-    cd "$DEPLOY_DIR" && git pull --rebase
-    ok "Repository updated"
+if [ -d "$CREW_DIR/.git" ]; then
+    info "Pulling latest in $CREW_DIR"
+    git -C "$CREW_DIR" pull --rebase --autostash
+    ok "CrewBook updated"
 else
-    info "Cloning from $REPO…"
-    git clone "$REPO" "$DEPLOY_DIR"
-    ok "Cloned to $DEPLOY_DIR"
+    info "Cloning $CREW_REPO -> $CREW_DIR"
+    git clone "$CREW_REPO" "$CREW_DIR"
+    ok "CrewBook cloned"
 fi
-cd "$DEPLOY_DIR"
+cd "$CREW_DIR"
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 4/7 — Create backend/.env (production)"
+step "Step 5/8  Generate CrewBook backend/.env"
 # ─────────────────────────────────────────────────────────────────────────────
 if [ -f backend/.env ]; then
-    warn "backend/.env already exists — leaving it untouched"
-    warn "If you need to re-generate secrets, delete it and re-run this script"
+    warn "backend/.env already exists — leaving it untouched."
+    warn "Delete it and re-run this script to regenerate secrets."
 else
     JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
     SEED_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
 
     cat > backend/.env <<ENVEOF
-# Auto-generated by deploy.sh on $(date -u +"%Y-%m-%d %H:%M UTC")
-# Review and update before production traffic
-
+# Auto-generated by deploy.sh on $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 MONGO_URL=mongodb://mongodb:27017
 DB_NAME=crewbook_db
 JWT_SECRET=${JWT_SECRET}
 ENV=production
-
-# CORS — only allow your production domain
 CORS_ORIGINS=https://${CREW_DOMAIN}
-
-# Admin seed endpoint (keep this safe)
 ADMIN_SEED_SECRET=${SEED_SECRET}
 ADMIN_DEFAULT_PASSWORD=Admin@123
-
-# Uploads
 UPLOADS_DIR=/app/uploads
 
-# ── Fill in the rest manually ────────────────────────────────────────────
-# RAZORPAY_KEY_ID=rzp_live_xxxx
-# RAZORPAY_KEY_SECRET=xxxx
-# EMERGENT_LLM_KEY=sk-emergent-xxxx
-# RESEND_API_KEY=re_xxxx
+# Optional integrations — fill in before going live:
+# RAZORPAY_KEY_ID=
+# RAZORPAY_KEY_SECRET=
+# EMERGENT_LLM_KEY=
+# RESEND_API_KEY=
 # VAPID_PUBLIC_KEY=
 # VAPID_PRIVATE_KEY=
-# VAPID_CONTACT_EMAIL=admin@crewbook.in
+# VAPID_CONTACT_EMAIL=admin@${CREW_DOMAIN}
 ENVEOF
-
-    ok "backend/.env created with generated JWT_SECRET + ADMIN_SEED_SECRET"
-    warn "Edit ${DEPLOY_DIR}/backend/.env to add RAZORPAY and other keys"
+    ok "Wrote backend/.env (JWT_SECRET + ADMIN_SEED_SECRET generated)"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 5/7 — Build and start CrewBook containers"
+step "Step 6/8  Build + start CrewBook stack"
 # ─────────────────────────────────────────────────────────────────────────────
-cd "$DEPLOY_DIR"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-ok "CrewBook containers started"
+ok "CrewBook containers up"
 
-# Brief wait for backend health check
-info "Waiting for backend to become healthy (up to 60s)…"
+info "Waiting for backend health (up to 60s)..."
 for i in $(seq 1 12); do
     sleep 5
     STATUS=$(docker inspect --format='{{.State.Health.Status}}' crewbook-backend 2>/dev/null || echo "unknown")
-    if [ "$STATUS" = "healthy" ]; then
-        ok "Backend is healthy"
-        break
-    fi
-    info "  Still waiting… ($((i*5))s) [status: $STATUS]"
+    if [ "$STATUS" = "healthy" ]; then ok "Backend healthy"; break; fi
+    info "  still waiting ($((i*5))s)  [status: $STATUS]"
 done
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 6/7 — Install host Caddy config (both domains)"
+step "Step 7/8  Write host Caddyfile (fresh, both domains)"
 # ─────────────────────────────────────────────────────────────────────────────
-# Stop old Caddy service so we don't leave stale config
-systemctl stop caddy 2>/dev/null || true
-
-# Back up existing Caddyfile if present
+mkdir -p /etc/caddy
 if [ -f "$CADDY_CONF" ]; then
-    cp "$CADDY_CONF" "${CADDY_CONF}.bak.$(date +%Y%m%d%H%M%S)"
-    ok "Backed up existing Caddyfile → ${CADDY_CONF}.bak.*"
+    BAK="${CADDY_CONF}.bak.$(date +%Y%m%d%H%M%S)"
+    cp "$CADDY_CONF" "$BAK"
+    ok "Existing Caddyfile backed up -> $BAK"
 fi
 
 cat > "$CADDY_CONF" <<CADDYEOF
 # /etc/caddy/Caddyfile
-# Auto-provisioned HTTPS for both apps on $(hostname)
-# Generated by CrewBook deploy.sh on $(date -u +"%Y-%m-%d %H:%M UTC")
+# Generated by CrewBook deploy.sh on $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+#
+# This single host Caddy terminates TLS for BOTH apps while they share a VPS.
+# When either app moves to its own server later, just remove its block from
+# this file (or replace this file with the original) — no app code changes needed.
 
-# ── Existing Jivdani app ─────────────────────────────────────────────────────
-${JVS_DOMAIN} {
-    encode gzip zstd
-    reverse_proxy localhost:8080 {
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
+# Global options — auto-HTTPS via Let's Encrypt
+{
+    # Replace with a real email for ACME notices when ready:
+    # email admin@mmpf.in
+    admin off
 }
 
-# ── CrewBook ─────────────────────────────────────────────────────────────────
+# ── CrewBook ────────────────────────────────────────────────────────────────
 ${CREW_DOMAIN} {
     encode gzip zstd
-    reverse_proxy localhost:3000 {
+    reverse_proxy 127.0.0.1:3000 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
-        # Long timeout for AI endpoints and file uploads
         transport http {
-            read_timeout 120s
+            read_timeout  120s
             write_timeout 120s
         }
     }
 }
+
+# ── JVSapp ──────────────────────────────────────────────────────────────────
+${JVS_DOMAIN} {
+    encode gzip zstd
+    reverse_proxy 127.0.0.1:8080 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
 CADDYEOF
+ok "Caddyfile written -> $CADDY_CONF"
 
-ok "Caddy config written to $CADDY_CONF"
+info "Validating Caddyfile..."
+caddy validate --config "$CADDY_CONF" --adapter caddyfile
 
-# Validate and start Caddy
-caddy validate --config "$CADDY_CONF"
-systemctl start caddy && systemctl enable caddy
-ok "Caddy started and enabled"
+# Ensure no other container is holding 80/443
+if ss -tlnp 2>/dev/null | grep -E ':(80|443)\s' | grep -v caddy >/dev/null; then
+    warn "Something other than Caddy is listening on 80 or 443:"
+    ss -tlnp | grep -E ':(80|443)\s' || true
+    warn "You may need to stop that service before Caddy can bind 80/443."
+fi
+
+systemctl enable caddy
+systemctl restart caddy
+ok "Host Caddy restarted"
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 7/7 — Final health check"
+step "Step 8/8  Final health check"
 # ─────────────────────────────────────────────────────────────────────────────
-sleep 5
+sleep 4
+echo ""
+info "Running containers:"
+docker ps --format "  {{.Names}}\t{{.Status}}" || true
 
 echo ""
-info "Container status:"
-docker ps --format "  {{.Names}}\t{{.Status}}" | grep -E "crewbook|mongodb" || true
+info "Caddy:"
+systemctl is-active caddy >/dev/null && ok "caddy active" || warn "caddy not active — journalctl -u caddy -n 50"
 
 echo ""
-info "Caddy status:"
-systemctl is-active caddy && echo "  Caddy is running" || echo "  Caddy is NOT running — check: journalctl -u caddy -n 30"
+info "Local probes:"
+curl -fsS -o /dev/null -w "  127.0.0.1:3000  -> HTTP %{http_code}\n" http://127.0.0.1:3000  || warn "127.0.0.1:3000 down"
+curl -fsS -o /dev/null -w "  127.0.0.1:8080  -> HTTP %{http_code}\n" http://127.0.0.1:8080  || warn "127.0.0.1:8080 down"
 
 echo ""
-info "Quick endpoint check:"
-curl -sf http://localhost:3000 -o /dev/null && ok "localhost:3000 responds" || warn "localhost:3000 not responding yet"
-curl -sf http://localhost:8080 -o /dev/null && ok "localhost:8080 (jvsapp) responds" || warn "localhost:8080 not responding"
-
+echo -e "${BOLD}${GREEN}=================================================${RESET}"
+echo -e "${BOLD}${GREEN} Deployment complete                              ${RESET}"
+echo -e "${BOLD}${GREEN}=================================================${RESET}"
+echo -e "  CrewBook:  ${BOLD}https://${CREW_DOMAIN}${RESET}"
+echo -e "  JVSapp:    ${BOLD}https://${JVS_DOMAIN}${RESET}"
 echo ""
-echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════╗${RESET}"
-echo -e "${BOLD}${GREEN}║  ✓  Deployment complete!                        ║${RESET}"
-echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════╝${RESET}"
+echo -e "  ${YELLOW}Next steps:${RESET}"
+echo -e "  1. Verify DNS A records resolve to this VPS for both domains."
+echo -e "  2. (Optional) Edit ${CADDY_CONF} and uncomment 'email admin@mmpf.in'"
+echo -e "     for ACME notices, then 'systemctl reload caddy'."
+echo -e "  3. Seed CrewBook demo data:"
+echo -e "       cd ${CREW_DIR} && docker compose exec backend python /app/scripts/seed_data.py"
+echo -e "  4. Add Razorpay / EMERGENT_LLM_KEY in ${CREW_DIR}/backend/.env, then:"
+echo -e "       cd ${CREW_DIR} && docker compose -f docker-compose.yml -f docker-compose.prod.yml restart backend"
 echo ""
-echo -e "  ${CYAN}→${RESET} CrewBook: ${BOLD}https://${CREW_DOMAIN}${RESET}"
-echo -e "  ${CYAN}→${RESET} Jivdani:  ${BOLD}https://${JVS_DOMAIN}${RESET}"
-echo ""
-echo -e "  ${YELLOW}Optional next steps:${RESET}"
-echo -e "  1. Seed demo data:"
-echo -e "     cd ${DEPLOY_DIR} && docker compose exec backend python /app/scripts/seed_data.py"
-echo -e "  2. Add RAZORPAY / EMERGENT_LLM_KEY to ${DEPLOY_DIR}/backend/.env then restart:"
-echo -e "     cd ${DEPLOY_DIR} && docker compose -f docker-compose.yml -f docker-compose.prod.yml restart backend"
-echo -e "  3. Check logs:"
-echo -e "     docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f"
+echo -e "  ${YELLOW}To restore JVSapp's single-server setup later:${RESET}"
+echo -e "     rm ${JVS_DIR}/docker-compose.override.yml"
+echo -e "     cd ${JVS_DIR} && docker compose up -d"
+echo -e "     (then point app.mmpf.in DNS at the new server)"
 echo ""
