@@ -1,8 +1,12 @@
 # Photoo + JVSapp — Unified VPS Deployment Guide
 
 **VPS:** `45.196.196.114` (root)
-**Photoo:** `https://photoo.in`
+**Photoo:** `https://app.photoo.in`
 **JVSapp:**   `https://app.mmpf.in`
+
+> 📘 **Looking for a deeper operational reference?**
+> See **[`HOSTING.md`](./HOSTING.md)** — covers the dual-app architecture, port allocation,
+> day-2 ops, backups, and how to split the apps across two VPSes later.
 
 > **Why a single deploy script?**
 > Both apps will live on this VPS for the next 2–3 months, then move to dedicated servers.
@@ -18,7 +22,7 @@
 - [x] Root SSH access to the VPS
 - [x] Docker + Docker Compose ≥ 2.24 installed (already present per user)
 - [x] DNS A records:
-  - `photoo.in` → `45.196.196.114`
+  - `app.photoo.in` → `45.196.196.114`
   - `app.mmpf.in`  → `45.196.196.114`
 - [x] Both repos public:
   - `https://github.com/shubhamshirve/CrewApp`
@@ -61,7 +65,7 @@ The script is **idempotent** — safe to re-run after fixes / updates.
                                                      ▼
                                         ┌────────────────────────┐
                                         │  Host Caddy  :80 :443  │  /etc/caddy/Caddyfile
-                                        │  photoo.in → :3000  │
+                                        │  app.photoo.in → :3000  │
                                         │  app.mmpf.in  → :8080  │
                                         └───────┬────────────┬───┘
                                                 │            │
@@ -149,7 +153,7 @@ docker compose up -d                          # works exactly as designed in the
 # On the new VPS, use the standard Photoo flow:
 git clone https://github.com/shubhamshirve/CrewApp.git /opt/photoo && cd /opt/photoo
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-# Then either deploy a dedicated Caddy with just the photoo.in block,
+# Then either deploy a dedicated Caddy with just the app.photoo.in block,
 # or let the frontend container's internal Caddy own :80 / :443.
 ```
 
@@ -180,9 +184,9 @@ caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
 | Symptom | Probable cause | Fix |
 |---|---|---|
 | `caddy: bind: address already in use` on :80/:443 | JVSapp container still binding host 80 | Confirm `/opt/jvsapp/docker-compose.override.yml` exists; `cd /opt/jvsapp && docker compose up -d --force-recreate` |
-| TLS cert not issued | DNS not yet propagated | `dig +short photoo.in app.mmpf.in` — both must return `45.196.196.114` |
+| TLS cert not issued | DNS not yet propagated | `dig +short app.photoo.in app.mmpf.in` — both must return `45.196.196.114` |
 | `502 Bad Gateway` from Caddy | Backing container down | `docker ps` — restart the failing service |
-| Photoo frontend loads, `/api/*` fails | CORS mismatch | Ensure `CORS_ORIGINS=https://photoo.in` in `/opt/photoo/backend/.env`, then restart backend |
+| Photoo frontend loads, `/api/*` fails | CORS mismatch | Ensure `CORS_ORIGINS=https://app.photoo.in` in `/opt/photoo/backend/.env`, then restart backend |
 | Compose error `unknown tag !override` | Docker Compose < 2.24 | Upgrade Docker, or hand-edit JVSapp's compose to bind 8080/8443 directly |
 | Need to undo everything | — | `rm /opt/jvsapp/docker-compose.override.yml && cd /opt/jvsapp && docker compose up -d`; restore old Caddyfile from `/etc/caddy/Caddyfile.bak.*` |
 
@@ -196,5 +200,5 @@ caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
 - [x] JVSapp now bound to `127.0.0.1:8080`/`8443` only — host Caddy fronts it
 - [x] `JWT_SECRET` is 64-char hex (auto-generated)
 - [x] Admin seed endpoint requires `ADMIN_SEED_SECRET` header
-- [x] CORS restricted to `https://photoo.in`
+- [x] CORS restricted to `https://app.photoo.in`
 - [ ] **TODO on VPS:** `ufw allow 22,80,443/tcp && ufw enable`

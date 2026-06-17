@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 # ── Stage 1: Build React app (pnpm) ────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
@@ -6,11 +7,20 @@ FROM node:20-alpine AS builder
 # to avoid breaking yarn 1.x. This Dockerfile handles pnpm explicitly.
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
+# pnpm stores its content-addressable package store at this path. Mounting it
+# as a BuildKit cache makes every subsequent build skip the network entirely —
+# `pnpm install` finishes in seconds when nothing in pnpm-lock.yaml changed.
+ENV PNPM_HOME="/pnpm" \
+    PATH="/pnpm:$PATH"
+
 WORKDIR /app
 
-# Install dependencies (frozen lockfile = reproducible builds)
+# Install dependencies with a persistent cache mount (BuildKit feature).
+# `id=pnpm-store` lets multiple projects on the same builder share the cache.
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --frozen-lockfile
 
 # Copy source and build
 COPY . .

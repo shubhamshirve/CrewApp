@@ -233,7 +233,10 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - [ ] No-Show penalty (30-day suspension) — explicitly deferred by user
 
 ### Deployment & Infrastructure (Done — Feb 2026)
-- ✅ **App rebrand: CrewBook → Photoo** — display name, identifiers, container/volume names, DB name (`photoo_db`), domain (`photoo.in`), admin email (`admin@photoo.in`), logo letter (P), Caddyfile, all 49 source files. GitHub repo URL kept as `shubhamshirve/CrewApp` per user. Deploy script now auto-migrates legacy `crewbook_*` Docker volumes → `photoo_*` on first run.
+- ✅ **App rebrand: CrewBook → Photoo** — display name, identifiers, container/volume names, DB name (`photoo_db`), domain (`app.photoo.in`), admin email (`admin@photoo.in`), logo letter (P), Caddyfile, all 49 source files. GitHub repo URL kept as `shubhamshirve/CrewApp` per user. Deploy script now auto-migrates legacy `crewbook_*` Docker volumes → `photoo_*` on first run.
+- ✅ **Frontend Docker build fix**: CRA 5 / `react-scripts@5.0.1` ships eslint-webpack-plugin built for ESLint v8, while package.json pins eslint@9 → in-build lint pass crashed. Disabled via `craco.config.js` (`eslint.enable: false`) + Dockerfile env (`DISABLE_ESLINT_PLUGIN=true`). Lint still runs separately in CI.
+- ✅ **BuildKit pnpm cache mount** in `frontend/Dockerfile` (`--mount=type=cache,id=pnpm-store,target=/pnpm/store`) — subsequent rebuilds finish in ~30 s when `pnpm-lock.yaml` is unchanged (down from ~18 min on first build).
+- ✅ **Operations doc** `deploy/HOSTING.md` — comprehensive guide for co-hosting Photoo + JVSapp on one VPS: architecture diagram, port allocation table, day-2 ops, backups, third-app extension, split-server migration paths, troubleshooting matrix.
 - ✅ MongoDB downgraded to 4.4 (1 GB VPS memory constraint)
 - ✅ Frontend build switched to **pnpm 9** (corepack)
 - ✅ Frontend served by **Caddy** (replaces nginx) — gzip + SPA fallback
@@ -242,7 +245,7 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ **Slim requirements.txt** — removed `emergentintegrations`, `litellm`, `openai`, all `google-*` SDKs, `boto3`, `stripe`, `pandas`, `numpy`, `tiktoken`, `huggingface_hub`, dev-only tools (black/isort/mypy/flake8). 133 → 56 packages. Regression guard at `backend/tests/test_imports_sanity.py`.
 - ✅ CI/CD via GitHub Actions → GHCR (`.github/workflows/ci.yml`)
 - ✅ DB helper scripts: `scripts/seed_data.py`, `scripts/reset_db.py`
-- ✅ **Unified multi-app VPS deploy** (`deploy/deploy.sh`) — non-destructive co-hosting of Photoo (`photoo.in`) + JVSapp (`app.mmpf.in`) on `45.196.196.114`:
+- ✅ **Unified multi-app VPS deploy** (`deploy/deploy.sh`) — non-destructive co-hosting of Photoo (`app.photoo.in`) + JVSapp (`app.mmpf.in`) on `45.196.196.114`:
   - Host Caddy terminates TLS for both domains
   - JVSapp port re-mapping via `docker-compose.override.yml` with `!override` tag (no edits to JVSapp's repo files)
   - Trivial decommission path when either app moves to a dedicated server (just delete the override + Caddy block)

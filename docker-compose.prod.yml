@@ -13,4 +13,4 @@ services:
 
   frontend:
     ports:
-      - "127.0.0.1:3000:80"   # localhost-only bind; host Caddy proxies photoo.in here
+      - "127.0.0.1:3000:80"   # localhost-only bind; host Caddy proxies app.photoo.in here
