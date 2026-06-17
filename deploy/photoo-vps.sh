@@ -128,52 +128,7 @@ fi
 # Enable BuildKit for all subsequent docker / compose calls
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
-
-# ── Configure Docker daemon to use BuildKit by default ────────────────────────
-# Setting DOCKER_BUILDKIT=1 in the environment is not always enough —
-# some Docker/Compose versions ignore it. Writing it into daemon.json
-# makes BuildKit the permanent default and is the only reliable method.
-DOCKER_DAEMON_JSON="/etc/docker/daemon.json"
-BUILDKIT_IN_DAEMON=$(python3 -c "
-import json, sys
-try:
-    with open('${DOCKER_DAEMON_JSON}') as f:
-        d = json.load(f)
-    sys.stdout.write('yes' if d.get('features', {}).get('buildkit') == True else 'no')
-except:
-    sys.stdout.write('no')
-" 2>/dev/null || echo "no")
-
-if [ "$BUILDKIT_IN_DAEMON" != "yes" ]; then
-    info "Enabling BuildKit in Docker daemon.json (one-time setup)..."
-    python3 - <<'PYEOF'
-import json, os
-path = "/etc/docker/daemon.json"
-d = {}
-if os.path.exists(path):
-    try:
-        with open(path) as f:
-            d = json.load(f)
-    except Exception:
-        pass   # invalid JSON — start fresh
-d.setdefault("features", {})["buildkit"] = True
-with open(path, "w") as f:
-    json.dump(d, f, indent=2)
-print("  daemon.json written")
-PYEOF
-    systemctl reload-or-restart docker
-    # Wait for daemon to come back up
-    for i in 1 2 3 4 5; do
-        sleep 2
-        docker info >/dev/null 2>&1 && break
-        info "  waiting for Docker daemon... (${i})"
-    done
-    ok "Docker daemon restarted with BuildKit enabled"
-else
-    ok "Docker daemon already has BuildKit configured"
-fi
-
-ok "Docker Compose $COMPOSE_VER  |  BuildKit enabled (env + daemon.json)"
+ok "Docker Compose $COMPOSE_VER  |  DOCKER_BUILDKIT=1 enabled"
 
 # =============================================================================
 step "1/9  Install Caddy on host (if missing)"
