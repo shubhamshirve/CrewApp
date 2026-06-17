@@ -45,6 +45,9 @@ services:
     volumes:
       # Persist user-uploaded profile pictures across container restarts
       - uploads_data:/app/uploads
+      # Mount scripts from repo root so seed_data.py / reset_db.py are available
+      # inside the container without rebuilding the image.
+      - ./scripts:/app/scripts:ro
     networks:
       - photoo-net
     healthcheck:
