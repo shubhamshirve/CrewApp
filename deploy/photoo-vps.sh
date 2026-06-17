@@ -85,11 +85,35 @@ command -v docker >/dev/null 2>&1 || {
   Quick install:  curl -fsSL https://get.docker.com | sh && systemctl enable --now docker"
 }
 
-# Docker Compose v2
-$DC version >/dev/null 2>&1 || {
-    err "Docker Compose v2 plugin not found.
-  Install:  apt-get install -y docker-compose-plugin"
-}
+# Docker Compose v2 — auto-install if missing
+if ! $DC version >/dev/null 2>&1; then
+    info "Docker Compose v2 plugin not found — installing..."
+
+    # Method 1: Try the docker-compose-plugin package (requires Docker's official apt repo)
+    apt-get install -y -q docker-compose-plugin 2>/dev/null && \
+        ok "docker-compose-plugin installed via apt" || {
+
+        # Method 2: Download the binary directly from GitHub releases
+        info "apt method failed — downloading compose binary from GitHub..."
+        COMPOSE_VER_DL=$(curl -fsSL https://api.github.com/repos/docker/compose/releases/latest \
+            | grep '"tag_name"' | cut -d'"' -f4)
+        ARCH=$(uname -m)
+        [ "$ARCH" = "aarch64" ] && ARCH="aarch64" || ARCH="x86_64"
+        COMPOSE_BIN_URL="https://github.com/docker/compose/releases/download/${COMPOSE_VER_DL}/docker-compose-linux-${ARCH}"
+
+        mkdir -p /usr/local/lib/docker/cli-plugins
+        curl -fsSL "$COMPOSE_BIN_URL" -o /usr/local/lib/docker/cli-plugins/docker-compose
+        chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+        $DC version >/dev/null 2>&1 \
+            && ok "Docker Compose ${COMPOSE_VER_DL} installed from GitHub" \
+            || err "Failed to install Docker Compose v2. Run manually:
+  mkdir -p /usr/local/lib/docker/cli-plugins
+  curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \\
+       -o /usr/local/lib/docker/cli-plugins/docker-compose
+  chmod +x /usr/local/lib/docker/cli-plugins/docker-compose"
+    }
+fi
 
 # Warn if Compose < 2.24 (needed for !reset tag in docker-compose.prod.yml)
 COMPOSE_VER=$($DC version --short 2>/dev/null || echo "0.0.0")
