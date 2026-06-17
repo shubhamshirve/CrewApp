@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI):
     if cors_origins == "*":
         logger.warning("CORS_ORIGINS is set to wildcard (*) — restrict this in production")
 
-    logger.info("CrewBook API started successfully")
+    logger.info("Photoo API started successfully")
     yield
     # ── Shutdown ──
     client.close()
@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
 # ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="CrewBook API",
+    title="Photoo API",
     description="Freelance Crew Booking Platform",
     lifespan=lifespan,
     # Hide docs in production
@@ -194,7 +194,7 @@ api_router.include_router(uploads.router, tags=["uploads"])
 
 @api_router.get("/health")
 async def health():
-    return {"status": "ok", "service": "CrewBook API"}
+    return {"status": "ok", "service": "Photoo API"}
 
 
 app.include_router(api_router)

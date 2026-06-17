@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for CrewBook - Continuation Tests
+Backend API Testing for Photoo - Continuation Tests
 Tests the following:
 1. Rating Aggregate uses MongoDB Pipeline (not Python to_list scan)
 2. 90-min Buffer Check on add_session for Lead
@@ -304,7 +304,7 @@ def test_90min_buffer_add_session(rohan_token, rohan_id):
 
 def main():
     print(f"\n{BLUE}{'='*70}{RESET}")
-    print(f"{BLUE}CrewBook Backend API Testing - Continuation Tests{RESET}")
+    print(f"{BLUE}Photoo Backend API Testing - Continuation Tests{RESET}")
     print(f"{BLUE}{'='*70}{RESET}\n")
     
     # Login as Rohan

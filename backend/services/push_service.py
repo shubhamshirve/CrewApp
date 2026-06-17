@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
-VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:support@crewbook.in")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:support@photoo.in")
 
 
 async def send_push_to_user(db, user_id: str, title: str, body: str, url: str = "/notifications"):

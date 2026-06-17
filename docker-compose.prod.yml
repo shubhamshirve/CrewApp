@@ -1,4 +1,4 @@
-# Production overrides for CrewBook
+# Production overrides for Photoo
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # Changes from base:
@@ -13,4 +13,4 @@ services:
 
   frontend:
     ports:
-      - "127.0.0.1:3000:80"   # localhost-only bind; host Caddy proxies crew.mmpf.in here
+      - "127.0.0.1:3000:80"   # localhost-only bind; host Caddy proxies photoo.in here

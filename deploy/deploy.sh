@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# CrewBook + JVSapp — Unified VPS Deployment Script
+# Photoo + JVSapp — Unified VPS Deployment Script
 #
 # What this script does (idempotent, re-runnable):
 #   1.  Installs Caddy on the host (if missing)
 #   2.  Clones / updates JVSapp at  /opt/jvsapp
-#   3.  Clones / updates CrewBook at /opt/crewbook
+#   3.  Clones / updates Photoo at /opt/photoo
 #   4.  Creates a NON-DESTRUCTIVE docker-compose.override.yml inside JVSapp
 #       that remaps host 80→8080 and 443→8443 (so host Caddy can own 80/443).
 #       JVSapp's own files are NEVER edited — the override is a separate file
 #       that can be deleted to restore single-server defaults.
-#   5.  Generates CrewBook backend/.env with random JWT_SECRET + ADMIN_SEED_SECRET
+#   5.  Generates Photoo backend/.env with random JWT_SECRET + ADMIN_SEED_SECRET
 #   6.  Builds + starts both stacks with Docker Compose
 #   7.  Writes a fresh /etc/caddy/Caddyfile that terminates TLS for both:
-#         crew.mmpf.in  → 127.0.0.1:3000  (CrewBook frontend)
+#         photoo.in  → 127.0.0.1:3000  (Photoo frontend)
 #         app.mmpf.in   → 127.0.0.1:8080  (JVSapp)
 #   8.  Validates + reloads Caddy
 #
@@ -29,9 +29,9 @@ set -euo pipefail
 # ── Config ──────────────────────────────────────────────────────────────────
 CREW_REPO="https://github.com/shubhamshirve/CrewApp.git"
 JVS_REPO="https://github.com/shubhamshirve/JVSapp.git"
-CREW_DIR="/opt/crewbook"
+CREW_DIR="/opt/photoo"
 JVS_DIR="/opt/jvsapp"
-CREW_DOMAIN="crew.mmpf.in"
+CREW_DOMAIN="photoo.in"
 JVS_DOMAIN="app.mmpf.in"
 CADDY_CONF="/etc/caddy/Caddyfile"
 
@@ -47,16 +47,70 @@ step() { echo -e "\n${BOLD}${CYAN}── $* ${RESET}"; }
 if [ "$(id -u)" -ne 0 ]; then err "Run as root (sudo or su -)"; exit 1; fi
 
 echo -e "\n${BOLD}${CYAN}=================================================${RESET}"
-echo -e "${BOLD}${CYAN} CrewBook + JVSapp  —  Unified VPS Deployment    ${RESET}"
+echo -e "${BOLD}${CYAN} Photoo + JVSapp  —  Unified VPS Deployment    ${RESET}"
 echo -e "${BOLD}${CYAN}=================================================${RESET}"
 echo -e "  Host Caddy domains:"
-echo -e "    ${BOLD}${CREW_DOMAIN}${RESET} -> 127.0.0.1:3000  (CrewBook)"
+echo -e "    ${BOLD}${CREW_DOMAIN}${RESET} -> 127.0.0.1:3000  (Photoo)"
 echo -e "    ${BOLD}${JVS_DOMAIN}${RESET}  -> 127.0.0.1:8080  (JVSapp)"
 
 # Ensure prerequisites
 command -v git    >/dev/null || { apt-get update -qq && apt-get install -y git; }
 command -v docker >/dev/null || { err "Docker is required but not installed. Aborting."; exit 1; }
 command -v python3 >/dev/null || { apt-get install -y python3; }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Optional pre-flight:  detect a legacy "crewbook" deploy (renamed Feb 2026).
+# If old artefacts are present, we migrate them in place so the user doesn't
+# lose data. Safe to run on a fresh server — does nothing if no legacy items.
+# ─────────────────────────────────────────────────────────────────────────────
+LEGACY_DIR="/opt/crewbook"
+LEGACY_CONTAINERS=(crewbook-frontend crewbook-backend crewbook-mongodb)
+LEGACY_VOLUMES=(crewbook_mongodb_data crewbook_uploads_data crewbook_caddy_data crewbook_caddy_config)
+NEW_VOLUMES=(photoo_mongodb_data photoo_uploads_data photoo_caddy_data photoo_caddy_config)
+
+migrate_legacy() {
+    local found=0
+    [ -d "$LEGACY_DIR" ] && found=1
+    for c in "${LEGACY_CONTAINERS[@]}"; do
+        docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$c" && found=1
+    done
+    for v in "${LEGACY_VOLUMES[@]}"; do
+        docker volume ls --format '{{.Name}}' 2>/dev/null | grep -qx "$v" && found=1
+    done
+    [ "$found" -eq 0 ] && return 0
+
+    step "Migrating legacy 'crewbook' deploy -> 'photoo'"
+    # 1. Stop old containers gracefully
+    for c in "${LEGACY_CONTAINERS[@]}"; do
+        if docker ps -a --format '{{.Names}}' | grep -qx "$c"; then
+            info "Removing old container: $c"
+            docker rm -f "$c" >/dev/null 2>&1 || true
+        fi
+    done
+    # 2. Copy each legacy volume to the new name (only if new is empty/absent)
+    for i in "${!LEGACY_VOLUMES[@]}"; do
+        local src="${LEGACY_VOLUMES[$i]}"
+        local dst="${NEW_VOLUMES[$i]}"
+        docker volume ls --format '{{.Name}}' | grep -qx "$src" || continue
+        if docker volume ls --format '{{.Name}}' | grep -qx "$dst"; then
+            warn "Volume $dst already exists — leaving as-is (no overwrite)"
+            continue
+        fi
+        info "Copying volume: $src -> $dst"
+        docker volume create "$dst" >/dev/null
+        docker run --rm \
+            -v "$src":/from:ro -v "$dst":/to \
+            alpine:3 sh -c 'cd /from && cp -a . /to/' >/dev/null
+        ok "Volume copied: $src -> $dst"
+    done
+    # 3. Move /opt/crewbook out of the way (don't delete — let user clean up)
+    if [ -d "$LEGACY_DIR" ] && [ ! -d "/opt/crewbook.legacy" ]; then
+        mv "$LEGACY_DIR" "/opt/crewbook.legacy"
+        ok "Moved $LEGACY_DIR -> /opt/crewbook.legacy (safe to delete later)"
+    fi
+    ok "Legacy migration complete — proceeding with normal deploy."
+}
+migrate_legacy
 
 # ─────────────────────────────────────────────────────────────────────────────
 step "Step 1/8  Install Caddy (host)"
@@ -169,9 +223,9 @@ if not to_remap:
     sys.exit(0)
 
 header = [
-    "# AUTO-GENERATED by CrewBook deploy.sh",
+    "# AUTO-GENERATED by Photoo deploy.sh",
     "# Purpose:  free host ports 80 + 443 so the host Caddy can terminate TLS",
-    "#           for both crew.mmpf.in and app.mmpf.in.",
+    "#           for both photoo.in and app.mmpf.in.",
     "# Safe to delete this file later if JVSapp is moved to its own server —",
     "# the original docker-compose.yml will then take over 80/443 again.",
     "#",
@@ -209,21 +263,21 @@ docker compose up -d
 ok "JVSapp running"
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 4/8  Clone / update CrewBook"
+step "Step 4/8  Clone / update Photoo"
 # ─────────────────────────────────────────────────────────────────────────────
 if [ -d "$CREW_DIR/.git" ]; then
     info "Pulling latest in $CREW_DIR"
     git -C "$CREW_DIR" pull --rebase --autostash
-    ok "CrewBook updated"
+    ok "Photoo updated"
 else
     info "Cloning $CREW_REPO -> $CREW_DIR"
     git clone "$CREW_REPO" "$CREW_DIR"
-    ok "CrewBook cloned"
+    ok "Photoo cloned"
 fi
 cd "$CREW_DIR"
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 5/8  Generate CrewBook backend/.env"
+step "Step 5/8  Generate Photoo backend/.env"
 # ─────────────────────────────────────────────────────────────────────────────
 if [ -f backend/.env ]; then
     warn "backend/.env already exists — leaving it untouched."
@@ -235,7 +289,7 @@ else
     cat > backend/.env <<ENVEOF
 # Auto-generated by deploy.sh on $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 MONGO_URL=mongodb://mongodb:27017
-DB_NAME=crewbook_db
+DB_NAME=photoo_db
 JWT_SECRET=${JWT_SECRET}
 ENV=production
 CORS_ORIGINS=https://${CREW_DOMAIN}
@@ -256,16 +310,16 @@ ENVEOF
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-step "Step 6/8  Build + start CrewBook stack"
+step "Step 6/8  Build + start Photoo stack"
 # ─────────────────────────────────────────────────────────────────────────────
 docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-ok "CrewBook containers up"
+ok "Photoo containers up"
 
 info "Waiting for backend health (up to 60s)..."
 for i in $(seq 1 12); do
     sleep 5
-    STATUS=$(docker inspect --format='{{.State.Health.Status}}' crewbook-backend 2>/dev/null || echo "unknown")
+    STATUS=$(docker inspect --format='{{.State.Health.Status}}' photoo-backend 2>/dev/null || echo "unknown")
     if [ "$STATUS" = "healthy" ]; then ok "Backend healthy"; break; fi
     info "  still waiting ($((i*5))s)  [status: $STATUS]"
 done
@@ -282,7 +336,7 @@ fi
 
 cat > "$CADDY_CONF" <<CADDYEOF
 # /etc/caddy/Caddyfile
-# Generated by CrewBook deploy.sh on $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# Generated by Photoo deploy.sh on $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 #
 # This single host Caddy terminates TLS for BOTH apps while they share a VPS.
 # When either app moves to its own server later, just remove its block from
@@ -295,7 +349,7 @@ cat > "$CADDY_CONF" <<CADDYEOF
     admin off
 }
 
-# ── CrewBook ────────────────────────────────────────────────────────────────
+# ── Photoo ────────────────────────────────────────────────────────────────
 ${CREW_DOMAIN} {
     encode gzip zstd
     reverse_proxy 127.0.0.1:3000 {
@@ -358,14 +412,14 @@ echo ""
 echo -e "${BOLD}${GREEN}=================================================${RESET}"
 echo -e "${BOLD}${GREEN} Deployment complete                              ${RESET}"
 echo -e "${BOLD}${GREEN}=================================================${RESET}"
-echo -e "  CrewBook:  ${BOLD}https://${CREW_DOMAIN}${RESET}"
+echo -e "  Photoo:  ${BOLD}https://${CREW_DOMAIN}${RESET}"
 echo -e "  JVSapp:    ${BOLD}https://${JVS_DOMAIN}${RESET}"
 echo ""
 echo -e "  ${YELLOW}Next steps:${RESET}"
 echo -e "  1. Verify DNS A records resolve to this VPS for both domains."
 echo -e "  2. (Optional) Edit ${CADDY_CONF} and uncomment 'email admin@mmpf.in'"
 echo -e "     for ACME notices, then 'systemctl reload caddy'."
-echo -e "  3. Seed CrewBook demo data:"
+echo -e "  3. Seed Photoo demo data:"
 echo -e "       cd ${CREW_DIR} && docker compose exec backend python /app/scripts/seed_data.py"
 echo -e "  4. Add Razorpay / EMERGENT_LLM_KEY in ${CREW_DIR}/backend/.env, then:"
 echo -e "       cd ${CREW_DIR} && docker compose -f docker-compose.yml -f docker-compose.prod.yml restart backend"

@@ -353,7 +353,7 @@ export default function GigDetail() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `crewbook_contract_${inviteId.slice(0, 8)}.pdf`;
+      a.download = `photoo_contract_${inviteId.slice(0, 8)}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Contract downloaded!");

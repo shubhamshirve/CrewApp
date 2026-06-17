@@ -1,4 +1,4 @@
-# CrewBook — Product Roadmap
+# Photoo — Product Roadmap
 
 > Last updated: Feb 2026  
 > Stack: React + FastAPI + MongoDB | Indian wedding & event photography/videography crew platform

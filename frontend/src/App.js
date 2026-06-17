@@ -50,7 +50,7 @@ function ProtectedRoute({ children }) {
 
 function AdminGuard({ children }) {
   const { user, loading } = useAuth();
-  const hasToken = !!localStorage.getItem("crewbook_token");
+  const hasToken = !!localStorage.getItem("photoo_token");
   if (loading || (!user && hasToken)) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />

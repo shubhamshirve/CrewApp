@@ -27,7 +27,7 @@ export default function AdminLogin() {
       if (!loggedInUser.is_admin) {
         toast.error("Access denied. Admin credentials required.");
         // logout is implicit — token was stored, clear it
-        localStorage.removeItem("crewbook_token");
+        localStorage.removeItem("photoo_token");
         return;
       }
       toast.success("Welcome back, Admin");
@@ -63,7 +63,7 @@ export default function AdminLogin() {
             <Shield size={28} className="text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white font-display">Admin Panel</h1>
-          <p className="text-zinc-500 text-sm mt-1">CrewBook · Restricted Access</p>
+          <p className="text-zinc-500 text-sm mt-1">Photoo · Restricted Access</p>
         </div>
 
         {/* Card */}
@@ -80,7 +80,7 @@ export default function AdminLogin() {
                 autoComplete="email"
                 className="w-full rounded-xl px-4 py-3 text-sm text-white border border-white/10 focus:outline-none focus:border-blue-500/50 transition-colors"
                 style={{ background: "rgba(255,255,255,0.04)" }}
-                placeholder="admin@crewbook.in"
+                placeholder="admin@photoo.in"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
@@ -129,7 +129,7 @@ export default function AdminLogin() {
         <p className="text-center text-xs text-zinc-700 mt-4">
           Not an admin?{" "}
           <a href="/" className="text-blue-400 hover:text-blue-300 transition-colors">
-            Go to CrewBook
+            Go to Photoo
           </a>
         </p>
       </div>

@@ -547,7 +547,7 @@ export default function Profile() {
                   {/* WhatsApp button */}
                   {(profile.whatsapp_number || profile.phone) && (
                     <a
-                      href={`https://wa.me/${(profile.whatsapp_number || profile.phone).replace(/\D/g, "")}?text=Hi%20${encodeURIComponent(profile.full_name)}%2C%20I%20found%20your%20profile%20on%20CrewBook!`}
+                      href={`https://wa.me/${(profile.whatsapp_number || profile.phone).replace(/\D/g, "")}?text=Hi%20${encodeURIComponent(profile.full_name)}%2C%20I%20found%20your%20profile%20on%20Photoo!`}
                       target="_blank"
                       rel="noopener noreferrer"
                       data-testid="whatsapp-btn"

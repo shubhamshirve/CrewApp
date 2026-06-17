@@ -1,6 +1,6 @@
-/* CrewBook Service Worker v3 — PWA caching + push notifications */
+/* Photoo Service Worker v3 — PWA caching + push notifications */
 
-const CACHE_VERSION = "crewbook-v3";
+const CACHE_VERSION = "photoo-v3";
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 
@@ -102,7 +102,7 @@ self.addEventListener("fetch", (event) => {
 // ── Push Notification ────────────────────────────────────────────────────────────
 self.addEventListener("push", (event) => {
   let data = {
-    title: "CrewBook",
+    title: "Photoo",
     body: "You have a new notification",
     url: "/notifications",
   };
@@ -119,7 +119,7 @@ self.addEventListener("push", (event) => {
     body: data.body,
     icon: "/icon-192.png",
     badge: "/icon-192.png",
-    tag: "crewbook-notification",
+    tag: "photoo-notification",
     renotify: true,
     requireInteraction: false,
     vibrate: [200, 100, 200],

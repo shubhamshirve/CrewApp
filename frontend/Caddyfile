@@ -1,4 +1,4 @@
-# ── CrewBook Caddy Configuration ────────────────────────────────────────────
+# ── Photoo Caddy Configuration ────────────────────────────────────────────
 # Listens on port 80 only (TLS is terminated at the load balancer / cloud edge)
 
 :80 {

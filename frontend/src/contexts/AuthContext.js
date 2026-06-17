@@ -9,7 +9,7 @@ export const API = BACKEND_URL ? `${BACKEND_URL}/api` : "/api";
 const api = axios.create({ baseURL: API });
 
 function getToken() {
-  return localStorage.getItem("crewbook_token") || null;
+  return localStorage.getItem("photoo_token") || null;
 }
 
 api.interceptors.request.use((config) => {
@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isImpersonating, setIsImpersonating] = useState(
-    !!localStorage.getItem("crewbook_admin_token")
+    !!localStorage.getItem("photoo_admin_token")
   );
 
   const fetchMe = useCallback(async () => {
@@ -34,8 +34,8 @@ export function AuthProvider({ children }) {
       const res = await api.get("/auth/me");
       setUser(res.data);
     } catch {
-      localStorage.removeItem("crewbook_token");
-      localStorage.removeItem("crewbook_admin_token");
+      localStorage.removeItem("photoo_token");
+      localStorage.removeItem("photoo_admin_token");
       setIsImpersonating(false);
     } finally {
       setLoading(false);
@@ -46,21 +46,21 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await api.post("/auth/login", { email, password });
-    localStorage.setItem("crewbook_token", res.data.token);
+    localStorage.setItem("photoo_token", res.data.token);
     setUser(res.data.user);
     return res.data.user;
   };
 
   const register = async (payload) => {
     const res = await api.post("/auth/register", payload);
-    localStorage.setItem("crewbook_token", res.data.token);
+    localStorage.setItem("photoo_token", res.data.token);
     setUser(res.data.user);
     return res.data.user;
   };
 
   const logout = () => {
-    localStorage.removeItem("crewbook_token");
-    localStorage.removeItem("crewbook_admin_token");
+    localStorage.removeItem("photoo_token");
+    localStorage.removeItem("photoo_admin_token");
     setIsImpersonating(false);
     setUser(null);
   };
@@ -73,9 +73,9 @@ export function AuthProvider({ children }) {
 
   // Same-page impersonation: swap tokens in localStorage, update React state
   const startImpersonation = async (impersonateToken) => {
-    const adminToken = localStorage.getItem("crewbook_token");
-    localStorage.setItem("crewbook_admin_token", adminToken);
-    localStorage.setItem("crewbook_token", impersonateToken);
+    const adminToken = localStorage.getItem("photoo_token");
+    localStorage.setItem("photoo_admin_token", adminToken);
+    localStorage.setItem("photoo_token", impersonateToken);
     setIsImpersonating(true);
     const res = await api.get("/auth/me");
     setUser(res.data);
@@ -84,10 +84,10 @@ export function AuthProvider({ children }) {
 
   // Restore admin session from saved token
   const exitImpersonation = async () => {
-    const adminToken = localStorage.getItem("crewbook_admin_token");
+    const adminToken = localStorage.getItem("photoo_admin_token");
     if (adminToken) {
-      localStorage.setItem("crewbook_token", adminToken);
-      localStorage.removeItem("crewbook_admin_token");
+      localStorage.setItem("photoo_token", adminToken);
+      localStorage.removeItem("photoo_admin_token");
     }
     setIsImpersonating(false);
     const res = await api.get("/auth/me");

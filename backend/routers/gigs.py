@@ -843,7 +843,7 @@ async def download_contract(invite_id: str, current_user: dict = Depends(get_cur
     pdf_bytes = generate_contract_pdf(gig_clean, invite_clean, lead_user, freelancer_user)
 
     safe_title = gig.get("title", "contract").replace(" ", "_")[:40]
-    filename = f"crewbook_contract_{safe_title}_{invite_id[:8]}.pdf"
+    filename = f"photoo_contract_{safe_title}_{invite_id[:8]}.pdf"
 
     return Response(
         content=pdf_bytes,

@@ -544,9 +544,9 @@ async def seed_admin(request: Request):
     admin_password = os.environ.get("ADMIN_DEFAULT_PASSWORD", "Admin@123")
     admin_doc = {
         "_id": str(uuid.uuid4()),
-        "email": "admin@crewbook.in",
+        "email": "admin@photoo.in",
         "password_hash": hash_password(admin_password),
-        "full_name": "CrewBook Admin",
+        "full_name": "Photoo Admin",
         "phone": "9999999999",
         "location": "Mumbai",
         "pincode": "400001",
@@ -570,7 +570,7 @@ async def seed_admin(request: Request):
         "updated_at": now,
     }
     await db.users.insert_one(admin_doc)
-    return {"message": "Admin created", "email": "admin@crewbook.in"}
+    return {"message": "Admin created", "email": "admin@photoo.in"}
 
 
 # ── Log Read Endpoints ─────────────────────────────────────────────────────────

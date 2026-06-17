@@ -17,7 +17,7 @@ def admin_token():
     # Ensure admin exists
     requests.post(f"{BASE_URL}/api/admin/seed-admin")
     response = requests.post(f"{BASE_URL}/api/auth/login", json={
-        "email": "admin@crewbook.in",
+        "email": "admin@photoo.in",
         "password": "Admin@123"
     })
     if response.status_code == 200:

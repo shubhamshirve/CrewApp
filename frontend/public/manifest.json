@@ -1,6 +1,6 @@
 {
-  "name": "CrewBook",
-  "short_name": "CrewBook",
+  "name": "Photoo",
+  "short_name": "Photoo",
   "description": "Freelance crew booking for the Indian film & events industry",
   "start_url": "/dashboard",
   "scope": "/",
@@ -50,7 +50,7 @@
     {
       "name": "Dashboard",
       "short_name": "Home",
-      "description": "Your CrewBook dashboard",
+      "description": "Your Photoo dashboard",
       "url": "/dashboard",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },

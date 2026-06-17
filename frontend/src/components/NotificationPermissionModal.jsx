@@ -16,7 +16,7 @@ export default function NotificationPermissionModal({ isOpen, onComplete }) {
     const dismissUntil = new Date();
     dismissUntil.setDate(dismissUntil.getDate() + 30);
     localStorage.setItem(
-      'crewbook_notification_dismissed',
+      'photoo_notification_dismissed',
       dismissUntil.toISOString()
     );
   };

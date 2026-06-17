@@ -1,5 +1,5 @@
 """
-CrewBook API Tests - Auth, Admin, Users, Gigs, Wallet, Connections
+Photoo API Tests - Auth, Admin, Users, Gigs, Wallet, Connections
 """
 import pytest
 import requests
@@ -7,7 +7,7 @@ import os
 import time
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
-ADMIN_EMAIL = "admin@crewbook.in"
+ADMIN_EMAIL = "admin@photoo.in"
 ADMIN_PASSWORD = "Admin@123"
 TEST_EMAIL = f"TEST_user_{int(time.time())}@example.com"
 TEST_PASSWORD = "Test@123"

@@ -1,4 +1,4 @@
-# CrewBook — Docker Setup Guide
+# Photoo — Docker Setup Guide
 
 ## Prerequisites
 - Docker 24+
@@ -10,8 +10,8 @@
 
 ```bash
 # 1. Clone the repo
-git clone <your-repo-url> crewbook
-cd crewbook
+git clone <your-repo-url> photoo
+cd photoo
 
 # 2. Configure environment variables
 cp backend/.env.example backend/.env
@@ -28,7 +28,7 @@ curl -X POST http://localhost/api/admin/seed-admin
 ```
 
 Open **http://localhost** in your browser.  
-Admin login: `admin@crewbook.in` / `Admin@123`
+Admin login: `admin@photoo.in` / `Admin@123`
 
 ---
 
@@ -36,9 +36,9 @@ Admin login: `admin@crewbook.in` / `Admin@123`
 
 | Service   | Container            | Internal Port | Exposed |
 |-----------|----------------------|---------------|---------|
-| Frontend  | crewbook-frontend    | 80            | 80      |
-| Backend   | crewbook-backend     | 8001          | 8001    |
-| MongoDB   | crewbook-mongodb     | 27017         | —       |
+| Frontend  | photoo-frontend    | 80            | 80      |
+| Backend   | photoo-backend     | 8001          | 8001    |
+| MongoDB   | photoo-mongodb     | 27017         | —       |
 
 > MongoDB is **not** exposed externally by default. Add `ports: ["27017:27017"]` under the `mongodb` service if you need direct access.
 
@@ -51,7 +51,7 @@ Admin login: `admin@crewbook.in` / `Admin@123`
 | Variable               | Description                              | Default           |
 |------------------------|------------------------------------------|-------------------|
 | `MONGO_URL`            | MongoDB connection string                | `mongodb://localhost:27017` |
-| `DB_NAME`              | Database name                            | `crewbook_db`     |
+| `DB_NAME`              | Database name                            | `photoo_db`     |
 | `CORS_ORIGINS`         | Allowed origins (comma-separated)        | `*`               |
 | `JWT_SECRET`           | Secret for JWT signing (**change this**) | —                 |
 | `RAZORPAY_KEY_ID`      | Razorpay API key ID                      | —                 |
@@ -120,7 +120,7 @@ Browser
               ▼
 ┌─────────────────────────────────┐
 │ MongoDB 7.0 (mongodb:27017)     │
-│  Persisted volume: crewbook_    │
+│  Persisted volume: photoo_    │
 │  mongodb_data                   │
 └─────────────────────────────────┘
 ```

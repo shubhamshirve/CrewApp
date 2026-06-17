@@ -1,5 +1,5 @@
 """
-CrewBook New Features Tests:
+Photoo New Features Tests:
 - Templates API (GET, PUT, DELETE) -- notification template management
 - Calendar Sync API (status, connect, disconnect) -- mocked Google Calendar
 - Gigs 90-min buffer -- schedule conflict check
@@ -12,7 +12,7 @@ import time
 import uuid
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
-ADMIN_EMAIL = "admin@crewbook.in"
+ADMIN_EMAIL = "admin@photoo.in"
 ADMIN_PASSWORD = "Admin@123"
 
 

@@ -16,7 +16,7 @@ export default function NotificationPrompt() {
   useEffect(() => {
     if (!pushService.isSupported()) return;
     const permission = pushService.getPermission();
-    const dismissed = localStorage.getItem("crewbook_notif_dismissed");
+    const dismissed = localStorage.getItem("photoo_notif_dismissed");
     if (permission === "default" && !dismissed) {
       // Small delay so it doesn't flash on initial load
       const t = setTimeout(() => setVisible(true), 2500);
@@ -46,7 +46,7 @@ export default function NotificationPrompt() {
   };
 
   const handleDismiss = () => {
-    localStorage.setItem("crewbook_notif_dismissed", "1");
+    localStorage.setItem("photoo_notif_dismissed", "1");
     setVisible(false);
   };
 

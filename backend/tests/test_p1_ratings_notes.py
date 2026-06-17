@@ -1,5 +1,5 @@
 """
-CrewBook P1 Features Tests:
+Photoo P1 Features Tests:
 - GET /api/ratings/pending - returns pending ratings for completed gigs
 - POST /api/ratings - submit rating (punctuality, gear_handling, teamwork)
 - GET /api/notes/{freelancer_id} - get private note (empty if none)
@@ -15,7 +15,7 @@ import time
 import uuid
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
-ADMIN_EMAIL = "admin@crewbook.in"
+ADMIN_EMAIL = "admin@photoo.in"
 ADMIN_PASSWORD = "Admin@123"
 
 LEAD_EMAIL = "testlead@example.com"

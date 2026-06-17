@@ -112,7 +112,7 @@ lint-frontend:
 # ────────────────────────────────────────────────────────────────────────────
 help:
 	@echo ""
-	@echo "  CrewBook Makefile commands:"
+	@echo "  Photoo Makefile commands:"
 	@echo ""
 	@echo "  Docker:"
 	@echo "    make up             Start all services (build if needed)"

@@ -1,4 +1,4 @@
-# CrewBook
+# Photoo
 
 > Freelance crew booking platform for the Indian film & events industry.
 > Photographers, videographers, and assistants discover gigs, build teams, and manage bookings — all in one place.
@@ -83,8 +83,8 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/shubhamshirve/CrewApp.git crewbook
-cd crewbook
+git clone https://github.com/shubhamshirve/CrewApp.git photoo
+cd photoo
 
 # 2. Configure the backend environment
 cp backend/.env.example backend/.env
@@ -107,7 +107,7 @@ open http://localhost
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | `admin@crewbook.in` | `Admin@123` |
+| Admin | `admin@photoo.in` | `Admin@123` |
 | Lead Photographer | `rohan@example.com` | `Test@1234` |
 | Second Shooter | `priya@example.com` | `Test@1234` |
 | Videographer | `aakash@example.com` | `Test@1234` |
@@ -125,7 +125,7 @@ All scripts live in `scripts/` and use the same `MONGO_URL` / `DB_NAME` environm
 ```bash
 # Run directly (local)
 cd scripts
-MONGO_URL=mongodb://localhost:27017 DB_NAME=crewbook_db python seed_data.py
+MONGO_URL=mongodb://localhost:27017 DB_NAME=photoo_db python seed_data.py
 
 # Run inside Docker
 docker compose exec backend python /app/scripts/seed_data.py
@@ -144,7 +144,7 @@ What it creates:
 
 ```bash
 # Wipe all data — prompts for confirmation
-MONGO_URL=mongodb://localhost:27017 DB_NAME=crewbook_db python scripts/reset_db.py
+MONGO_URL=mongodb://localhost:27017 DB_NAME=photoo_db python scripts/reset_db.py
 
 # Skip confirmation prompt
 python scripts/reset_db.py --yes
@@ -203,7 +203,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001 pytest tests/ -v
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `MONGO_URL` | ✅ | — | MongoDB connection string |
-| `DB_NAME` | ✅ | — | Database name (`crewbook_db`) |
+| `DB_NAME` | ✅ | — | Database name (`photoo_db`) |
 | `JWT_SECRET` | ✅ | — | 32+ char secret for JWT signing |
 | `ENV` | | `development` | `production` hides API docs, enforces stricter settings |
 | `CORS_ORIGINS` | | `*` | Comma-separated allowed origins — **restrict in production** |
@@ -214,7 +214,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001 pytest tests/ -v
 | `EMERGENT_LLM_KEY` | | — | Emergent Universal Key for Gemini Flash AI |
 | `VAPID_PUBLIC_KEY` | | — | Web Push VAPID public key |
 | `VAPID_PRIVATE_KEY` | | — | Web Push VAPID private key |
-| `VAPID_CONTACT_EMAIL` | | `admin@crewbook.in` | Web Push contact email |
+| `VAPID_CONTACT_EMAIL` | | `admin@photoo.in` | Web Push contact email |
 | `RESEND_API_KEY` | | *(mocked)* | Resend email API key — email is mocked when not set |
 | `UPLOADS_DIR` | | `/app/uploads` | Directory for profile picture uploads |
 
@@ -283,7 +283,7 @@ Browser / PWA
               ▼
 ┌─────────────────────────────────────────┐
 │  MongoDB 4.4 (mongodb:27017)            │
-│   Persisted volume: crewbook_mongodb_   │
+│   Persisted volume: photoo_mongodb_   │
 │   data (256 MB limit, 1 GB VPS)        │
 └─────────────────────────────────────────┘
 ```

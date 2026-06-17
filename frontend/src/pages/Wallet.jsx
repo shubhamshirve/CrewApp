@@ -107,7 +107,7 @@ export default function Wallet() {
         key: key_id,
         amount: order.amount,
         currency: "INR",
-        name: "CrewBook",
+        name: "Photoo",
         description: `${plan.name} ₹${plan.price}/month`,
         order_id: order.id,
         handler: async (response) => {
@@ -163,7 +163,7 @@ export default function Wallet() {
       const { order, key_id, wallet_deducted, pro_rata_credited } = res.data;
       const options = {
         key: key_id, amount: order.amount, currency: "INR",
-        name: "CrewBook", description: `Upgrade to ${plan.name}`,
+        name: "Photoo", description: `Upgrade to ${plan.name}`,
         order_id: order.id,
         handler: async (response) => {
           try {

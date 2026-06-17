@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CrewBook — Sample Data Seeder
+Photoo — Sample Data Seeder
 =================================
 Inserts realistic demo data into the database.
 
@@ -10,7 +10,7 @@ Usage:
     docker compose exec backend python /app/scripts/seed_data.py
 
 Credentials after seeding:
-    admin@crewbook.in   / Admin@123
+    admin@photoo.in   / Admin@123
     rohan@example.com   / Test@1234   (Lead Photographer)
     priya@example.com   / Test@1234   (Second Shooter)
     aakash@example.com  / Test@1234   (Videographer)
@@ -40,7 +40,7 @@ except ImportError:
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME   = os.environ.get("DB_NAME", "crewbook_db")
+DB_NAME   = os.environ.get("DB_NAME", "photoo_db")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -95,9 +95,9 @@ def seed_users(db):
     users = [
         {
             "_id": ID["admin"],
-            "email": "admin@crewbook.in",
+            "email": "admin@photoo.in",
             "password_hash": hash_pw("Admin@123"),
-            "full_name": "CrewBook Admin",
+            "full_name": "Photoo Admin",
             "phone": "9999999999",
             "location": "Mumbai",
             "pincode": "400001",
@@ -769,7 +769,7 @@ def seed_notifications(db):
 
 def main():
     print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════╗{RESET}")
-    print(f"{BOLD}{CYAN}║     CrewBook — Sample Data Seeder        ║{RESET}")
+    print(f"{BOLD}{CYAN}║     Photoo — Sample Data Seeder        ║{RESET}")
     print(f"{BOLD}{CYAN}╚══════════════════════════════════════════╝{RESET}")
     print(f"\n  {CYAN}MongoDB:{RESET} {MONGO_URL}")
     print(f"  {CYAN}Database:{RESET} {DB_NAME}\n")
@@ -803,7 +803,7 @@ def main():
   Login credentials:
 
   {BOLD}Admin{RESET}
-    Email:    admin@crewbook.in
+    Email:    admin@photoo.in
     Password: Admin@123
     URL:      /auth → redirects to /admin/dashboard
 

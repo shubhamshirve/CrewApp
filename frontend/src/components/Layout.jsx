@@ -133,14 +133,14 @@ export default function Layout({ children }) {
         {!collapsed && (
           <Link to="/dashboard" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#E05D26" }}>
-              <span className="text-white font-bold text-sm font-display">C</span>
+              <span className="text-white font-bold text-sm font-display">P</span>
             </div>
-            <span className="text-slate-900 font-semibold font-display text-lg">CrewBook</span>
+            <span className="text-slate-900 font-semibold font-display text-lg">Photoo</span>
           </Link>
         )}
         {collapsed && (
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#E05D26" }}>
-            <span className="text-white font-bold text-sm">C</span>
+            <span className="text-white font-bold text-sm">P</span>
           </div>
         )}
       </div>
@@ -246,9 +246,9 @@ export default function Layout({ children }) {
           </button>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "#E05D26" }}>
-              <span className="text-white font-bold text-xs">C</span>
+              <span className="text-white font-bold text-xs">P</span>
             </div>
-            <span className="text-slate-900 font-semibold font-display">CrewBook</span>
+            <span className="text-slate-900 font-semibold font-display">Photoo</span>
           </div>
           <div className="w-6" />
         </div>
@@ -291,8 +291,8 @@ export default function Layout({ children }) {
                 <Download size={15} className="text-orange-500 flex-shrink-0" />
                 <span className="text-slate-700 font-display truncate">
                   {isIosFallback
-                    ? <>Install <strong>CrewBook</strong> on your iPhone — tap to see how</>
-                    : <>Install <strong>CrewBook</strong> for one-tap access + offline support</>}
+                    ? <>Install <strong>Photoo</strong> on your iPhone — tap to see how</>
+                    : <>Install <strong>Photoo</strong> for one-tap access + offline support</>}
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -329,7 +329,7 @@ export default function Layout({ children }) {
               >
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="text-lg font-display font-semibold text-slate-900">
-                    Install CrewBook
+                    Install Photoo
                   </h3>
                   <button
                     onClick={() => setShowIosHelp(false)}
@@ -354,7 +354,7 @@ export default function Layout({ children }) {
                   </li>
                 </ol>
                 <p className="mt-4 text-xs text-slate-500">
-                  CrewBook will launch full-screen and works offline.
+                  Photoo will launch full-screen and works offline.
                 </p>
               </div>
             </div>

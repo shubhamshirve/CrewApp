@@ -86,11 +86,11 @@ def _render_template(template_str: str, variables: dict) -> str:
 async def send_otp_email(db, recipient_email: str, otp: str, full_name: str = ""):
     """Send a 6-digit OTP verification email."""
     display_name = full_name or "there"
-    subject = "CrewBook — Your verification code"
+    subject = "Photoo — Your verification code"
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
       <div style="background: #0A0A0A; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
-        <h2 style="color: #F97316; margin: 0; font-size: 22px;">CrewBook</h2>
+        <h2 style="color: #F97316; margin: 0; font-size: 22px;">Photoo</h2>
         <p style="color: #9CA3AF; margin: 4px 0 0; font-size: 13px;">Freelance Crew Booking Platform</p>
       </div>
       <div style="padding: 32px 24px; background: #ffffff; text-align: center;">
@@ -106,7 +106,7 @@ async def send_otp_email(db, recipient_email: str, otp: str, full_name: str = ""
         </p>
       </div>
       <div style="padding: 16px; text-align: center; color: #9CA3AF; font-size: 11px; background: #F9FAFB; border-radius: 0 0 8px 8px;">
-        CrewBook · Freelance Crew Platform · India
+        Photoo · Freelance Crew Platform · India
       </div>
     </div>"""
     return await send_email(db, recipient_email, subject, html, "otp_verification")
@@ -129,17 +129,17 @@ async def send_invite_email(db, freelancer_email: str, freelancer_name: str, lea
         html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: #0A0A0A; padding: 24px; text-align: center;">
-            <h2 style="color: #F59E0B; margin: 0;">CrewBook</h2>
+            <h2 style="color: #F59E0B; margin: 0;">Photoo</h2>
           </div>
           <div style="padding: 24px; background: #ffffff;">
             <p>Hi <strong>{freelancer_name}</strong>,</p>
             <p><strong>{lead_name}</strong> has invited you to work on <strong>"{gig_title}"</strong>.</p>
             <p>Proposed fee: <strong>₹{fee:,.0f}</strong></p>
-            <p>Log in to CrewBook to accept, reject, or counter this invite.</p>
+            <p>Log in to Photoo to accept, reject, or counter this invite.</p>
             <a href="#" style="display:inline-block;background:#F59E0B;color:#000;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;margin-top:16px;">View Invite</a>
           </div>
           <div style="padding:16px;text-align:center;color:#6B7280;font-size:12px;">
-            CrewBook · Freelance Crew Platform · India
+            Photoo · Freelance Crew Platform · India
           </div>
         </div>"""
     await send_email(db, freelancer_email, subject, html, "invite_sent")
@@ -160,16 +160,16 @@ async def send_booking_confirmed_email(db, freelancer_email: str, freelancer_nam
         html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: #0A0A0A; padding: 24px; text-align: center;">
-            <h2 style="color: #F59E0B; margin: 0;">CrewBook</h2>
+            <h2 style="color: #F59E0B; margin: 0;">Photoo</h2>
           </div>
           <div style="padding: 24px; background: #ffffff;">
             <p>Hi <strong>{freelancer_name}</strong>,</p>
             <p>Your booking for <strong>"{gig_title}"</strong> is confirmed!</p>
             <p>Agreed fee: <strong>₹{agreed_fee:,.0f}</strong></p>
-            <p>Check the gig workspace on CrewBook for details and updates.</p>
+            <p>Check the gig workspace on Photoo for details and updates.</p>
           </div>
           <div style="padding:16px;text-align:center;color:#6B7280;font-size:12px;">
-            CrewBook · Freelance Crew Platform · India
+            Photoo · Freelance Crew Platform · India
           </div>
         </div>"""
     await send_email(db, freelancer_email, subject, html, "booking_confirmed")
@@ -186,7 +186,7 @@ async def send_gig_completed_email(db, lead_email: str, lead_name: str, gig_titl
         html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: #0A0A0A; padding: 24px; text-align: center;">
-            <h2 style="color: #F59E0B; margin: 0;">CrewBook</h2>
+            <h2 style="color: #F59E0B; margin: 0;">Photoo</h2>
           </div>
           <div style="padding: 24px; background: #ffffff;">
             <p>Hi <strong>{lead_name}</strong>,</p>
@@ -194,7 +194,7 @@ async def send_gig_completed_email(db, lead_email: str, lead_name: str, gig_titl
             <p>Please log in to rate your crew members and close out the gig.</p>
           </div>
           <div style="padding:16px;text-align:center;color:#6B7280;font-size:12px;">
-            CrewBook · Freelance Crew Platform · India
+            Photoo · Freelance Crew Platform · India
           </div>
         </div>"""
     await send_email(db, lead_email, subject, html, "gig_completed")

@@ -36,7 +36,7 @@ export default function PlanGate({ children }) {
         </h2>
         <p className="text-slate-500 text-sm max-w-xs mb-6">
           This feature is available to subscribed members only. Choose a plan to
-          unlock the full CrewBook experience.
+          unlock the full Photoo experience.
         </p>
 
         <button

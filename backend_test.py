@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Backend API Test Suite for CrewBook
+Backend API Test Suite for Photoo
 Tests the fixed 90-min buffer add_session endpoint
 """
 
@@ -222,7 +222,7 @@ def test_90min_buffer_add_session():
 
 if __name__ == "__main__":
     print("\n" + "="*80)
-    print("CrewBook Backend API Test Suite")
+    print("Photoo Backend API Test Suite")
     print("Testing: Fixed 90-min buffer add_session endpoint")
     print("="*80)
     

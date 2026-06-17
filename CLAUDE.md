@@ -1,4 +1,4 @@
-# CLAUDE.md — CrewBook Developer Guide
+# CLAUDE.md — Photoo Developer Guide
 
 This file tells Claude Code how to work in this repository.
 
@@ -16,7 +16,7 @@ This keeps all agents in sync without needing to re-explore the codebase each ti
 
 ## Project Overview
 
-**CrewBook** is a freelance crew booking platform for the Indian film/events industry. Users post gigs, connect with crew members, manage subscriptions, and communicate via WhatsApp. Admins manage users, handle verification, and monitor platform activity.
+**Photoo** is a freelance crew booking platform for the Indian film/events industry. Users post gigs, connect with crew members, manage subscriptions, and communicate via WhatsApp. Admins manage users, handle verification, and monitor platform activity.
 
 **Stack:**
 - **Backend:** Python 3.11, FastAPI, Motor (async MongoDB driver)
@@ -32,7 +32,7 @@ This keeps all agents in sync without needing to re-explore the codebase each ti
 ## Project Structure
 
 ```
-CrewBook/
+Photoo/
 ├── backend/
 │   ├── routers/          # FastAPI route handlers (one file per domain)
 │   │   ├── admin.py      # All /api/admin/* routes
@@ -47,7 +47,7 @@ CrewBook/
 │   ├── auth_utils.py     # JWT encode/decode, get_current_user
 │   ├── server.py         # FastAPI app, exception handlers, startup
 │   └── tests/
-│       └── test_crewbook.py    # Integration tests (requests, live server)
+│       └── test_photoo.py    # Integration tests (requests, live server)
 ├── frontend/
 │   └── src/
 │       ├── pages/
@@ -143,7 +143,7 @@ docker compose up --build
 curl -X POST http://localhost/api/admin/seed-admin
 ```
 
-Admin credentials: `admin@crewbook.in` / `Admin@123`
+Admin credentials: `admin@photoo.in` / `Admin@123`
 
 ---
 
@@ -152,7 +152,7 @@ Admin credentials: `admin@crewbook.in` / `Admin@123`
 ```bash
 # From repo root (requires a running backend)
 cd backend
-REACT_APP_BACKEND_URL=http://localhost:8001 pytest tests/test_crewbook.py -v
+REACT_APP_BACKEND_URL=http://localhost:8001 pytest tests/test_photoo.py -v
 ```
 
 Tests are real HTTP integration tests against a live server — no mocks, no fixtures spinning up their own server. Test users/gigs created during the run are prefixed `TEST_` for easy identification.

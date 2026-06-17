@@ -2,14 +2,14 @@ services:
   # ── MongoDB 4.4 ──────────────────────────────────────────────────────────────
   mongodb:
     image: mongo:4.4
-    container_name: crewbook-mongodb
+    container_name: photoo-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_DATABASE: crewbook_db
+      MONGO_INITDB_DATABASE: photoo_db
     volumes:
       - mongodb_data:/data/db
     networks:
-      - crewbook-net
+      - photoo-net
     healthcheck:
       # mongo:4.4 ships with the legacy `mongo` shell (not `mongosh`)
       test: ["CMD", "mongo", "--quiet", "--eval", "db.adminCommand('ping')"]
@@ -27,7 +27,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: crewbook-backend
+    container_name: photoo-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
@@ -46,7 +46,7 @@ services:
       # Persist user-uploaded profile pictures across container restarts
       - uploads_data:/app/uploads
     networks:
-      - crewbook-net
+      - photoo-net
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
       interval: 15s
@@ -66,7 +66,7 @@ services:
       args:
         # Leave empty so Caddy proxy handles /api — no hard-coded URL in the bundle
         REACT_APP_BACKEND_URL: ""
-    container_name: crewbook-frontend
+    container_name: photoo-frontend
     restart: unless-stopped
     ports:
       - "3000:80"
@@ -74,7 +74,7 @@ services:
       backend:
         condition: service_healthy
     networks:
-      - crewbook-net
+      - photoo-net
     volumes:
       # Persist Caddy's ACME/TLS data across restarts
       - caddy_data:/data
@@ -86,15 +86,15 @@ services:
 
 volumes:
   mongodb_data:
-    name: crewbook_mongodb_data
+    name: photoo_mongodb_data
   uploads_data:
-    name: crewbook_uploads_data
+    name: photoo_uploads_data
   caddy_data:
-    name: crewbook_caddy_data
+    name: photoo_caddy_data
   caddy_config:
-    name: crewbook_caddy_config
+    name: photoo_caddy_config
 
 networks:
-  crewbook-net:
-    name: crewbook-network
+  photoo-net:
+    name: photoo-network
     driver: bridge

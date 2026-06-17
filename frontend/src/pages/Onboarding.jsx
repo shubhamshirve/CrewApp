@@ -123,9 +123,9 @@ export default function Onboarding() {
         {/* Logo */}
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#E05D26" }}>
-            <span className="text-white font-bold text-sm">C</span>
+            <span className="text-white font-bold text-sm">P</span>
           </div>
-          <span className="text-slate-900 font-semibold font-display text-lg">CrewBook</span>
+          <span className="text-slate-900 font-semibold font-display text-lg">Photoo</span>
         </div>
 
         {/* Progress */}

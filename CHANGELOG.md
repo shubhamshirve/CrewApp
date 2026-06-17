@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to CrewBook are documented here.
+All notable changes to Photoo are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
@@ -121,7 +121,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `App.js` — `/admin/logs` route wired with `AdminGuard`
 
 **Tests**
-- `TestAdminLogs` class in `test_crewbook.py` — 12 integration tests covering all 6 log endpoints: shape validation, filter correctness, auth guard, and limit cap
+- `TestAdminLogs` class in `test_photoo.py` — 12 integration tests covering all 6 log endpoints: shape validation, filter correctness, auth guard, and limit cap
 
 ### Fixed
 - `log_admin_action()` now uses `admin.get("id", "unknown")` and `before or {}` / `after or {}` to handle None inputs safely
@@ -178,4 +178,4 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Admin panel: overview stats, verification queue, penalties, gig board, settings
 - WhatsApp notifications (simulated)
 - Docker Compose setup with nginx, FastAPI, MongoDB
-- Integration test suite (`test_crewbook.py`)
+- Integration test suite (`test_photoo.py`)

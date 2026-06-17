@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CrewBook — Database Reset Script
+Photoo — Database Reset Script
 ===================================
 Drops ALL collections and optionally re-seeds with demo data.
 
@@ -34,7 +34,7 @@ except ImportError:
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME   = os.environ.get("DB_NAME", "crewbook_db")
+DB_NAME   = os.environ.get("DB_NAME", "photoo_db")
 
 # All known collections (in drop order — safe to add new ones here)
 ALL_COLLECTIONS = [
@@ -143,7 +143,7 @@ def run_seed():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Reset (wipe) the CrewBook MongoDB database.",
+        description="Reset (wipe) the Photoo MongoDB database.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -180,7 +180,7 @@ def main():
         sys.exit(0)
 
     print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════╗{RESET}")
-    print(f"{BOLD}{CYAN}║     CrewBook — Database Reset            ║{RESET}")
+    print(f"{BOLD}{CYAN}║     Photoo — Database Reset            ║{RESET}")
     print(f"{BOLD}{CYAN}╚══════════════════════════════════════════╝{RESET}")
 
     # Connect

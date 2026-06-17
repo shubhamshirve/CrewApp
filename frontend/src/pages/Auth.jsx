@@ -198,7 +198,7 @@ export default function Auth() {
     setLoading(true);
     try {
       const user = await login(loginData.email, loginData.password);
-      const dismissedUntil = localStorage.getItem("crewbook_notification_dismissed");
+      const dismissedUntil = localStorage.getItem("photoo_notification_dismissed");
       const shouldShowModal = !dismissedUntil || new Date() >= new Date(dismissedUntil);
       if (shouldShowModal) {
         setShowNotificationModal(true);
@@ -236,7 +236,7 @@ export default function Auth() {
       delete payload.whatsapp_same_as_mobile;
       await register(payload);
 
-      const dismissedUntil = localStorage.getItem("crewbook_notification_dismissed");
+      const dismissedUntil = localStorage.getItem("photoo_notification_dismissed");
       const shouldShowModal = !dismissedUntil || new Date() >= new Date(dismissedUntil);
       if (shouldShowModal) {
         setShowNotificationModal(true);
@@ -278,9 +278,9 @@ export default function Auth() {
         {/* Logo */}
         <div className="flex items-center gap-2 mb-8">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#E05D26" }}>
-            <span className="text-white font-bold font-display">C</span>
+            <span className="text-white font-bold font-display">P</span>
           </div>
-          <span className="text-slate-900 text-xl font-semibold font-display">CrewBook</span>
+          <span className="text-slate-900 text-xl font-semibold font-display">Photoo</span>
         </div>
 
         <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">

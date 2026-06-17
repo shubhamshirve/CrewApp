@@ -39,7 +39,7 @@ export default function AdminLayout({ children }) {
               <Shield size={16} className="text-white" />
             </div>
             <div>
-              <p className="text-slate-900 font-semibold text-sm font-display leading-none">CrewBook</p>
+              <p className="text-slate-900 font-semibold text-sm font-display leading-none">Photoo</p>
               <p className="text-blue-600 text-[10px] font-semibold tracking-widest uppercase mt-0.5">Admin</p>
             </div>
           </div>

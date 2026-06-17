@@ -1,5 +1,5 @@
 /**
- * CrewBook Push Notification Service
+ * Photoo Push Notification Service
  * Manages browser push subscription and communicates with backend.
  */
 
