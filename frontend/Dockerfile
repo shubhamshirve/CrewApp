@@ -20,7 +20,15 @@ COPY . .
 ARG REACT_APP_BACKEND_URL=""
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL \
     GENERATE_SOURCEMAP=false \
-    INLINE_RUNTIME_CHUNK=false
+    INLINE_RUNTIME_CHUNK=false \
+    # CRA 5 / react-scripts 5.0.1 ship eslint-webpack-plugin with options that
+    # were REMOVED in ESLint v9 (`extensions`, `resolvePluginsRelativeTo`).
+    # Our package.json pins eslint@9.x, so the in-build lint pass crashes with
+    # "Unknown options: extensions, resolvePluginsRelativeTo".
+    # Lint runs separately in CI; disable the build-time plugin here.
+    DISABLE_ESLINT_PLUGIN=true \
+    ESLINT_NO_DEV_ERRORS=true \
+    CI=false
 
 RUN pnpm run build
 

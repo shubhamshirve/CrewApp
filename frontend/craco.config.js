@@ -24,13 +24,14 @@ if (config.enableHealthCheck) {
 
 let webpackConfig = {
   eslint: {
-    configure: {
-      extends: ["plugin:react-hooks/recommended"],
-      rules: {
-        "react-hooks/rules-of-hooks": "error",
-        "react-hooks/exhaustive-deps": "warn",
-      },
-    },
+    // CRA 5 / react-scripts ships eslint-webpack-plugin built for ESLint v8.
+    // Our package.json pins eslint@9, which removed the `extensions` and
+    // `resolvePluginsRelativeTo` options the plugin still passes — the
+    // production build crashes with "Invalid Options: Unknown options".
+    // ESLint runs separately in CI (mcp_lint_javascript / pre-commit), so we
+    // disable the in-build lint pass entirely. Dev server is unaffected
+    // because react-error-overlay still surfaces compile errors live.
+    enable: false,
   },
   webpack: {
     alias: {
