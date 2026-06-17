@@ -11,13 +11,25 @@
 up:
 	docker compose up -d --build
 
+## Start with production overrides (use this on VPS)
+up-prod:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
 ## Stop all services
 down:
 	docker compose down
 
+## Stop production stack
+down-prod:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+
 ## Follow all service logs
 logs:
 	docker compose logs -f
+
+## Follow production logs
+logs-prod:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f
 
 ## Follow backend logs only
 logs-backend:

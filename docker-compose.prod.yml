@@ -1,0 +1,16 @@
+# Production overrides for CrewBook
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Changes from base:
+#  - Frontend binds to 127.0.0.1:3000 (host Caddy proxies in; external clients can't reach it directly)
+#  - Backend NOT exposed to host (only reachable inside Docker network via backend:8001)
+#  - MongoDB stays internal (already no ports in base)
+
+services:
+  backend:
+    # Remove host port binding — backend is only accessed by frontend via Docker internal DNS
+    ports: []
+
+  frontend:
+    ports:
+      - "127.0.0.1:3000:80"   # localhost-only bind; host Caddy proxies crew.mmpf.in here
