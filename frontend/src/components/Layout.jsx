@@ -28,7 +28,34 @@ export default function Layout({ children }) {
   const [unread, setUnread] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  // Compute install-prompt eligibility ONCE via lazy state initializer.
+  // (Lazy initializers are run by React exactly once at mount and may have
+  // side-effects like reading/writing storage.)
+  const initInstall = () => {
+    if (typeof window === "undefined") return { allowed: false, isIos: false };
+    const isStandalone =
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true;
+    if (isStandalone || localStorage.getItem("pwa-installed") === "1") {
+      return { allowed: false, isIos: false };
+    }
+    if (!sessionStorage.getItem("pwa-visit-counted")) {
+      const next = (parseInt(localStorage.getItem("pwa-visit-count") || "0", 10) || 0) + 1;
+      localStorage.setItem("pwa-visit-count", String(next));
+      sessionStorage.setItem("pwa-visit-counted", "1");
+    }
+    const visits = parseInt(localStorage.getItem("pwa-visit-count") || "0", 10);
+    const snoozedUntil = parseInt(localStorage.getItem("pwa-install-snoozed-until") || "0", 10);
+    const allowed = visits >= 2 && Date.now() > snoozedUntil;
+    const ua = window.navigator.userAgent || "";
+    const isIos = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+    return { allowed, isIos: isIos && isSafari };
+  };
+  const [installInit] = useState(initInstall);
+  const [showInstallBanner, setShowInstallBanner] = useState(installInit.allowed && installInit.isIos);
+  const [isIosFallback] = useState(installInit.isIos && installInit.allowed);
+  const [showIosHelp, setShowIosHelp] = useState(false);
 
   const handleBackToAdmin = async () => {
     await exitImpersonation();
@@ -39,31 +66,62 @@ export default function Layout({ children }) {
     api.get("/notifications/unread-count").then(r => setUnread(r.data.count)).catch(() => {});
   }, [location.pathname]);
 
-  // Capture the browser's install prompt event
+  // Listen for the browser's install prompt (Chromium / Android) and the
+  // appinstalled event. Eligibility was computed synchronously above so this
+  // effect only registers listeners.
   useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
     const handler = (e) => {
       e.preventDefault();
       setInstallPrompt(e);
-      const dismissed = sessionStorage.getItem("pwa-install-dismissed");
-      if (!dismissed) setShowInstallBanner(true);
+      if (installInit.allowed) setShowInstallBanner(true);
+    };
+    const installedHandler = () => {
+      localStorage.setItem("pwa-installed", "1");
+      setShowInstallBanner(false);
+      setShowIosHelp(false);
+      setInstallPrompt(null);
     };
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", installedHandler);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installedHandler);
+    };
+    // installInit is computed once per mount; safe to ignore for deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleInstall = async () => {
+    if (isIosFallback) {
+      setShowIosHelp(true);
+      return;
+    }
     if (!installPrompt) return;
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
     if (outcome === "accepted") {
       setShowInstallBanner(false);
       setInstallPrompt(null);
+    } else {
+      // User cancelled the native prompt — snooze 7 days
+      localStorage.setItem(
+        "pwa-install-snoozed-until",
+        String(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      );
+      setShowInstallBanner(false);
     }
   };
 
   const dismissBanner = () => {
     setShowInstallBanner(false);
-    sessionStorage.setItem("pwa-install-dismissed", "1");
+    setShowIosHelp(false);
+    // Snooze 7 days so we don't pester the user every visit
+    localStorage.setItem(
+      "pwa-install-snoozed-until",
+      String(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    );
   };
 
   const handleLogout = () => { logout(); navigate("/"); };
@@ -223,13 +281,18 @@ export default function Layout({ children }) {
           {/* Notification Permission Prompt */}
           {!isImpersonating && <NotificationPrompt />}
 
-          {/* PWA Install Banner */}
+          {/* PWA Install Banner — surfaces on visit #2+, snoozable, iOS-aware */}
           {showInstallBanner && (
-            <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-orange-200 bg-orange-50 text-sm">
-              <div className="flex items-center gap-2">
+            <div
+              data-testid="pwa-install-banner"
+              className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-orange-200 bg-orange-50 text-sm"
+            >
+              <div className="flex items-center gap-2 min-w-0">
                 <Download size={15} className="text-orange-500 flex-shrink-0" />
-                <span className="text-slate-700 font-display">
-                  Install <strong>CrewBook</strong> on your device for quick access
+                <span className="text-slate-700 font-display truncate">
+                  {isIosFallback
+                    ? <>Install <strong>CrewBook</strong> on your iPhone — tap to see how</>
+                    : <>Install <strong>CrewBook</strong> for one-tap access + offline support</>}
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -239,11 +302,60 @@ export default function Layout({ children }) {
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white font-display"
                   style={{ background: "#E05D26" }}
                 >
-                  Install
+                  {isIosFallback ? "Show me how" : "Install"}
                 </button>
-                <button onClick={dismissBanner} className="text-slate-400 hover:text-slate-600 p-0.5">
+                <button
+                  data-testid="pwa-install-dismiss"
+                  onClick={dismissBanner}
+                  className="text-slate-400 hover:text-slate-600 p-0.5"
+                  aria-label="Dismiss"
+                >
                   <X size={14} />
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* iOS A2HS instructions modal */}
+          {showIosHelp && (
+            <div
+              data-testid="pwa-ios-help"
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4"
+              onClick={() => setShowIosHelp(false)}
+            >
+              <div
+                className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="text-lg font-display font-semibold text-slate-900">
+                    Install CrewBook
+                  </h3>
+                  <button
+                    onClick={() => setShowIosHelp(false)}
+                    className="text-slate-400 hover:text-slate-600"
+                    aria-label="Close"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <ol className="space-y-2 text-sm text-slate-700 font-display">
+                  <li className="flex gap-2">
+                    <span className="font-semibold text-orange-600">1.</span>
+                    Tap the <strong>Share</strong> button in Safari
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold text-orange-600">2.</span>
+                    Scroll down and choose <strong>Add to Home Screen</strong>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold text-orange-600">3.</span>
+                    Tap <strong>Add</strong> in the top-right
+                  </li>
+                </ol>
+                <p className="mt-4 text-xs text-slate-500">
+                  CrewBook will launch full-screen and works offline.
+                </p>
               </div>
             </div>
           )}

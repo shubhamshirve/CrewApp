@@ -237,6 +237,8 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ Frontend build switched to **pnpm 9** (corepack)
 - ✅ Frontend served by **Caddy** (replaces nginx) — gzip + SPA fallback
 - ✅ PWA support — `manifest.json`, `sw.js`, offline page, `InstallAppButton`
+- ✅ **Smart in-app install prompt** (`Layout.jsx`) — surfaces only on 2nd+ visit, 7-day snooze on dismiss, iOS Safari "Add to Home Screen" instructions modal as fallback (no `beforeinstallprompt` on iOS)
+- ✅ **Slim requirements.txt** — removed `emergentintegrations`, `litellm`, `openai`, all `google-*` SDKs, `boto3`, `stripe`, `pandas`, `numpy`, `tiktoken`, `huggingface_hub`, dev-only tools (black/isort/mypy/flake8). 133 → 56 packages. Regression guard at `backend/tests/test_imports_sanity.py`.
 - ✅ CI/CD via GitHub Actions → GHCR (`.github/workflows/ci.yml`)
 - ✅ DB helper scripts: `scripts/seed_data.py`, `scripts/reset_db.py`
 - ✅ **Unified multi-app VPS deploy** (`deploy/deploy.sh`) — non-destructive co-hosting of CrewBook (`crew.mmpf.in`) + JVSapp (`app.mmpf.in`) on `45.196.196.114`:
