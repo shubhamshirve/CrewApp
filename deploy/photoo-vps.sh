@@ -128,57 +128,7 @@ fi
 # Enable BuildKit for all subsequent docker / compose calls
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
-
-# ── Enable BuildKit in Docker daemon.json (persistent, survives reboots) ─────
-# DOCKER_BUILDKIT=1 env var alone is not reliable — some Compose versions
-# ignore it and use the legacy builder, which doesn't understand --mount.
-# Writing it into daemon.json is the only guaranteed method.
-# This runs NOW in Step 0, BEFORE any docker build command, so BuildKit
-# is definitely active when we reach Step 6.
-DOCKER_DAEMON_JSON="/etc/docker/daemon.json"
-
-BUILDKIT_IN_DAEMON=$(python3 -c "
-import json, sys
-try:
-    with open('${DOCKER_DAEMON_JSON}') as f:
-        d = json.load(f)
-    sys.stdout.write('yes' if d.get('features', {}).get('buildkit') == True else 'no')
-except Exception:
-    sys.stdout.write('no')
-" 2>/dev/null || echo "no")
-
-if [ "$BUILDKIT_IN_DAEMON" != "yes" ]; then
-    info "Configuring Docker daemon to use BuildKit (one-time setup)..."
-    python3 - <<'PYEOF'
-import json, os
-path = "/etc/docker/daemon.json"
-d = {}
-if os.path.exists(path):
-    try:
-        with open(path) as f:
-            d = json.load(f)
-    except Exception:
-        pass   # malformed JSON — start fresh
-d.setdefault("features", {})["buildkit"] = True
-with open(path, "w") as f:
-    json.dump(d, f, indent=2)
-print("  /etc/docker/daemon.json updated")
-PYEOF
-
-    systemctl reload-or-restart docker
-    # Wait for daemon to come back up before proceeding
-    for _i in 1 2 3 4 5 6 7 8 9 10; do
-        sleep 2
-        docker info >/dev/null 2>&1 && break
-        info "  waiting for Docker daemon... (${_i})"
-    done
-    docker info >/dev/null 2>&1 || err "Docker daemon did not restart — check: journalctl -u docker -n 30"
-    ok "Docker daemon restarted with BuildKit enabled"
-else
-    ok "Docker daemon BuildKit already configured"
-fi
-
-ok "Docker Compose $COMPOSE_VER  |  BuildKit enabled (env + daemon.json)"
+ok "Docker Compose $COMPOSE_VER  |  ready"
 
 # =============================================================================
 step "1/9  Install Caddy on host (if missing)"

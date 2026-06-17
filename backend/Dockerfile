@@ -6,11 +6,12 @@ RUN groupadd --gid 1001 appgroup && \
 
 WORKDIR /app
 
-# PIP_NO_CACHE_DIR is intentionally NOT set — the BuildKit cache mount below
-# persists ~/.cache/pip across builds, making pip installs nearly instant when
-# requirements.txt hasn't changed.
+# PIP_NO_CACHE_DIR=1 keeps the image lean (no pip http cache inside the image).
+# Docker's layer cache handles the real speed-up: this RUN step is skipped
+# entirely on deploys where requirements.txt hasn't changed.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     UPLOADS_DIR=/app/uploads
 
@@ -21,12 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies (layer cached separately from source).
-# The BuildKit cache mount keeps ~/.cache/pip warm on the VPS host —
-# when requirements.txt hasn't changed, pip resolves everything locally
-# with no network downloads at all.
+# Docker re-runs this only when requirements.txt changes — unchanged deploys
+# skip it entirely via layer cache.
 COPY requirements.txt .
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 # Copy source code
 COPY --chown=appuser:appgroup . .
