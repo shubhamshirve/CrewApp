@@ -138,11 +138,23 @@ def _parse_dt(date_str: str, time_str: str) -> datetime | None:
         return None
 
 
-async def _check_90min_buffer(db, freelancer_id: str, new_date: str, new_start: str, new_end: str) -> str | None:
+async def _check_90min_buffer(
+    db,
+    freelancer_id: str,
+    new_date: str,
+    new_start: str,
+    new_end: str,
+    exclude_gig_id: str | None = None,
+) -> str | None:
     """
     Check if a new session conflicts (within 90-minute buffer) with freelancer's existing accepted sessions.
     Returns an error message string if conflict found, None otherwise.
     Batch-fetches all relevant gigs to avoid N+1 queries.
+
+    Args:
+        exclude_gig_id: optional gig to exclude from the check (used when the lead adds a
+                        session to their own gig — we don't want the gig's own sessions
+                        to conflict with themselves).
     """
     new_s = _parse_dt(new_date, new_start)
     new_e = _parse_dt(new_date, new_end)
@@ -150,10 +162,12 @@ async def _check_90min_buffer(db, freelancer_id: str, new_date: str, new_start: 
         return None  # Can't validate — skip
 
     buffer = timedelta(minutes=90)
-    # Get all accepted invites for this freelancer
-    existing_invites = await db.gig_invites.find(
-        {"freelancer_id": freelancer_id, "status": "accepted"}
-    ).to_list(200)
+    # Get all accepted invites for this freelancer (optionally excluding one gig)
+    invite_filter: dict = {"freelancer_id": freelancer_id, "status": "accepted"}
+    if exclude_gig_id:
+        invite_filter["gig_id"] = {"$ne": exclude_gig_id}
+
+    existing_invites = await db.gig_invites.find(invite_filter).to_list(200)
 
     if not existing_invites:
         return None
