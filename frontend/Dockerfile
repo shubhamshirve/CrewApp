@@ -10,7 +10,7 @@ COPY package.json package-lock.json ./
 # BuildKit cache mount: keeps the npm HTTP cache between CI runs so
 # re-downloading unchanged packages is avoided when deps do change.
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline
+    npm ci --prefer-offline --legacy-peer-deps
 
 # Copy source and build
 COPY . .
