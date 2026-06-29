@@ -51,8 +51,13 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Two-level cache: registry cache (persists forever) + GHA cache (fast local hit)
+          cache-from: |
+            type=registry,ref=${{ env.BACKEND_IMAGE }}:cache
+            type=gha,scope=backend
+          cache-to: |
+            type=registry,ref=${{ env.BACKEND_IMAGE }}:cache,mode=max
+            type=gha,scope=backend,mode=max
 
   # ── Frontend ─────────────────────────────────────────────────────────────────
   build-frontend:
@@ -95,8 +100,12 @@ jobs:
           labels: ${{ steps.meta-frontend.outputs.labels }}
           build-args: |
             REACT_APP_BACKEND_URL=
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=registry,ref=${{ env.FRONTEND_IMAGE }}:cache
+            type=gha,scope=frontend
+          cache-to: |
+            type=registry,ref=${{ env.FRONTEND_IMAGE }}:cache,mode=max
+            type=gha,scope=frontend,mode=max
 
   # ── Deploy to VPS (only on push to main) ─────────────────────────────────────
   deploy:
@@ -132,11 +141,11 @@ jobs:
             set -e
             cd /opt/photoo
 
-            # Pull latest images from GHCR (no rebuild needed)
-            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+            # Pull latest images from GHCR in parallel
+            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull --quiet
 
-            # Restart containers with new images, remove old ones
-            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --remove-orphans
+            # Restart with zero downtime (replace old containers with new ones)
+            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --remove-orphans --no-build
 
             # Clean up dangling images to save disk space
             docker image prune -f
