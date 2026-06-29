@@ -286,6 +286,18 @@ backend:
         comment: "✅ VERIFIED: User profile page load working correctly. GET /api/users/{own_user_id} returns HTTP 200 with proper profile data. Tested with testmobile@crewbook.in credentials."
 
 frontend:
+  - task: "GigBoard - City filter by user's city"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/GigBoard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added city quick-select pills (My City + All Cities) to GigBoard Browse tab. Initialized filters.city with user.location so gigs default to user's city. fetchBrowse now accepts cityOverride param for immediate filtering. Also added result count label and empty-state with 'browse all cities' link. Verified backend filtering works: aakash(Delhi) sees Delhi gigs, rohan(Mumbai) sees Mumbai gigs. All Cities pill shows all 4 gigs."
+
   - task: "AdminSettings page — Pricing, Event Types, Roles tabs"
     implemented: true
     working: "NA"
@@ -415,7 +427,7 @@ agent_communication:
   - agent: "testing"
     message: "✅ BOTH FIXES VERIFIED (2/2 tests passed): TEST 1 - Subscription page (/wallet) now shows plans at the TOP: Visual order is (1) Coupon Input, (2) Plan Cards (Basic ₹69, Pro ₹99), (3) Wallet Balance, (4) Referral section. Coupon input box is correctly positioned above plan cards. TEST 2 - Upgrade wall shows navigation sidebar: Dashboard page displays left sidebar (220px width, 11 nav links) alongside 'Subscription Required' upgrade wall content. Both requested fixes are working correctly."
   - agent: "main"
-    message: "Continuation pass: 1) ratings.py - MongoDB $avg aggregation pipeline replaces to_list(1000) Python-side scan. 2) gigs.py - add_session() now validates 90-min buffer for the lead photographer when adding new sessions. 3) Makefile added with up/down/logs/seed/reset/reset-seed/health/test/lint targets. 4) CHANGELOG.md updated with full v2.0 entry. Seed data: admin@crewbook.in/Admin@123, crew users: rohan/priya/aakash/kavya/vikram @example.com / Test@1234"
+    message: "Added city-first filtering to GigBoard Browse tab. Changes: 1) filters.city now initializes with user.location (user's city from profile). 2) fetchBrowse() accepts optional cityOverride param. 3) Added city quick-select pill buttons: 'My City (city_name)' pre-selected orange pill + 'All Cities' dark pill. 4) Added results context label showing gig count + current city. Test with rohan@example.com (Mumbai) / Test@1234. Gig board access requires pro plan."
   - agent: "testing"
     message: "✅ RATING VALIDATION & ADMIN SEED PROTECTION TESTING COMPLETE (9/9 tests passed): Tested 2 new backend fixes. TEST SUITE 1 - Rating Score Validation (3/3 PASS): punctuality=10 returns 422, punctuality=0 returns 422, non-existent gig returns 404. TEST SUITE 2 - Rating Membership Validation (3/3 PASS): rater not on gig returns 403 'You were not part of this booking', self-rating returns 400 'Cannot rate yourself', non-completed gig returns 400 'Ratings are only allowed after a gig is completed'. TEST SUITE 3 - Admin Seed Endpoint Protection (3/3 PASS): no header returns 403 'Seed endpoint disabled', wrong secret returns 403 'Seed endpoint disabled', endpoint completely locked down. All security and validation fixes are working correctly."
   - agent: "testing"

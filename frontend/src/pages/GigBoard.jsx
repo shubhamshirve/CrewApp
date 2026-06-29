@@ -705,7 +705,7 @@ export default function GigBoard() {
   const [applyModal, setApplyModal] = useState(null);
   const [manageModal, setManageModal] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({ role: "", city: "", event_type: "", budget_min: "", budget_max: "" });
+  const [filters, setFilters] = useState({ role: "", city: user?.location || "", event_type: "", budget_min: "", budget_max: "" });
 
   // Use platform context instead of per-page API calls
   const dynamicRoles = platformRoles;
@@ -714,12 +714,13 @@ export default function GigBoard() {
   // Check plan access — admins always have full access
   const hasAccess = user?.is_admin === true || user?.active_plan_features?.public_gig_enabled === true;
 
-  const fetchBrowse = useCallback(async () => {
+  const fetchBrowse = useCallback(async (cityOverride) => {
     setLoading(true);
+    const cityVal = cityOverride !== undefined ? cityOverride : filters.city;
     try {
       const params = {};
       if (filters.role) params.role = filters.role;
-      if (filters.city) params.city = filters.city;
+      if (cityVal) params.city = cityVal;
       if (filters.event_type) params.event_type = filters.event_type;
       if (filters.budget_min) params.budget_min = Number(filters.budget_min);
       if (filters.budget_max) params.budget_max = Number(filters.budget_max);
@@ -854,13 +855,56 @@ export default function GigBoard() {
         {/* Browse filters */}
         {hasAccess && !accessDenied && tab === "browse" && (
           <div className="space-y-3">
+            {/* City quick-select pills */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                <MapPin size={12} /> City:
+              </span>
+              {user?.location && (
+                <button
+                  data-testid="city-pill-my-city"
+                  onClick={() => {
+                    setFilters(f => ({ ...f, city: user.location }));
+                    fetchBrowse(user.location);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    filters.city?.toLowerCase() === user.location?.toLowerCase()
+                      ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-orange-300 hover:text-orange-500"
+                  }`}
+                >
+                  <MapPin size={10} />
+                  {user.location}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    filters.city?.toLowerCase() === user.location?.toLowerCase()
+                      ? "bg-white/25 text-white"
+                      : "bg-orange-50 text-orange-500"
+                  }`}>My City</span>
+                </button>
+              )}
+              <button
+                data-testid="city-pill-all"
+                onClick={() => {
+                  setFilters(f => ({ ...f, city: "" }));
+                  fetchBrowse("");
+                }}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                  !filters.city
+                    ? "bg-slate-700 text-white border-slate-700 shadow-sm"
+                    : "bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-800"
+                }`}
+              >
+                All Cities
+              </button>
+            </div>
+
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   data-testid="filter-city"
                   className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400"
-                  placeholder="Filter by city..."
+                  placeholder="Search a different city..."
                   value={filters.city}
                   onChange={e => setFilters(f => ({ ...f, city: e.target.value }))}
                 />
@@ -947,11 +991,25 @@ export default function GigBoard() {
             {/* Browse Tab */}
             {tab === "browse" && (
               <div className="space-y-4">
+                {/* Results context label */}
+                {gigs.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <MapPin size={11} />
+                    <span>
+                      Showing <span className="font-medium text-slate-600">{gigs.length}</span> gig{gigs.length !== 1 ? "s" : ""}
+                      {filters.city ? <> in <span className="font-medium text-orange-500">{filters.city}</span></> : " from all cities"}
+                    </span>
+                  </div>
+                )}
                 {gigs.length === 0 ? (
                   <div className="text-center py-20">
                     <Briefcase size={40} className="mx-auto mb-4 text-slate-300" />
-                    <p className="text-slate-500 text-sm">No open gigs found</p>
-                    <p className="text-slate-400 text-xs mt-1">Try adjusting filters or check back later</p>
+                    <p className="text-slate-500 text-sm">No open gigs found{filters.city ? ` in ${filters.city}` : ""}</p>
+                    <p className="text-slate-400 text-xs mt-1">
+                      {filters.city ? (
+                        <>Try <button className="text-orange-400 hover:underline" onClick={() => { setFilters(f => ({ ...f, city: "" })); fetchBrowse(""); }}>browsing all cities</button> or check back later</>
+                      ) : "Try adjusting filters or check back later"}
+                    </p>
                   </div>
                 ) : (
                   gigs.map(g => (
