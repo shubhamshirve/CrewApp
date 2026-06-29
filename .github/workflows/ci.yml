@@ -24,6 +24,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── Build Python wheels outside Docker (fast with GHA cache) ──────────
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: backend/wheels
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Build wheels (compile once, cache forever)
+        run: |
+          pip wheel -r backend/requirements.txt --wheel-dir backend/wheels/ --quiet
+
+      # ── Wrap pre-built wheels in a slim Python image (seconds) ────────────
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -48,15 +67,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./backend
+          file: ./backend/Dockerfile.ci
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: |
-            type=registry,ref=${{ env.BACKEND_IMAGE }}:cache
-            type=gha,scope=backend
-          cache-to: |
-            type=registry,ref=${{ env.BACKEND_IMAGE }}:cache,mode=max
-            type=gha,scope=backend,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
 
   # ── Frontend ─────────────────────────────────────────────────────────────────
   build-frontend:
@@ -125,7 +141,6 @@ jobs:
       - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6
         with:
-          # Context = pre-built build/ dir; Dockerfile just does COPY . into Caddy
           context: ./frontend/build
           file: ./frontend/Dockerfile.ci
           push: ${{ github.event_name != 'pull_request' }}
@@ -166,9 +181,7 @@ jobs:
           script: |
             set -e
             cd /opt/photoo
-
             docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull --quiet
             docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --remove-orphans --no-build
             docker image prune -f
-
             echo "Deployment complete"

@@ -84,5 +84,9 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 
+# CI-generated artifacts (created during GitHub Actions, never committed)
+backend/wheels/
+frontend/build/
+
 # Test credentials (auto-generated, never commit)
 memory/test_credentials.md

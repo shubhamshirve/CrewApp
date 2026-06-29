@@ -1,0 +1,37 @@
+# CI-optimised backend image.
+# Python wheels are pre-built by the CI runner (pip wheel -r requirements.txt).
+# This Dockerfile only extracts pre-built wheels — no gcc, no internet, ~30 seconds.
+# Build time: ~30 seconds (vs 8-10 minutes with full pip install).
+#
+# For local Docker builds use the main Dockerfile instead:
+#   docker build -f Dockerfile -t backend .
+FROM python:3.11-slim
+
+RUN groupadd --gid 1001 appgroup && \
+    useradd --uid 1001 --gid appgroup --shell /bin/sh --create-home appuser
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UPLOADS_DIR=/app/uploads
+
+# Install from pre-built wheels (no gcc needed, no network calls)
+COPY wheels/ /tmp/wheels/
+COPY requirements.txt .
+RUN pip install --no-index --find-links /tmp/wheels -r requirements.txt \
+    && rm -rf /tmp/wheels
+
+# Application source code
+COPY --chown=appuser:appgroup . .
+
+RUN mkdir -p /app/uploads && chown appuser:appgroup /app/uploads
+
+USER appuser
+
+EXPOSE 8001
+
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001", \
+     "--workers", "2", "--proxy-headers", "--forwarded-allow-ips", "*"]
