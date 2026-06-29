@@ -51,7 +51,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
-          # Two-level cache: registry cache (persists forever) + GHA cache (fast local hit)
           cache-from: |
             type=registry,ref=${{ env.BACKEND_IMAGE }}:cache
             type=gha,scope=backend
@@ -70,6 +69,38 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ── Build React outside Docker (fast with GHA cache) ──────────────────
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache npm packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --legacy-peer-deps --prefer-offline
+
+      - name: Build React app
+        working-directory: frontend
+        env:
+          REACT_APP_BACKEND_URL: ""
+          GENERATE_SOURCEMAP: "false"
+          DISABLE_ESLINT_PLUGIN: "true"
+          ESLINT_NO_DEV_ERRORS: "true"
+          CI: "false"
+        run: npm run build
+
+      # ── Wrap pre-built files in Caddy (seconds, no npm in Docker) ─────────
+      - name: Copy Caddyfile into build output
+        run: cp frontend/Caddyfile frontend/build/Caddyfile
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -94,25 +125,20 @@ jobs:
       - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          # Context = pre-built build/ dir; Dockerfile just does COPY . into Caddy
+          context: ./frontend/build
+          file: ./frontend/Dockerfile.ci
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
-          build-args: |
-            REACT_APP_BACKEND_URL=
-          cache-from: |
-            type=registry,ref=${{ env.FRONTEND_IMAGE }}:cache
-            type=gha,scope=frontend
-          cache-to: |
-            type=registry,ref=${{ env.FRONTEND_IMAGE }}:cache,mode=max
-            type=gha,scope=frontend,mode=max
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
 
   # ── Deploy to VPS (only on push to main) ─────────────────────────────────────
   deploy:
     name: Deploy to VPS
     needs: [build-backend, build-frontend]
     runs-on: ubuntu-latest
-    # Only auto-deploy on direct pushes to main (not PRs, not develop)
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
@@ -141,13 +167,8 @@ jobs:
             set -e
             cd /opt/photoo
 
-            # Pull latest images from GHCR in parallel
             docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull --quiet
-
-            # Restart with zero downtime (replace old containers with new ones)
             docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --remove-orphans --no-build
-
-            # Clean up dangling images to save disk space
             docker image prune -f
 
             echo "Deployment complete"
