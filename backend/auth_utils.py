@@ -8,7 +8,14 @@ from db import get_db
 
 SECRET_KEY = os.environ.get("JWT_SECRET")
 if not SECRET_KEY:
-    raise RuntimeError("JWT_SECRET environment variable is required but not set")
+    import warnings
+    SECRET_KEY = "insecure-default-dev-key-change-me-in-backend-env"
+    warnings.warn(
+        "JWT_SECRET is not set — using an insecure default key. "
+        "Set a proper JWT_SECRET in backend/.env for production!",
+        RuntimeWarning,
+        stacklevel=2,
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
