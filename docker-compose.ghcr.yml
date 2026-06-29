@@ -1,0 +1,15 @@
+# GHCR image override — used exclusively by CI/CD auto-deployment.
+#
+# Replaces the local `build:` context with pre-built images from GitHub
+# Container Registry so the VPS never needs the source code to rebuild.
+#
+# Usage on VPS (also what the deploy job runs):
+#   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --remove-orphans
+
+services:
+  backend:
+    image: ghcr.io/shubhamshirve/crewapp-backend:latest
+
+  frontend:
+    image: ghcr.io/shubhamshirve/crewapp-frontend:latest

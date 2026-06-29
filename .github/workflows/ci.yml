@@ -1,4 +1,4 @@
-name: CI — Build & Push to GHCR
+name: CI — Build, Push & Deploy
 
 on:
   push:
@@ -97,3 +97,34 @@ jobs:
             REACT_APP_BACKEND_URL=
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ── Deploy to VPS (only on push to main) ─────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    # Only auto-deploy on direct pushes to main (not PRs, not develop)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            cd /opt/photoo
+
+            # Pull latest images from GHCR (no rebuild needed)
+            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+
+            # Restart containers with new images, remove old ones
+            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --remove-orphans
+
+            # Clean up dangling images to save disk space
+            docker image prune -f
+
+            echo "✅ Deployment complete"
