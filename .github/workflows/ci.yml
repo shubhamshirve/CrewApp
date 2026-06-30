@@ -212,7 +212,7 @@ jobs:
               echo "backend/.env not found — creating with safe defaults"
               mkdir -p backend
               SEED_SECRET=$(openssl rand -hex 16)
-              printf 'DB_NAME=crewbook_db\nJWT_SECRET=%s\nADMIN_DEFAULT_PASSWORD=Admin@123\nADMIN_SEED_SECRET=%s\n' \
+              printf 'DB_NAME=photoo_db\nJWT_SECRET=%s\nADMIN_DEFAULT_PASSWORD=Admin@123\nADMIN_SEED_SECRET=%s\n' \
                 "$(openssl rand -hex 32)" "$SEED_SECRET" > backend/.env
               echo "OK: backend/.env created (ADMIN_SEED_SECRET=$SEED_SECRET)"
             else
@@ -233,7 +233,6 @@ jobs:
 
             # ── Deploy ──────────────────────────────────────────────────────
             echo "--- Starting containers ---"
-            # Stop any running stack first (handles mongo version change cleanly)
             $DC -f docker-compose.vps.yml down --remove-orphans 2>/dev/null || true
             $DC -f docker-compose.vps.yml up -d
 

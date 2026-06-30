@@ -10,7 +10,7 @@ services:
     volumes:
       - mongodb_data:/data/db
     environment:
-      MONGO_INITDB_DATABASE: crewbook_db
+      MONGO_INITDB_DATABASE: photoo_db
     healthcheck:
       # mongo:4.4 ships the `mongo` shell (not `mongosh`)
       test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')", "--quiet"]
@@ -34,7 +34,7 @@ services:
       MONGO_URL: mongodb://mongodb:27017
       ENV: production
       UPLOADS_DIR: /app/uploads
-      DB_NAME: crewbook_db
+      DB_NAME: photoo_db
     volumes:
       - uploads_data:/app/uploads
     ports:

@@ -38,7 +38,7 @@ services:
       # Uploads directory inside the container (mounted as named volume below)
       UPLOADS_DIR: /app/uploads
       # Non-secret default — overridden by backend/.env if that file exists
-      DB_NAME: ${DB_NAME:-crewbook_db}
+      DB_NAME: ${DB_NAME:-photoo_db}
     depends_on:
       mongodb:
         condition: service_healthy
