@@ -211,11 +211,18 @@ jobs:
             if [ ! -f backend/.env ]; then
               echo "backend/.env not found — creating with safe defaults"
               mkdir -p backend
-              printf 'DB_NAME=crewbook_db\nJWT_SECRET=%s\nADMIN_DEFAULT_PASSWORD=Admin@123\n' \
-                "$(openssl rand -hex 32)" > backend/.env
-              echo "OK: backend/.env created"
+              SEED_SECRET=$(openssl rand -hex 16)
+              printf 'DB_NAME=crewbook_db\nJWT_SECRET=%s\nADMIN_DEFAULT_PASSWORD=Admin@123\nADMIN_SEED_SECRET=%s\n' \
+                "$(openssl rand -hex 32)" "$SEED_SECRET" > backend/.env
+              echo "OK: backend/.env created (ADMIN_SEED_SECRET=$SEED_SECRET)"
             else
               echo "OK: backend/.env exists"
+              # Ensure ADMIN_SEED_SECRET is present (add if missing)
+              if ! grep -q "ADMIN_SEED_SECRET" backend/.env; then
+                SEED_SECRET=$(openssl rand -hex 16)
+                printf '\nADMIN_SEED_SECRET=%s\n' "$SEED_SECRET" >> backend/.env
+                echo "OK: Added ADMIN_SEED_SECRET to existing .env"
+              fi
             fi
 
             # ── Pull latest images ───────────────────────────────────────────
@@ -229,5 +236,25 @@ jobs:
             $DC -f docker-compose.vps.yml down --remove-orphans 2>/dev/null || true
             $DC -f docker-compose.vps.yml up -d
 
+            # ── Wait for backend to be healthy ──────────────────────────────
+            echo "--- Waiting for backend to be ready ---"
+            for i in $(seq 1 24); do
+              if curl -sf http://localhost:8001/api/health >/dev/null 2>&1; then
+                echo "OK: Backend is healthy"
+                break
+              fi
+              echo "Waiting... ($i/24)"
+              sleep 5
+            done
+
+            # ── Seed admin if not already seeded ────────────────────────────
+            SEED_SECRET=$(grep ADMIN_SEED_SECRET backend/.env | cut -d= -f2)
+            if [ -n "$SEED_SECRET" ]; then
+              SEED_RESULT=$(curl -sf -X POST http://localhost:8001/api/admin/seed-admin \
+                -H "X-Seed-Secret: $SEED_SECRET" 2>&1 || echo "seed_failed")
+              echo "Seed result: $SEED_RESULT"
+            fi
+
             docker image prune -f
             echo "--- Deployment complete ---"
+            echo "Admin login: admin@photoo.in / Admin@123"
