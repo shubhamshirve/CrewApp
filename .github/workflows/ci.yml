@@ -227,6 +227,7 @@ jobs:
 
             # ── Pull latest images ───────────────────────────────────────────
             echo "--- Pulling images ---"
+            docker pull mongo:4.4
             docker pull ghcr.io/shubhamshirve/crewapp-backend:latest
             docker pull ghcr.io/shubhamshirve/crewapp-frontend:latest
 
@@ -237,13 +238,18 @@ jobs:
             $DC -f docker-compose.vps.yml up -d
 
             # ── Wait for backend to be healthy ──────────────────────────────
-            echo "--- Waiting for backend to be ready ---"
-            for i in $(seq 1 24); do
+            echo "--- Waiting for backend to be ready (up to 5 min) ---"
+            for i in $(seq 1 60); do
               if curl -sf http://localhost:8001/api/health >/dev/null 2>&1; then
-                echo "OK: Backend is healthy"
+                echo "OK: Backend is healthy after $((i*5))s"
                 break
               fi
-              echo "Waiting... ($i/24)"
+              if [ "$i" -eq 60 ]; then
+                echo "ERROR: Backend did not become healthy in time"
+                docker logs $(docker ps -q -f name=backend) --tail 30
+                exit 1
+              fi
+              echo "Waiting... ($i/60)"
               sleep 5
             done
 
