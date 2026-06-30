@@ -232,6 +232,12 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - [ ] Referral leaderboard
 - [ ] No-Show penalty (30-day suspension) — explicitly deferred by user
 
+### HTTPS Fix — app.photoo.in (Done — Feb 2026)
+- ✅ **Port 443 exposed** in `docker-compose.vps.yml` frontend service (`- "443:443"` added alongside port 80)
+- ✅ **Caddy TLS volumes** added (`caddy_data:/data`, `caddy_config:/config`) for persistent Let's Encrypt certificate storage
+- ✅ `EXPOSE 80 443` updated in both `Dockerfile` and `Dockerfile.ci` for accurate documentation
+- Caddy will auto-provision Let's Encrypt cert on first startup after deployment
+
 ### Deployment & Infrastructure (Done — Feb 2026)
 - ✅ **App rebrand: CrewBook → Photoo** — display name, identifiers, container/volume names, DB name (`photoo_db`), domain (`app.photoo.in`), admin email (`admin@photoo.in`), logo letter (P), Caddyfile, all 49 source files. GitHub repo URL kept as `shubhamshirve/CrewApp` per user. Deploy script now auto-migrates legacy `crewbook_*` Docker volumes → `photoo_*` on first run.
 - ✅ **Frontend Docker build fix**: CRA 5 / `react-scripts@5.0.1` ships eslint-webpack-plugin built for ESLint v8, while package.json pins eslint@9 → in-build lint pass crashed. Disabled via `craco.config.js` (`eslint.enable: false`) + Dockerfile env (`DISABLE_ESLINT_PLUGIN=true`). Lint still runs separately in CI.

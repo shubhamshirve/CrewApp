@@ -32,6 +32,6 @@ FROM caddy:2-alpine
 COPY --from=builder /app/build /usr/share/caddy/html
 COPY Caddyfile /etc/caddy/Caddyfile
 
-EXPOSE 80
+EXPOSE 80 443
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
