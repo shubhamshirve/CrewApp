@@ -91,6 +91,15 @@ def get_razorpay_client():
     ))
 
 
+def _require_razorpay():
+    """Raise a clear 503 if Razorpay credentials are not configured."""
+    if not os.environ.get("RAZORPAY_KEY_ID") or not os.environ.get("RAZORPAY_KEY_SECRET"):
+        raise HTTPException(
+            status_code=503,
+            detail="Payment gateway is not configured. Please add wallet balance to pay or contact support."
+        )
+
+
 class SubscribeRequest(BaseModel):
     plan_id: Optional[str] = None
     plan: Optional[str] = None
@@ -246,18 +255,23 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
             "discount_amount": discount_amount,
         }
 
+    _require_razorpay()
     rp = get_razorpay_client()
-    order = rp.order.create({
-        "amount": remaining_paise,
-        "currency": "INR",
-        "receipt": f"sub_{current_user['id'][:8]}_{uuid.uuid4().hex[:8]}",
-        "notes": {
-            "user_id": current_user["id"],
-            "plan": plan_info["plan_key"],
-            "plan_id": plan_info["plan_id"] or "",
-            "coupon_code": coupon_code_used or "",
-        }
-    })
+    try:
+        order = rp.order.create({
+            "amount": remaining_paise,
+            "currency": "INR",
+            "receipt": f"sub_{current_user['id'][:8]}_{uuid.uuid4().hex[:8]}",
+            "notes": {
+                "user_id": current_user["id"],
+                "plan": plan_info["plan_key"],
+                "plan_id": plan_info["plan_id"] or "",
+                "coupon_code": coupon_code_used or "",
+            }
+        })
+    except Exception as rp_err:
+        logger.error("Razorpay order creation failed: %s", rp_err)
+        raise HTTPException(status_code=503, detail=f"Payment gateway error: {rp_err}")
     try:
         await db.payment_logs.insert_one({
             "_id": str(uuid.uuid4()),
@@ -372,6 +386,7 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
 
 @router.post("/subscribe/verify")
 async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depends(get_current_user)):
+    _require_razorpay()
     rp = get_razorpay_client()
     db = get_db()
     now = datetime.now(timezone.utc)
@@ -538,12 +553,17 @@ async def upgrade_plan(data: SubscribeRequest, current_user: dict = Depends(get_
         })
         return {"full_wallet_cover": True, "pro_rata_credited": pro_rata, "wallet_deducted": wallet_deducted, "expires_at": expires_at}
 
+    _require_razorpay()
     rp = get_razorpay_client()
-    order = rp.order.create({
-        "amount": remaining_paise, "currency": "INR",
-        "receipt": f"upg_{current_user['id'][:8]}_{uuid.uuid4().hex[:8]}",
-        "notes": {"user_id": current_user["id"], "plan_id": new_plan_info["plan_id"] or "", "type": "upgrade"},
-    })
+    try:
+        order = rp.order.create({
+            "amount": remaining_paise, "currency": "INR",
+            "receipt": f"upg_{current_user['id'][:8]}_{uuid.uuid4().hex[:8]}",
+            "notes": {"user_id": current_user["id"], "plan_id": new_plan_info["plan_id"] or "", "type": "upgrade"},
+        })
+    except Exception as rp_err:
+        logger.error("Razorpay upgrade order creation failed: %s", rp_err)
+        raise HTTPException(status_code=503, detail=f"Payment gateway error: {rp_err}")
     return {
         "full_wallet_cover": False,
         "pro_rata_credited": pro_rata,

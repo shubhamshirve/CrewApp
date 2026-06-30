@@ -996,7 +996,7 @@ export default function Profile() {
       </Dialog>
 
       {/* ── Gear Dialog ─────────────────────────────────────────────────── */}
-      <Dialog open={!!gearDialog} onOpenChange={() => { setGearDialog(null); setGearStep(0); setAiNorm(null); setAiNormLoading(false); }}>
+      <Dialog open={!!gearDialog} onOpenChange={() => { setGearDialog(null); setGearStep(0); setAiNorm(null); setAiNormLoading(false); if (aiNormTimer.current) clearTimeout(aiNormTimer.current); }}>
         <DialogContent className="bg-white border-slate-200 max-w-sm">
           <DialogHeader>
             <div className="flex items-center gap-2">
@@ -1005,6 +1005,8 @@ export default function Profile() {
                   onClick={() => {
                     setGearStep(0);
                     setGearForm(p => ({ ...p, name: "", brand: "", model_number: "", is_custom: false }));
+                    setAiNorm(null);
+                    if (aiNormTimer.current) clearTimeout(aiNormTimer.current);
                   }}
                   className="text-slate-400 hover:text-slate-600 transition-colors -ml-1 flex-shrink-0"
                 >

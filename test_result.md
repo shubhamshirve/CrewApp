@@ -397,23 +397,40 @@ frontend:
         agent: "testing"
         comment: "✅ BUG FIXED - ALL TESTS PASSED (5/5): The _check_90min_buffer() function now correctly accepts 6 parameters including optional exclude_gig_id parameter (line 147: exclude_gig_id: str | None = None). Tested with rohan@example.com on portrait gig 'Kapoor Family Portrait Session' (gig-portrait-000-0000-0000-0000-000000000002). TEST A: Successfully added session on different day (2025-12-28 09:00-12:00) - returned 200 OK, no 500 error. TEST B: Successfully added session on same day as existing session (2026-06-24 11:30-14:00) - returned 200 OK, no conflict detected (Rohan as lead has no accepted freelancer invites), no 500 error. TEST C: Verified newly added sessions appear in GET /api/gigs/{gig_id} response (total 5 sessions). The TypeError is completely resolved - endpoint no longer crashes with 500 Internal Server Error."
 
+  - task: "Razorpay missing credentials crash on subscribe with coupon"
+    implemented: true
+    working: true
+    file: "backend/routers/wallet.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported: Internal Server Error when applying coupon and clicking subscribe. Root cause: Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) not configured. When user has 0 wallet balance and coupon doesn't fully cover the cost, backend calls rp.order.create() which throws razorpay.errors.BadRequestError: Authentication failed, uncaught, resulting in 500."
+      - working: true
+        agent: "main"
+        comment: "Fixed: Added _require_razorpay() helper that checks for credentials and raises HTTPException(503, 'Payment gateway not configured...') before any Razorpay API call. Wrapped all rp.order.create() calls in try/except. Now returns clean 503 instead of 500 crash. Frontend already reads err.response?.data?.detail in toast. Fixed in 3 places: create_subscription_order, verify_payment, upgrade_plan endpoints."
+      - working: true
+        agent: "testing"
+        comment: "✅ BUG FIX VERIFIED (2/2 tests passed): Tested with vikram@example.com (₹0 wallet balance). TEST 1 - Subscribe with coupon TEST20 (20% off, ₹69→₹55.20): Returns HTTP 503 with message 'Payment gateway is not configured. Please add wallet balance to pay or contact support.' (NOT 500 crash). TEST 2 - Subscribe without coupon (₹69 full price): Returns HTTP 503 with same clear message (NOT 500 crash). The _require_razorpay() helper at line 94-100 correctly checks for missing credentials before calling rp.order.create(). All 3 Razorpay call sites (create_subscription_order line 258, verify_payment line 389, upgrade_plan line 556) are protected. Bug is completely fixed - no more 500 Internal Server Error when Razorpay credentials are missing."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 9
+  test_sequence: 11
   run_ui: false
 
 test_plan:
   current_focus:
-    - "90-min buffer check on add_session for Lead photographer"
-  stuck_tasks:
-    - "90-min buffer check on add_session for Lead photographer"
+    - "Razorpay missing credentials crash on subscribe with coupon"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Optimization pass complete. Changes: 1) New async TTL cache (cache.py) for platform data — 5-min TTL with immediate invalidation on admin write. 2) Removed hardcoded event_type/role validators in gigs.py, users.py, public_gigs.py — now DB-driven. 3) Fixed N+1 in _check_90min_buffer by batch-fetching gigs. 4) Added 11 missing MongoDB indexes (gigs, wallet_transactions, public_gigs, etc.). 5) Created PlatformContext.js — one fetch on app mount replaces 4+ duplicate per-page calls. Admin creds: admin@crewbook.in / Admin@123"
+    message: "Fixed Razorpay 500 crash. Root cause: rp.order.create() was called with None credentials when user has 0 wallet balance and coupon doesn't fully cover. Added _require_razorpay() check + try/except on all 3 Razorpay call sites (create-order, verify, upgrade). Now returns HTTP 503 with clear message. Test: login as vikram@example.com / Test@1234 (0 wallet), apply coupon TEST20 (20% off), try to subscribe to Basic plan (₹69→₹55.20). Should get toast 'Payment gateway not configured...' instead of crashing."
   - agent: "testing"
     message: "✅ ALL OPTIMIZATION TESTS PASSED (8/8): 1) TTL cache working with proper invalidation 2) Dynamic event types/roles from DB 3) N+1 fix verified (health < 1s) 4) MongoDB indexes working 5) Admin CRUD operations successful. Created admin user via /api/admin/seed-admin. All performance optimizations are working correctly."
   - agent: "testing"
@@ -434,4 +451,6 @@ agent_communication:
     message: "CONTINUATION TESTS RESULTS (2 tests): ✅ TEST 1 PASS - Rating Aggregate MongoDB Pipeline: Verified that ratings.py uses MongoDB aggregation pipeline (lines 178-196) instead of Python to_list scan. Tested rating submission for Priya on completed gig, confirmed avg_rating=4.67 (float) and total_ratings=1 in user profile. ❌ TEST 2 FAIL - 90-min Buffer on add_session: CRITICAL BUG - endpoint completely broken with TypeError. Function _check_90min_buffer() defined with 5 params but called with 6 (including gig_id). POST /api/gigs/{gig_id}/sessions returns 500 error. Main agent must fix function signature to accept gig_id parameter and exclude current gig from conflict checks."
   - agent: "main"
     message: "Google Calendar analysis: Integration is fully MOCKED (no real OAuth). All 4 endpoints (status/connect/disconnect/sync-logs) exist but only set DB flags. sync_gig_to_calendar() in calendar_service.py is never called anywhere. Real implementation needs Google Cloud OAuth credentials. Gear automation (Option D) implemented: 1) GOOGLE_GEMINI_API_KEY stored in backend/.env (not in frontend, gitignored). 2) Created gear_ai_service.py using emergentintegrations + Gemini 2.5 Flash. 3) New GET /platform/gear-catalogue/normalize endpoint — real-time AI normalization with catalogue match detection. 4) Updated POST /platform/gear-submissions — auto-approves if AI confidence >=0.85 OR 3+ users submitted same gear, with smart duplicate detection. 5) Frontend Profile.jsx updated with debounced AI suggestions while typing, Accept button, updated toast messages. All tested and working."
+  - agent: "testing"
+    message: "✅ RAZORPAY CRASH FIX VERIFIED (2/2 tests passed): Tested the fix for 'Internal Server Error when applying coupon and clicking subscribe'. Used vikram@example.com (₹0 wallet balance) to test both scenarios: (1) Subscribe with coupon TEST20 (20% off, ₹69→₹55.20) - returns HTTP 503 with clear message 'Payment gateway is not configured...', NOT 500 crash. (2) Subscribe without coupon (₹69 full price) - returns HTTP 503 with same message, NOT 500 crash. The _require_razorpay() helper function correctly validates credentials before any Razorpay API call. All 3 endpoints (create_subscription_order, verify_payment, upgrade_plan) are properly protected. Bug is completely fixed."
 
