@@ -233,10 +233,11 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - [ ] No-Show penalty (30-day suspension) — explicitly deferred by user
 
 ### HTTPS Fix — app.photoo.in (Done — Feb 2026)
-- ✅ **Port 443 exposed** in `docker-compose.vps.yml` frontend service (`- "443:443"` added alongside port 80)
-- ✅ **Caddy TLS volumes** added (`caddy_data:/data`, `caddy_config:/config`) for persistent Let's Encrypt certificate storage
-- ✅ `EXPOSE 80 443` updated in both `Dockerfile` and `Dockerfile.ci` for accurate documentation
-- Caddy will auto-provision Let's Encrypt cert on first startup after deployment
+- ✅ **Port 443 exposed** in `docker-compose.vps.yml` frontend service
+- ✅ **Caddy TLS volumes** added (`caddy_data:/data`, `caddy_config:/config`) for persistent Let's Encrypt certificates
+- ✅ **Brute-force rate limiting** on `/api/auth/login` — 5 req/min per IP → HTTP 429 via `caddy-ratelimit` plugin (xcaddy build)
+- ✅ `Caddyfile` updated: dedicated `handle /api/auth/login` block with `rate_limit` zone + `order rate_limit before reverse_proxy` in global config
+- ✅ Both `Dockerfile` and `Dockerfile.ci` updated to build custom Caddy via xcaddy with `--with github.com/mholt/caddy-ratelimit`
 
 ### Deployment & Infrastructure (Done — Feb 2026)
 - ✅ **App rebrand: CrewBook → Photoo** — display name, identifiers, container/volume names, DB name (`photoo_db`), domain (`app.photoo.in`), admin email (`admin@photoo.in`), logo letter (P), Caddyfile, all 49 source files. GitHub repo URL kept as `shubhamshirve/CrewApp` per user. Deploy script now auto-migrates legacy `crewbook_*` Docker volumes → `photoo_*` on first run.

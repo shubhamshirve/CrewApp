@@ -1,11 +1,19 @@
 # CI-optimised serve image.
 # React is built by the CI runner (npm ci + npm run build).
-# This Dockerfile just wraps the pre-built build/ directory in Caddy — no Node needed.
-# Build time: ~5 seconds (copy only).
+# This Dockerfile wraps the pre-built build/ directory in a custom Caddy
+# binary (built via xcaddy) that includes the caddy-ratelimit plugin.
+# Build time: ~60 s on first run; cached on subsequent runs.
 #
-# For local Docker builds use the main Dockerfile instead:
-#   docker build -f Dockerfile -t frontend .
+# For local Docker builds use the main Dockerfile instead.
+
+# ── Stage 1: Build custom Caddy with rate-limit plugin ──────────────────────
+FROM caddy:2-builder AS caddy-builder
+RUN xcaddy build \
+    --with github.com/mholt/caddy-ratelimit
+
+# ── Stage 2: Final image — copy custom Caddy + pre-built React files ────────
 FROM caddy:2-alpine
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY . /usr/share/caddy/html
 COPY Caddyfile /etc/caddy/Caddyfile
 EXPOSE 80 443

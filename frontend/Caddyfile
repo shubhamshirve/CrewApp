@@ -1,10 +1,14 @@
 # ── Photoo Caddy Configuration ────────────────────────────────────────────
 # Caddy automatically provisions a Let's Encrypt certificate for the domain.
 # Ports required on VPS: 80 (HTTP challenge + redirect) and 443 (HTTPS).
+# Rate limiting on /api/auth/login uses the caddy-ratelimit plugin
+# (built via xcaddy in Dockerfile / Dockerfile.ci).
 
 {
-    # Used by Let's Encrypt for expiry notifications — change to your email
+    # Used by Let's Encrypt for expiry notifications
     email admin@photoo.in
+    # Ensure rate_limit handler executes before reverse_proxy
+    order rate_limit before reverse_proxy
 }
 
 # Redirect plain HTTP → HTTPS
@@ -26,7 +30,27 @@ app.photoo.in {
         -Server
     }
 
-    # ── API reverse proxy ──────────────────────────────────────────────────
+    # ── Brute-force protection: login (5 attempts/min per IP → HTTP 429) ──
+    handle /api/auth/login {
+        rate_limit {
+            zone login_bruteforce {
+                key    {http.request.remote_ip}
+                events 5
+                window 1m
+            }
+        }
+        reverse_proxy backend:8001 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            transport http {
+                read_timeout 120s
+                write_timeout 120s
+            }
+        }
+    }
+
+    # ── General API reverse proxy ──────────────────────────────────────────
     handle /api/* {
         reverse_proxy backend:8001 {
             header_up X-Real-IP {remote_host}

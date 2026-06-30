@@ -26,9 +26,14 @@ ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL \
 
 RUN npm run build
 
-# ── Stage 2: Serve with Caddy ────────────────────────────────────────────────
-FROM caddy:2-alpine
+# ── Stage 2: Build custom Caddy with rate-limit plugin ──────────────────────
+FROM caddy:2-builder AS caddy-builder
+RUN xcaddy build \
+    --with github.com/mholt/caddy-ratelimit
 
+# ── Stage 3: Serve with custom Caddy ────────────────────────────────────────
+FROM caddy:2-alpine
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY --from=builder /app/build /usr/share/caddy/html
 COPY Caddyfile /etc/caddy/Caddyfile
 
