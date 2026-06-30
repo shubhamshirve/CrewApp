@@ -1,0 +1,65 @@
+# Standalone compose file for VPS deployment.
+# Uses pre-built images from GHCR — no build context needed.
+# Usage: docker compose -f docker-compose.vps.yml up -d
+
+services:
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: crewbook_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - photoo-network
+
+  backend:
+    image: ghcr.io/shubhamshirve/crewapp-backend:latest
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      MONGO_URL: mongodb://mongodb:27017
+      ENV: production
+      UPLOADS_DIR: /app/uploads
+      DB_NAME: crewbook_db
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "8001:8001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - photoo-network
+
+  frontend:
+    image: ghcr.io/shubhamshirve/crewapp-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - photoo-network
+
+volumes:
+  mongodb_data:
+  uploads_data:
+
+networks:
+  photoo-network:
+    name: photoo-network
+    driver: bridge
