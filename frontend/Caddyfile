@@ -1,7 +1,20 @@
 # ── Photoo Caddy Configuration ────────────────────────────────────────────
-# Listens on port 80 only (TLS is terminated at the load balancer / cloud edge)
+# Caddy automatically provisions a Let's Encrypt certificate for the domain.
+# Ports required on VPS: 80 (HTTP challenge + redirect) and 443 (HTTPS).
 
-:80 {
+{
+    # Used by Let's Encrypt for expiry notifications — change to your email
+    email admin@photoo.in
+}
+
+# Redirect plain HTTP → HTTPS
+http://app.photoo.in {
+    redir https://app.photoo.in{uri} permanent
+}
+
+# Main site — Caddy auto-provisions TLS via Let's Encrypt
+app.photoo.in {
+
     # ── Security headers ───────────────────────────────────────────────────
     header {
         X-Content-Type-Options nosniff
@@ -9,7 +22,7 @@
         X-XSS-Protection "1; mode=block"
         Referrer-Policy strict-origin-when-cross-origin
         Permissions-Policy "geolocation=(), microphone=(), camera=()"
-        # Hide server identity
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
         -Server
     }
 
@@ -19,7 +32,6 @@
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
-            # Increase timeout for long-running AI endpoints
             transport http {
                 read_timeout 120s
                 write_timeout 120s
@@ -30,7 +42,6 @@
     # ── React SPA ──────────────────────────────────────────────────────────
     handle {
         root * /usr/share/caddy/html
-        # Compress responses
         encode gzip
 
         # Cache static assets indefinitely (CRA adds content hashes)
