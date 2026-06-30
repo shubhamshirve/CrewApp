@@ -185,9 +185,10 @@ jobs:
             # Create a minimal backend/.env if it doesn't exist yet
             if [ ! -f backend/.env ]; then
               echo "backend/.env not found — creating with safe defaults"
+              mkdir -p backend
               printf 'DB_NAME=crewbook_db\nJWT_SECRET=%s\nADMIN_DEFAULT_PASSWORD=Admin@123\n' \
                 "$(openssl rand -hex 32)" > backend/.env
-              echo "backend/.env created. Set a proper JWT_SECRET for production!"
+              echo "backend/.env created."
             fi
 
             # Support docker compose v2 plugin OR legacy docker-compose v1
