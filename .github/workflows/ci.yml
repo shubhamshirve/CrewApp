@@ -182,6 +182,18 @@ jobs:
             set -e
             cd /opt/photoo
 
+            # Create a minimal backend/.env if it doesn't exist yet
+            # (proper production values should be set here manually)
+            if [ ! -f backend/.env ]; then
+              echo "backend/.env not found — creating with safe defaults"
+              cat > backend/.env <<EOF
+DB_NAME=crewbook_db
+JWT_SECRET=$(openssl rand -hex 32)
+ADMIN_DEFAULT_PASSWORD=Admin@123
+EOF
+              echo "backend/.env created. Set a proper JWT_SECRET for production!"
+            fi
+
             # Support docker compose v2 plugin OR legacy docker-compose v1
             if docker compose version >/dev/null 2>&1; then
               DC="docker compose"
