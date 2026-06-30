@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import os
+import re
 
 from db import get_db
 from auth_utils import get_admin_user, get_current_user
@@ -335,6 +336,47 @@ async def remove_gear_catalogue_item(item_id: str, admin: dict = Depends(get_adm
     return {"items": items}
 
 
+@router.get("/gear-catalogue/normalize")
+async def normalize_gear_name_endpoint(name: str, current_user: dict = Depends(get_current_user)):
+    """
+    Authenticated — normalize a typed gear name using AI.
+    Returns normalized name, brand, category, confidence and any matching catalogue item.
+    Used for real-time suggestions while typing in the gear form.
+    """
+    if not name or len(name.strip()) < 2:
+        return {"normalized_name": name, "brand": None, "category": None, "confidence": 0.0, "catalogue_match": None}
+
+    from services.gear_ai_service import normalize_gear_name
+    db = get_db()
+
+    ai_result = await normalize_gear_name(name.strip())
+
+    # Try to find a matching item in the catalogue
+    catalogue_match = None
+    if ai_result.get("normalized_name"):
+        items = await _get_gear_catalogue(db)
+        norm = ai_result["normalized_name"].lower()
+        for item in items:
+            if item["name"].lower() == norm:
+                catalogue_match = item
+                break
+        # Partial match fallback
+        if not catalogue_match:
+            for item in items:
+                if norm in item["name"].lower() or item["name"].lower() in norm:
+                    catalogue_match = item
+                    break
+
+    return {
+        "normalized_name": ai_result["normalized_name"],
+        "brand": ai_result["brand"],
+        "category": ai_result["category"],
+        "is_photography_gear": ai_result["is_photography_gear"],
+        "confidence": ai_result["confidence"],
+        "catalogue_match": catalogue_match,
+    }
+
+
 
 
 # ── Custom Gear Submissions ───────────────────────────────────────────────────
@@ -356,26 +398,132 @@ async def submit_custom_gear(
     data: CustomGearSubmission,
     current_user: dict = Depends(get_current_user),
 ):
-    """Authenticated user — submit a custom gear for admin review."""
+    """
+    Authenticated user — submit a custom gear for the master catalogue.
+
+    Auto-approval logic (two independent paths):
+      1. AI confidence >= 0.85 AND is_photography_gear == True  → auto-approve immediately
+      2. 3+ distinct users have submitted the same normalized gear name → auto-approve
+    Otherwise → status = "pending" for manual admin review.
+    """
     import uuid as _uuid
+    from services.gear_ai_service import validate_gear_submission
+
     db = get_db()
+    raw_name = data.name.strip()
+
+    # ── AI Validation ────────────────────────────────────────────────────────
+    ai = await validate_gear_submission(raw_name, data.category, data.brand)
+    normalized_name = ai.get("normalized_name") or raw_name
+    normalized_brand = ai.get("normalized_brand") or data.brand
+    normalized_category = ai.get("normalized_category") or data.category
+
+    ai_auto_approve = ai.get("is_valid", False) and ai.get("confidence", 0.0) >= 0.85
+
+    # ── Popularity check ─────────────────────────────────────────────────────
+    # Count how many *distinct* users already submitted the same normalized gear
+    existing_count = await db.custom_gear_submissions.count_documents(
+        {
+            "normalized_name": {"$regex": f"^{re.escape(normalized_name)}$", "$options": "i"},
+            "submitted_by": {"$ne": current_user["id"]},
+        }
+    )
+    popularity_auto_approve = existing_count >= 2  # this + 2 others = 3 total
+
+    should_auto_approve = ai_auto_approve or popularity_auto_approve
+
+    # ── Check for duplicate in catalogue if auto-approving ───────────────────
+    added_item = None
+    if should_auto_approve:
+        items = await _get_gear_catalogue(db)
+
+        # Smart duplicate detection: exact match OR significant model-word overlap
+        def _is_duplicate(candidate: str, existing: str) -> bool:
+            c, e = candidate.lower().strip(), existing.lower().strip()
+            if c == e:
+                return True
+            # Build key-word sets — exclude very short tokens and common noise words
+            skip = {"the", "a", "an", "and", "for", "of", "pro", "ii", "iii", "iv", "i"}
+            def _words(s):
+                return {w for w in re.split(r"[\s\-/]+", s) if len(w) >= 2 and w not in skip}
+            c_words = _words(c)
+            e_words = _words(e)
+            # Need at least 2 meaningful words in BOTH sides to do word-overlap matching
+            if len(c_words) < 2 or len(e_words) < 2:
+                return False
+            overlap = c_words & e_words
+            # If 80%+ of the smaller set's meaningful words overlap → duplicate
+            smaller = min(len(c_words), len(e_words))
+            return smaller > 1 and len(overlap) / smaller >= 0.8
+
+        # Check both raw user input and AI-normalized name against catalogue
+        existing_match = next(
+            (i for i in items if _is_duplicate(normalized_name, i["name"]) or _is_duplicate(raw_name, i["name"])),
+            None
+        )
+        if existing_match:
+            # Already in catalogue (or close enough) — log as auto_exists
+            should_auto_approve = False
+            status = "auto_exists"
+            normalized_name = existing_match["name"]   # use the canonical name
+        else:
+            new_item = {
+                "id": str(_uuid.uuid4()),
+                "name": normalized_name,
+                "category": normalized_category,
+                "brand": normalized_brand,
+            }
+            items.append(new_item)
+            await db.platform_meta.update_one(
+                {"_id": "gear_catalogue"}, {"$set": {"items": items}}, upsert=True
+            )
+            added_item = new_item
+            status = "auto_approved"
+    else:
+        status = "pending"
+
+    # ── Determine auto-approval reason ───────────────────────────────────────
+    auto_approve_reason = None
+    if status == "auto_approved":
+        if ai_auto_approve and popularity_auto_approve:
+            auto_approve_reason = "ai_and_popularity"
+        elif ai_auto_approve:
+            auto_approve_reason = "ai_confidence"
+        else:
+            auto_approve_reason = "popularity_threshold"
+
+    # ── Persist submission record ─────────────────────────────────────────────
     submission = {
         "id": str(_uuid.uuid4()),
-        "name": data.name.strip(),
+        "name": raw_name,
+        "normalized_name": normalized_name,
         "category": data.category,
+        "normalized_category": normalized_category,
         "brand": data.brand,
+        "normalized_brand": normalized_brand,
         "submitted_by": current_user["id"],
         "submitted_by_name": current_user.get("full_name", "Unknown User"),
-        "status": "pending",
+        "status": status,
+        "ai_confidence": ai.get("confidence", 0.0),
+        "ai_valid": ai.get("is_valid", False),
+        "ai_reason": ai.get("reason", ""),
+        "ai_available": ai.get("ai_available", False),
+        "auto_approve_reason": auto_approve_reason,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.custom_gear_submissions.insert_one({**submission, "_id": submission["id"]})
-    return {k: v for k, v in submission.items()}
+
+    response = {k: v for k, v in submission.items()}
+    response["auto_approved"] = status == "auto_approved"
+    response["already_in_catalogue"] = status == "auto_exists"
+    if added_item:
+        response["catalogue_item"] = added_item
+    return response
 
 
 @router.get("/gear-submissions")
 async def get_gear_submissions(admin: dict = Depends(get_admin_user)):
-    """Admin — get all pending gear submissions."""
+    """Admin — get all pending gear submissions (includes AI metadata)."""
     db = get_db()
     cursor = db.custom_gear_submissions.find({"status": "pending"}, {"_id": 0})
     items = await cursor.to_list(length=200)

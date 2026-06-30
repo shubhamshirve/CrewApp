@@ -8,7 +8,7 @@ import {
   Shield, MapPin, Star, Camera, User, UserPlus, UserCheck,
   StickyNote, Save, Trash2, Pencil, Plus, X, Upload,
   Instagram, Globe, Wallet, Link2, ChevronDown, ChevronLeft, ChevronRight,
-  Phone, MessageCircle, Loader2, CheckCircle2,
+  Phone, MessageCircle, Loader2, CheckCircle2, Sparkles, Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchPincodeData } from "@/utils/pincode";
@@ -158,6 +158,11 @@ export default function Profile() {
   const [gearSaving, setGearSaving] = useState(false);
   const [masterGear, setMasterGear] = useState([]);
 
+  // AI gear normalization
+  const [aiNorm, setAiNorm] = useState(null);       // { normalized_name, brand, category, confidence, catalogue_match }
+  const [aiNormLoading, setAiNormLoading] = useState(false);
+  const aiNormTimer = useRef(null);
+
   // Doc resubmit
   const [docDialog, setDocDialog] = useState(false);
   const [docForm, setDocForm] = useState({ id_type: "Aadhar", govt_id_base64: "", selfie_base64: "" });
@@ -280,6 +285,44 @@ export default function Profile() {
     setGearDialog({ mode: "edit", item });
   };
 
+  // ── AI gear name normalization (debounced) ─────────────────────────────────
+  const fetchAiNorm = async (name) => {
+    if (!name || name.trim().length < 3) { setAiNorm(null); setAiNormLoading(false); return; }
+    setAiNormLoading(true);
+    try {
+      const res = await api.get(`/platform/gear-catalogue/normalize?name=${encodeURIComponent(name.trim())}`);
+      const data = res.data;
+      // Only show suggestion if it differs meaningfully from what was typed
+      if (data.confidence >= 0.6 && data.is_photography_gear) {
+        setAiNorm(data);
+      } else {
+        setAiNorm(null);
+      }
+    } catch { setAiNorm(null); }
+    finally { setAiNormLoading(false); }
+  };
+
+  const handleGearNameChange = (value) => {
+    setGearForm(p => ({ ...p, name: value }));
+    setAiNorm(null);
+    if (aiNormTimer.current) clearTimeout(aiNormTimer.current);
+    if (value.trim().length >= 3) {
+      aiNormTimer.current = setTimeout(() => fetchAiNorm(value), 700);
+    }
+  };
+
+  const acceptAiSuggestion = () => {
+    if (!aiNorm) return;
+    setGearForm(p => ({
+      ...p,
+      name: aiNorm.normalized_name || p.name,
+      brand: aiNorm.brand || p.brand,
+      category: aiNorm.category && ["Camera","Lens","Lighting","Drone","Audio","Accessories","Other"].includes(aiNorm.category)
+        ? aiNorm.category : p.category,
+    }));
+    setAiNorm(null);
+  };
+
   const handleGearSave = async () => {
     const gearName = gearForm.name.trim();
     if (!gearName) { toast.error("Gear name required"); return; }
@@ -298,12 +341,18 @@ export default function Profile() {
         setProfile(p => ({ ...p, gear_vault: [...(p.gear_vault || []), res.data] }));
         if (gearForm.is_custom) {
           try {
-            await api.post("/platform/gear-submissions", {
+            const subRes = await api.post("/platform/gear-submissions", {
               name: gearName,
               category: gearForm.category,
               brand: gearForm.brand?.trim() || null,
             });
-            toast.success("Gear added! Submitted for admin review to include in master catalogue.");
+            if (subRes.data?.auto_approved) {
+              toast.success("Gear added! ✨ AI auto-approved it — now in the master catalogue.");
+            } else if (subRes.data?.already_in_catalogue) {
+              toast.success("Gear added to your vault! (Already in master catalogue)");
+            } else {
+              toast.success("Gear added! Submitted for admin review to include in master catalogue.");
+            }
           } catch {
             toast.success("Gear added to your vault!");
           }
@@ -947,7 +996,7 @@ export default function Profile() {
       </Dialog>
 
       {/* ── Gear Dialog ─────────────────────────────────────────────────── */}
-      <Dialog open={!!gearDialog} onOpenChange={() => { setGearDialog(null); setGearStep(0); }}>
+      <Dialog open={!!gearDialog} onOpenChange={() => { setGearDialog(null); setGearStep(0); setAiNorm(null); setAiNormLoading(false); }}>
         <DialogContent className="bg-white border-slate-200 max-w-sm">
           <DialogHeader>
             <div className="flex items-center gap-2">
@@ -1061,18 +1110,50 @@ export default function Profile() {
           {gearDialog?.mode === "add" && gearStep === 1 && gearForm.is_custom && (
             <div className="space-y-3 mt-2">
               <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 leading-relaxed">
-                Custom gear will be added to your vault and submitted for admin review to be included in the master catalogue.
+                Custom gear will be added to your vault. AI will validate and may auto-approve it for the master catalogue.
               </div>
               <div>
                 <label className={labelClass}>Gear Name *</label>
-                <input
-                  data-testid="gear-custom-name"
-                  className={inputClass}
-                  placeholder={`Custom ${gearForm.category} name…`}
-                  value={gearForm.name}
-                  onChange={e => setGearForm(p => ({ ...p, name: e.target.value }))}
-                  autoFocus
-                />
+                <div className="relative">
+                  <input
+                    data-testid="gear-custom-name"
+                    className={inputClass}
+                    placeholder={`Custom ${gearForm.category} name…`}
+                    value={gearForm.name}
+                    onChange={e => handleGearNameChange(e.target.value)}
+                    autoFocus
+                  />
+                  {aiNormLoading && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      <Loader2 size={13} className="animate-spin text-slate-400" />
+                    </div>
+                  )}
+                </div>
+                {/* AI suggestion chip */}
+                {aiNorm && !aiNormLoading && (
+                  <div className="mt-1.5 flex items-start gap-2 p-2 rounded-lg border border-blue-200 bg-blue-50">
+                    <Sparkles size={12} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-blue-700 font-medium">
+                        AI suggests: <span className="font-semibold">{aiNorm.normalized_name}</span>
+                        {aiNorm.brand && <span className="font-normal text-blue-500"> · {aiNorm.brand}</span>}
+                        {aiNorm.category && <span className="font-normal text-blue-500"> · {aiNorm.category}</span>}
+                      </p>
+                      {aiNorm.catalogue_match && (
+                        <p className="text-[10px] text-emerald-600 mt-0.5">✓ Already in catalogue — this will be a quick match!</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={acceptAiSuggestion}
+                      className="text-[10px] font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 px-2 py-0.5 rounded-md transition-colors flex-shrink-0"
+                    >
+                      Accept
+                    </button>
+                    <button onClick={() => setAiNorm(null)} className="text-slate-400 hover:text-slate-600 flex-shrink-0">
+                      <X size={11} />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
