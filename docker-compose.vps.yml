@@ -1,26 +1,33 @@
-# Standalone compose file for VPS deployment.
-# Uses pre-built images from GHCR — no build context needed.
-# Usage: docker compose -f docker-compose.vps.yml up -d
+# Standalone VPS compose file — optimised for 1 GB RAM.
+# Uses pre-built GHCR images. No build context needed.
 
 services:
   mongodb:
-    image: mongo:7
+    image: mongo:4.4                     # 4.4 is lean; Mongo 7 needs 1GB+ alone
+    # Cap WiredTiger cache at 256 MB (default is 50% of RAM = ~512 MB on 1 GB VPS)
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
     restart: unless-stopped
     volumes:
       - mongodb_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: crewbook_db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      # mongo:4.4 ships the `mongo` shell (not `mongosh`)
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')", "--quiet"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
     networks:
       - photoo-network
 
   backend:
     image: ghcr.io/shubhamshirve/crewapp-backend:latest
+    # 1 worker instead of 2 — saves ~120 MB on a 1 GB VPS
+    command: ["uvicorn", "server:app",
+              "--host", "0.0.0.0", "--port", "8001",
+              "--workers", "1",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
     restart: unless-stopped
     env_file: ./backend/.env
     environment:
@@ -36,7 +43,8 @@ services:
       mongodb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
       interval: 15s
       timeout: 10s
       retries: 5
