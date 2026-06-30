@@ -181,7 +181,15 @@ jobs:
           script: |
             set -e
             cd /opt/photoo
-            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull --quiet
-            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --remove-orphans --no-build
+
+            # Support docker compose v2 plugin OR legacy docker-compose v1
+            if docker compose version >/dev/null 2>&1; then
+              DC="docker compose"
+            else
+              DC="docker-compose"
+            fi
+
+            $DC -f docker-compose.yml -f docker-compose.ghcr.yml pull
+            $DC -f docker-compose.yml -f docker-compose.ghcr.yml up -d --remove-orphans
             docker image prune -f
             echo "Deployment complete"
