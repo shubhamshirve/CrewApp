@@ -135,7 +135,7 @@ export default function AdminReports() {
           {[
             { id: "overview", label: "Overview" },
             { id: "registrations", label: "Registrations" },
-            { id: "revenue", label: "Revenue" },
+            { id: "revenue", label: "Revenue & Sales" },
             { id: "payments", label: "Payment Log" },
             { id: "ai", label: "AI Usage" },
           ].map(t => (
@@ -165,7 +165,8 @@ export default function AdminReports() {
                   <StatCard label="Verified" value={overview.verified_users} icon={UserCheck} color="#8B5CF6" testId="stat-verified" />
                   <StatCard label="Pending Verify" value={overview.pending_verification} icon={ShieldCheck} color="#F59E0B" testId="stat-pending" />
                   <StatCard label="Subscribed" value={overview.subscribed_users} icon={CreditCard} color="#EC4899" testId="stat-subscribed" />
-                  <StatCard label="Revenue (30d)" value={`₹${(overview.revenue_30d || 0).toLocaleString("en-IN")}`} icon={IndianRupee} color="#F97316" testId="stat-revenue-30d" />
+                  <StatCard label="Revenue (30d)" value={`₹${(overview.revenue_30d || 0).toLocaleString("en-IN")}`} icon={IndianRupee} color="#16A34A" sub="After coupons & discounts" testId="stat-revenue-30d" />
+                  <StatCard label="Sales (30d)" value={`₹${(overview.sales_30d || 0).toLocaleString("en-IN")}`} icon={DollarSign} color="#F97316" sub="Plan face value (gross)" testId="stat-sales-30d" />
                   <StatCard label="Total Gigs" value={overview.total_gigs} icon={Briefcase} color="#06B6D4" testId="stat-gigs" />
                   <StatCard label="Public Gigs" value={overview.public_gigs} icon={Globe} color="#10B981" testId="stat-public-gigs" />
                 </div>
@@ -287,31 +288,60 @@ export default function AdminReports() {
             {/* REVENUE TAB */}
             {tab === "revenue" && (
               <div className="space-y-5">
+                {/* Summary cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div data-testid="rev-card-revenue" className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm text-center">
+                    <p className="text-xs text-slate-500 font-display mb-1 uppercase tracking-wide">Revenue ({range}d)</p>
+                    <p className="text-3xl font-bold text-emerald-600 font-display font-mono">
+                      ₹{revData.reduce((s, d) => s + (d.revenue || 0), 0).toLocaleString("en-IN")}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1 font-display">Actual charged (after discounts)</p>
+                  </div>
+                  <div data-testid="rev-card-sales" className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm text-center">
+                    <p className="text-xs text-slate-500 font-display mb-1 uppercase tracking-wide">Sales ({range}d)</p>
+                    <p className="text-3xl font-bold text-orange-500 font-display font-mono">
+                      ₹{revData.reduce((s, d) => s + (d.sales || 0), 0).toLocaleString("en-IN")}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1 font-display">Gross plan face value</p>
+                  </div>
+                  <div data-testid="rev-card-transactions" className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm text-center">
+                    <p className="text-xs text-slate-500 font-display mb-1 uppercase tracking-wide">Transactions ({range}d)</p>
+                    <p className="text-3xl font-bold text-blue-500 font-display">
+                      {revData.reduce((s, d) => s + (d.transactions || 0), 0)}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1 font-display">Successful payments</p>
+                  </div>
+                </div>
+
+                {/* Chart */}
                 <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <h3 className="text-sm font-semibold text-slate-900 font-display mb-5">Daily Revenue — last {range} days (₹)</h3>
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-sm font-semibold text-slate-900 font-display">Revenue vs Sales — last {range} days (₹)</h3>
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-emerald-500" />Revenue</span>
+                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-orange-400" />Sales</span>
+                    </div>
+                  </div>
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={chartRevData}>
+                    <BarChart data={chartRevData} barGap={2} barCategoryGap="30%">
                       <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94A3B8" }} />
                       <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} />
                       <Tooltip content={<CustomTooltip prefix="₹" />} />
-                      <Bar dataKey="revenue" fill="#F97316" radius={[4, 4, 0, 0]} name="Revenue (₹)" />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="sales" fill="#FB923C" radius={[3, 3, 0, 0]} name="Sales (₹)" />
+                      <Bar dataKey="revenue" fill="#22C55E" radius={[3, 3, 0, 0]} name="Revenue (₹)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm text-center">
-                    <p className="text-xs text-slate-500 font-display mb-1">Total Revenue ({range}d)</p>
-                    <p className="text-3xl font-bold text-orange-500 font-display font-mono">
-                      ₹{revData.reduce((s, d) => s + d.revenue, 0).toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                  <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm text-center">
-                    <p className="text-xs text-slate-500 font-display mb-1">Transactions ({range}d)</p>
-                    <p className="text-3xl font-bold text-blue-500 font-display">
-                      {revData.reduce((s, d) => s + d.transactions, 0)}
-                    </p>
-                  </div>
+
+                {/* Discount impact */}
+                <div className="p-5 rounded-2xl border border-orange-100 bg-orange-50 shadow-sm">
+                  <p className="text-xs font-semibold text-orange-800 font-display mb-1">Discount Impact ({range}d)</p>
+                  <p className="text-2xl font-bold text-orange-600 font-mono">
+                    ₹{(revData.reduce((s, d) => s + (d.sales || 0), 0) - revData.reduce((s, d) => s + (d.revenue || 0), 0)).toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-[11px] text-orange-600 mt-1 font-display">Total discounts given (coupons + wallet deductions)</p>
                 </div>
               </div>
             )}
@@ -325,7 +355,8 @@ export default function AdminReports() {
                     <thead>
                       <tr className="border-b border-slate-100">
                         <th className="pb-2 text-left text-slate-500 font-display">User</th>
-                        <th className="pb-2 text-left text-slate-500 font-display">Amount</th>
+                        <th className="pb-2 text-left text-slate-500 font-display">Revenue</th>
+                        <th className="pb-2 text-left text-slate-500 font-display">Sales</th>
                         <th className="pb-2 text-left text-slate-500 font-display">Plan</th>
                         <th className="pb-2 text-left text-slate-500 font-display">Payment ID</th>
                         <th className="pb-2 text-left text-slate-500 font-display">Date</th>
@@ -333,7 +364,7 @@ export default function AdminReports() {
                     </thead>
                     <tbody>
                       {recentPayments.length === 0 ? (
-                        <tr><td colSpan={5} className="py-8 text-center text-slate-400">No payments yet</td></tr>
+                        <tr><td colSpan={6} className="py-8 text-center text-slate-400">No payments yet</td></tr>
                       ) : recentPayments.map(p => (
                         <tr key={p.id} data-testid={`payment-row-${p.id}`} className="border-b border-slate-50 hover:bg-slate-50">
                           <td className="py-2">
@@ -343,12 +374,17 @@ export default function AdminReports() {
                           <td className="py-2 font-mono font-semibold text-emerald-600">
                             ₹{p.amount_paise ? (p.amount_paise / 100).toLocaleString("en-IN") : "—"}
                           </td>
+                          <td className="py-2 font-mono text-slate-500">
+                            {p.plan_price_paise
+                              ? `₹${(p.plan_price_paise / 100).toLocaleString("en-IN")}`
+                              : <span className="text-slate-300">—</span>}
+                          </td>
                           <td className="py-2">
                             <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 font-display text-[10px]">
-                              {p.plan || "—"}
+                              {p.plan_name || p.plan || "—"}
                             </span>
                           </td>
-                          <td className="py-2 font-mono text-slate-400 text-[10px] max-w-[100px] truncate">{p.razorpay_payment_id || "—"}</td>
+                          <td className="py-2 font-mono text-slate-400 text-[10px] max-w-[100px] truncate">{p.razorpay_payment_id || "Wallet"}</td>
                           <td className="py-2 text-slate-400">{p.created_at ? new Date(p.created_at).toLocaleDateString("en-IN") : "—"}</td>
                         </tr>
                       ))}

@@ -777,12 +777,17 @@ async def get_reports_overview(admin: dict = Depends(get_admin_user)):
         db.payment_logs.count_documents({"event": "payment_verified", "status": "success"}),
     )
 
-    # Revenue last 30 days
+    # Revenue & Sales last 30 days
     rev_cursor = await db.payment_logs.aggregate([
-        {"$match": {"event": "payment_verified", "status": "success", "created_at": {"$gte": thirty_days_ago}}},
-        {"$group": {"_id": None, "total": {"$sum": {"$divide": [{"$ifNull": ["$amount_paise", 0]}, 100]}}}}
+        {"$match": {"event": {"$in": ["payment_verified", "wallet_covered"]}, "status": "success", "created_at": {"$gte": thirty_days_ago}}},
+        {"$group": {
+            "_id": None,
+            "revenue": {"$sum": {"$divide": [{"$ifNull": ["$amount_paise", 0]}, 100]}},
+            "sales": {"$sum": {"$divide": [{"$ifNull": ["$plan_price_paise", {"$ifNull": ["$amount_paise", 0]}]}, 100]}},
+        }}
     ]).to_list(1)
-    rev_30d = rev_cursor[0]["total"] if rev_cursor else 0.0
+    rev_30d = rev_cursor[0]["revenue"] if rev_cursor else 0.0
+    sales_30d = rev_cursor[0]["sales"] if rev_cursor else 0.0
 
     # Subscriptions by plan
     plan_breakdown_cursor = await db.users.aggregate([
@@ -803,6 +808,7 @@ async def get_reports_overview(admin: dict = Depends(get_admin_user)):
         "public_gigs": public_gigs,
         "total_payments": total_revenue,
         "revenue_30d": round(rev_30d, 2),
+        "sales_30d": round(sales_30d, 2),
         "plan_breakdown": plan_breakdown,
     }
 
@@ -832,26 +838,27 @@ async def get_registrations_chart(days: int = 30, admin: dict = Depends(get_admi
 
 @router.get("/reports/revenue")
 async def get_revenue_chart(days: int = 30, admin: dict = Depends(get_admin_user)):
-    """Daily revenue from successful payments for the last N days."""
+    """Daily revenue & sales from successful payments for the last N days."""
     db = get_db()
     now = datetime.now(timezone.utc)
     start = (now - timedelta(days=days)).isoformat()
     pipeline = [
-        {"$match": {"event": "payment_verified", "status": "success", "created_at": {"$gte": start}}},
+        {"$match": {"event": {"$in": ["payment_verified", "wallet_covered"]}, "status": "success", "created_at": {"$gte": start}}},
         {"$addFields": {"date_str": {"$substr": ["$created_at", 0, 10]}}},
         {"$group": {
             "_id": "$date_str",
             "revenue": {"$sum": {"$divide": [{"$ifNull": ["$amount_paise", 0]}, 100]}},
+            "sales": {"$sum": {"$divide": [{"$ifNull": ["$plan_price_paise", {"$ifNull": ["$amount_paise", 0]}]}, 100]}},
             "transactions": {"$sum": 1},
         }},
         {"$sort": {"_id": 1}},
     ]
     result = await db.payment_logs.aggregate(pipeline).to_list(100)
-    day_map = {r["_id"]: {"revenue": round(r["revenue"], 2), "transactions": r["transactions"]} for r in result}
+    day_map = {r["_id"]: {"revenue": round(r["revenue"], 2), "sales": round(r["sales"], 2), "transactions": r["transactions"]} for r in result}
     output = []
     for i in range(days):
         d = (now - timedelta(days=days - 1 - i)).date().isoformat()
-        entry = day_map.get(d, {"revenue": 0.0, "transactions": 0})
+        entry = day_map.get(d, {"revenue": 0.0, "sales": 0.0, "transactions": 0})
         output.append({"date": d, **entry})
     return {"data": output}
 
@@ -861,12 +868,11 @@ async def get_recent_payments(limit: int = 20, admin: dict = Depends(get_admin_u
     """Recent successful payment transactions."""
     db = get_db()
     items = await db.payment_logs.find(
-        {"event": "payment_verified", "status": "success"}
+        {"event": {"$in": ["payment_verified", "wallet_covered"]}, "status": "success"}
     ).sort("created_at", -1).limit(min(limit, 50)).to_list(50)
     result = []
     for item in items:
         item["id"] = str(item.pop("_id"))
-        # Enrich with user name
         if item.get("user_id"):
             u = await db.users.find_one({"_id": item["user_id"]}, {"_id": 0, "full_name": 1, "email": 1})
             item["user_name"] = u.get("full_name", "Unknown") if u else "Unknown"

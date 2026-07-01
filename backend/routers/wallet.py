@@ -397,10 +397,13 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
             "razorpay_order_id": None,
             "razorpay_payment_id": None,
             "amount_paise": int(bill_rs * 100),
+            "plan_price_paise": int(plan_info["plan_price"] * 100),
+            "discount_amount": discount_amount,
+            "wallet_deducted": bill_rs,
             "plan": plan_info["plan_key"],
             "plan_id": plan_info["plan_id"],
-            "coupon_code": coupon_code_used,
-            "discount_amount": discount_amount,
+            "plan_name": plan_info["plan_name"],
+            "coupon_code": coupon_code_used or None,
             "status": "success",
             "detail": f"Full wallet cover: ₹{bill_rs:.2f}",
             "created_at": now.isoformat(),
@@ -488,15 +491,21 @@ async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depend
         "Subscription Activated!", f"Your {plan_info['plan_name']} is now active."
     )
     try:
+        actual_revenue_paise = int((plan_info["plan_price"] - (data.discount_amount or 0)) * 100)
         await db.payment_logs.insert_one({
             "_id": str(uuid.uuid4()),
             "user_id": current_user["id"],
             "event": "payment_verified",
             "razorpay_order_id": data.razorpay_order_id,
             "razorpay_payment_id": data.razorpay_payment_id,
-            "amount_paise": int(plan_info["plan_price"] * 100),
+            "amount_paise": actual_revenue_paise,
+            "plan_price_paise": int(plan_info["plan_price"] * 100),
+            "discount_amount": data.discount_amount or 0,
+            "wallet_deducted": data.wallet_deducted or 0,
             "plan": plan_info["plan_key"],
             "plan_id": plan_info["plan_id"],
+            "plan_name": plan_info["plan_name"],
+            "coupon_code": data.coupon_code or None,
             "status": "success",
             "detail": f"Subscription activated: {plan_info['plan_name']}",
             "created_at": now.isoformat(),
