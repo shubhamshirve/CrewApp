@@ -121,11 +121,22 @@ export default function Onboarding() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
       <div className="w-full max-w-xl">
         {/* Logo */}
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#E05D26" }}>
-            <span className="text-white font-bold text-sm">P</span>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#E05D26" }}>
+              <span className="text-white font-bold text-sm">P</span>
+            </div>
+            <span className="text-slate-900 font-semibold font-display text-lg">Photoo</span>
           </div>
-          <span className="text-slate-900 font-semibold font-display text-lg">Photoo</span>
+          {step < 3 && (
+            <button
+              data-testid="skip-onboarding-btn"
+              onClick={() => navigate("/dashboard")}
+              className="text-xs text-slate-400 hover:text-slate-600 font-display transition-colors underline-offset-2 hover:underline"
+            >
+              Skip for now
+            </button>
+          )}
         </div>
 
         {/* Progress */}
