@@ -491,15 +491,44 @@ frontend:
         agent: "testing"
         comment: "✅ ALL TESTS PASSED (2/2): TEST 4.1 - /app/backend/.env contains GOOGLE_GEMINI_API_KEY=AIzaSyB4sv4m14QvG3R-ust4mhW21FYZxU168_w (new premium key, not the old one). TEST 4.2 - GET /api/platform/gear-catalogue/normalize?name=canon+r5 as rohan returns {normalized_name: 'Canon EOS R5', brand: 'Canon', category: 'Camera', is_photography_gear: true, confidence: 0.99, catalogue_match: {...}} (AI normalization working with high confidence). Gemini API integration is fully functional with the new key."
 
+  - task: "Admin change-password (Security tab) — reuses /auth/change-password"
+    implemented: true
+    working: true
+    file: "backend/routers/auth.py, frontend/src/pages/admin/AdminSettings.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added a 'Security' tab in AdminSettings.jsx with a change-password form (current/new/confirm). Reuses existing generic /auth/change-password endpoint (works for any authenticated user incl. admin since it's based on get_current_user + JWT, not user-type specific). Also updated the endpoint to clear must_change_password=False on success. Test with admin@photoo.in / Admin@123 — go to /admin/settings -> Security tab."
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL TESTS PASSED (6/6): FEATURE 1 - Admin change password working correctly. TEST 1: Admin login with Admin@123 successful. TEST 2: POST /api/auth/change-password with current_password='Admin@123' and new_password='AdminNew@123' returns 200 with 'Password changed successfully'. TEST 3: Login with old password Admin@123 correctly fails (401). TEST 4: Login with new password AdminNew@123 successful. TEST 5: Changed password back to Admin@123 using /api/auth/change-password (cleanup). TEST 6: Login with restored password Admin@123 successful. The /auth/change-password endpoint works for admin users, properly validates current password, updates password hash, and clears must_change_password flag."
+
+  - task: "Admin reset user password — generates temp password + forces change on next login"
+    implemented: true
+    working: true
+    file: "backend/routers/admin.py, frontend/src/pages/admin/AdminUsers.jsx, frontend/src/components/ForcePasswordChange.jsx, frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "New endpoint POST /admin/users/{user_id}/reset-password (admin-only, blocks admin targets) generates a random temp password (letters+digits, 10 chars), sets password_hash + must_change_password=True, logs admin action, sends in-app notification to user, and returns the temp password in the response (shown once to admin in a copyable modal — no email/SMS configured so admin must share manually). Added 'Reset Password' item to the per-row Actions dropdown in AdminUsers.jsx with a 2-step confirm -> result modal. On the user side, added ForcePasswordChange.jsx full-screen gate wired into ProtectedRoute and AdminGuard in App.js — if user.must_change_password is true, user must enter the temp password as 'current password' via /auth/change-password before accessing any part of the app (with a logout escape hatch). Test: admin resets password for rohan@example.com (or any non-admin user) from /admin/users, then log in as that user with the generated temp password to see the forced change screen."
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL TESTS PASSED (14/14): FEATURE 2 - Admin reset user password + forced change flow working correctly. TEST 1: Admin login successful. TEST 2: Found rohan@example.com via GET /api/admin/users?search=rohan. TEST 3: POST /api/admin/users/{user_id}/reset-password returns 200 with temporary_password (10 chars, letters+digits) and message. TEST 4: Login with old password Test@1234 correctly fails (401). TEST 5: Login with temp password successful, user object contains must_change_password=true. TEST 6: GET /api/auth/me returns must_change_password=true. TEST 7: POST /api/auth/change-password with current_password=temp_password and new_password='NewSecure@123' returns 200. TEST 8: GET /api/auth/me returns must_change_password=false (flag cleared). TEST 9: Login with temp password correctly fails (401). TEST 10: Login with new password NewSecure@123 successful. TEST 11: Edge case - POST /api/admin/users/{admin_user_id}/reset-password returns 400 'Cannot reset password for an admin account this way' (admin accounts blocked). TEST 12: Edge case - Non-admin user calling reset endpoint returns 403 (admin-only). TEST 13: Restored rohan's password to Test@1234 (cleanup). TEST 14: Login with Test@1234 successful (verified after rate limit cleared). All password reset flows, forced change logic, and edge cases working correctly."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 13
+  test_sequence: 15
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "All new features tested and verified"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -535,4 +564,6 @@ agent_communication:
     message: "AI FEATURES BACKEND TESTING COMPLETE (3/3 APIs verified): ✅ TEST 1 - AI Gear Normalization API: GET /api/platform/gear-catalogue/normalize?name=godox%20ad200 returns catalogue_match for 'Godox AD200 Pro' (Lighting category). When AI disabled, returns ai_disabled=true with no processing. Graceful fallback when Gemini quota exceeded (20 req/day free tier limit hit). ✅ TEST 2 - AI Usage Report API: GET /api/admin/reports/ai-usage returns total_all=5, cost=$0.000062, endpoint_breakdown with gear-normalize entries, gear_outcomes (auto_approved/pending/already_in_catalogue), daily_data chart. All data structure correct. ✅ TEST 3 - AI Toggle API: PUT /api/platform/settings successfully toggles ai_features_enabled ON/OFF, gear normalization respects toggle state. ALL BACKEND APIs WORKING PERFECTLY. ⚠️ FRONTEND UI TESTING BLOCKED: Same navigation issue as previous testing agent - login API works but Playwright cannot access /profile or /admin pages after login. Recommend main agent investigate frontend auth flow/routing (AuthContext, localStorage, route guards)."
   - agent: "testing"
     message: "✅ NEW FEATURES TESTING COMPLETE (11/11 tests passed): Tested 4 new features requested by user. FEATURE 1 - Username (5/5 tests): check-username endpoint correctly validates availability and format, set-username enforces one-time setting (409 if already set), lookup by username works (/users/rohanphotoo returns rohan's profile). FEATURE 2 - Razorpay DB Read Fix (3/3 tests): Admin can update Razorpay keys via PUT /api/platform/api-keys (both key_id and key_secret), wallet.py reads from platform_secrets DB first then falls back to env vars, create-order returns 503 'Payment gateway error' with test keys (NOT 500 crash). FEATURE 3 - WhatsApp Button (1/1 test): Profile API returns phone='9876543210' field for rohan, whatsapp_number field exists in model. FEATURE 4 - Gemini Key Update (2/2 tests): .env contains new key AIzaSyB4sv4m14QvG3R-ust4mhW21FYZxU168_w, gear normalize API returns Canon EOS R5 with confidence=0.99 for 'canon r5' query. All 4 features are fully functional."
+  - agent: "testing"
+    message: "✅ ADMIN PASSWORD FEATURES TESTING COMPLETE (20/20 tests passed): Tested 2 new backend features. FEATURE 1 - Admin change password (6/6 tests): Admin can change their own password using POST /api/auth/change-password endpoint. Tested password change from Admin@123 → AdminNew@123, verified old password rejected, new password works, and successfully restored to Admin@123. The endpoint properly validates current password, updates hash, and clears must_change_password flag. FEATURE 2 - Admin reset user password + forced change flow (14/14 tests): POST /api/admin/users/{user_id}/reset-password generates 10-char temp password (letters+digits), sets must_change_password=true, returns temp password in response. Tested with rohan@example.com: old password rejected after reset, login with temp password successful with must_change_password=true in response, GET /api/auth/me confirms flag, user changes password via /api/auth/change-password, flag cleared to false, temp password rejected, new password works. Edge cases verified: admin accounts blocked from reset (400 error), non-admin users cannot access endpoint (403 error). Cleanup successful - rohan's password restored to Test@1234. All password management features working correctly."
 

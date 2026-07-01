@@ -4,9 +4,11 @@ from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 import uuid
 import os
+import secrets
+import string
 
 from db import get_db
-from auth_utils import get_admin_user, _clean_user, create_impersonation_token
+from auth_utils import get_admin_user, _clean_user, create_impersonation_token, hash_password
 from services.notifications_service import send_notification
 from services.log_service import log_admin_action
 
@@ -78,6 +80,15 @@ class AssignPlanRequest(BaseModel):
 
 class ExtendExpiryRequest(BaseModel):
     days: int        # positive integer — days to extend
+
+
+def _generate_temp_password(length: int = 10) -> str:
+    """Generate a random temporary password containing at least one letter and one digit."""
+    alphabet = string.ascii_letters + string.digits
+    while True:
+        pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+        if any(c.isalpha() for c in pwd) and any(c.isdigit() for c in pwd):
+            return pwd
 
 
 @router.get("/verification-queue")
@@ -334,6 +345,44 @@ async def adjust_wallet(user_id: str, data: WalletAdjustRequest, admin: dict = D
         {},
     )
     return {"new_balance": new_balance}
+
+
+@router.post("/users/{user_id}/reset-password")
+async def admin_reset_password(user_id: str, admin: dict = Depends(get_admin_user)):
+    """Admin generates a new temporary password for a user. User must change it on next login."""
+    db = get_db()
+    user = await db.users.find_one({"_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("is_admin"):
+        raise HTTPException(status_code=400, detail="Cannot reset password for an admin account this way")
+
+    temp_password = _generate_temp_password()
+    now = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"_id": user_id},
+        {"$set": {
+            "password_hash": hash_password(temp_password),
+            "must_change_password": True,
+            "updated_at": now,
+        }}
+    )
+    await log_admin_action(
+        db, admin, "reset_password",
+        "user", user_id,
+        {},
+        {"must_change_password": True},
+    )
+    await send_notification(
+        db, user_id, "security",
+        "Password Reset by Admin",
+        "An admin has reset your password. Please contact the admin to get your temporary password, then change it immediately after logging in.",
+        {},
+    )
+    return {
+        "temporary_password": temp_password,
+        "message": "Password reset successfully. Share this temporary password with the user securely — it won't be shown again.",
+    }
 
 
 @router.put("/users/{user_id}/flags")

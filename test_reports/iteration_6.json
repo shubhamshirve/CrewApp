@@ -25,5 +25,5 @@
   "seed_data_creation": "",
   "retest_needed": false,
   "main_agent_can_self_test": true,
-  "context_for_next_testing_agent": "Profile refactor is clean. All sub-components (ProfileHeader, GearVault, RatingsSection, StyleAndWorkflow) render correctly. EditProfileDialog opens with pre-filled form, closes with Escape. GearDialog opens category selection step. Admin Test AI button in API Keys tab works (Gemini active, returns Sony A7 IV normalized). Use public URL for testing: https://b130c0e8-2667-4d29-b664-47bd3be2608c.preview.emergentagent.com. Rohan ID: usr-rohan-00000000-0000-0000-0000-000000000002. Admin: admin@photoo.in / Admin@123."
+  "context_for_next_testing_agent": "Profile refactor is clean. All sub-components (ProfileHeader, GearVault, RatingsSection, StyleAndWorkflow) render correctly. EditProfileDialog opens with pre-filled form, closes with Escape. GearDialog opens category selection step. Admin Test AI button in API Keys tab works (Gemini active, returns Sony A7 IV normalized). Use public URL for testing: https://password-mgmt-tool.preview.emergentagent.com. Rohan ID: usr-rohan-00000000-0000-0000-0000-000000000002. Admin: admin@photoo.in / Admin@123."
 }

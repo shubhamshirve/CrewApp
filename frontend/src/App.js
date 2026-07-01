@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
 import PlanGate from "@/components/PlanGate";
+import ForcePasswordChange from "@/components/ForcePasswordChange";
 import "@/App.css";
 
 // User app pages
@@ -45,6 +46,7 @@ function ProtectedRoute({ children }) {
   );
   if (!user) return <Navigate to="/" replace />;
   if (user.is_admin) return <Navigate to="/admin/dashboard" replace />;
+  if (user.must_change_password) return <ForcePasswordChange />;
   return children;
 }
 
@@ -58,6 +60,7 @@ function AdminGuard({ children }) {
   );
   if (!user) return <Navigate to="/" replace />;
   if (!user.is_admin) return <Navigate to="/" replace />;
+  if (user.must_change_password) return <ForcePasswordChange />;
   return children;
 }
 

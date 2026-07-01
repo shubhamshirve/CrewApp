@@ -261,6 +261,7 @@ async def register(request: Request, data: RegisterRequest):
         "negative_stars": 0,
         "is_suspended": False,
         "is_admin": False,
+        "must_change_password": False,
         "avg_rating": None,
         "total_ratings": 0,
         "onboarding_complete": False,
@@ -420,6 +421,7 @@ async def change_password(request: Request, data: ChangePasswordRequest, current
         {"_id": current_user["id"]},
         {"$set": {
             "password_hash": hash_password(data.new_password),
+            "must_change_password": False,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }}
     )

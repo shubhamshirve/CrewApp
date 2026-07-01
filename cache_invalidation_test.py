@@ -6,7 +6,7 @@ import asyncio
 import aiohttp
 import json
 
-BASE_URL = "https://calendar-sync-check.preview.emergentagent.com/api"
+BASE_URL = "https://password-mgmt-tool.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@photoo.in"
 ADMIN_PASSWORD = "Admin@123"
 

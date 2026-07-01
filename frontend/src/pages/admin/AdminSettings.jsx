@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Settings, DollarSign, Tag, Briefcase, Camera, Inbox,
   Plus, Trash2, Save, RefreshCw, Key, Eye, EyeOff,
-  CheckCircle2, AlertCircle, Loader2, X, Zap, Copy, Link2,
+  CheckCircle2, AlertCircle, Loader2, X, Zap, Copy, Link2, Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,7 +15,7 @@ const inputClass = "bg-white border border-slate-200 text-slate-900 placeholder:
 const GEAR_CATS = ["Camera", "Lens", "Lighting", "Drone", "Audio", "Accessories", "Other"];
 
 export default function AdminSettings() {
-  const { api } = useAuth();
+  const { api, user } = useAuth();
 
   // Pricing state
   const [pricing, setPricing] = useState({
@@ -64,6 +64,10 @@ export default function AdminSettings() {
   // Test AI state
   const [testAiLoading, setTestAiLoading] = useState(false);
   const [testAiResult, setTestAiResult] = useState(null);
+
+  // Security — change password state
+  const [pwForm, setPwForm] = useState({ current: "", newPass: "", confirm: "" });
+  const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
     loadPricing();
@@ -309,6 +313,25 @@ export default function AdminSettings() {
     }
   };
 
+  // ── Security — Change Password ─────────────────────────────────────────────
+
+  const changePassword = async () => {
+    if (!pwForm.current) { toast.error("Enter your current password"); return; }
+    if (pwForm.newPass.length < 8) { toast.error("New password must be at least 8 characters"); return; }
+    if (!/[A-Za-z]/.test(pwForm.newPass) || !/\d/.test(pwForm.newPass)) { toast.error("New password must contain a letter and a number"); return; }
+    if (pwForm.newPass !== pwForm.confirm) { toast.error("Passwords don't match"); return; }
+    setPwSaving(true);
+    try {
+      await api.post("/auth/change-password", { current_password: pwForm.current, new_password: pwForm.newPass });
+      toast.success("Password changed successfully");
+      setPwForm({ current: "", newPass: "", confirm: "" });
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to change password");
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   // ── Render helpers ─────────────────────────────────────────────────────────
 
   const SectionCard = ({ children, title, icon: Icon }) => (
@@ -389,6 +412,9 @@ export default function AdminSettings() {
               onClick={() => { if (Object.keys(apiKeys).length === 0) loadApiKeys(); }}
             >
               <Key size={12} /> API Keys
+            </TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm font-display text-xs gap-1.5 text-slate-500">
+              <Lock size={12} /> Security
             </TabsTrigger>
           </TabsList>
 
@@ -916,6 +942,61 @@ export default function AdminSettings() {
                 );
               })
             )}
+          </TabsContent>
+
+          {/* ── Security Tab ── */}
+          <TabsContent value="security" className="mt-4 space-y-4">
+            <SectionCard title="Change Admin Password" icon={Lock}>
+              <p className="text-xs text-slate-500 mb-4">
+                Update the password for your own admin account ({user?.email}). Your current password is required to confirm.
+              </p>
+              <div className="max-w-sm space-y-3">
+                <div>
+                  <label className="text-xs text-slate-500 font-display mb-1 block">Current Password</label>
+                  <input
+                    data-testid="admin-change-pass-current"
+                    type="password"
+                    className={inputClass}
+                    placeholder="••••••••"
+                    value={pwForm.current}
+                    onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-display mb-1 block">New Password</label>
+                  <input
+                    data-testid="admin-change-pass-new"
+                    type="password"
+                    className={inputClass}
+                    placeholder="Min 8 chars, letter + number"
+                    value={pwForm.newPass}
+                    onChange={e => setPwForm(p => ({ ...p, newPass: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-display mb-1 block">Confirm New Password</label>
+                  <input
+                    data-testid="admin-change-pass-confirm"
+                    type="password"
+                    className={inputClass}
+                    placeholder="Re-enter new password"
+                    value={pwForm.confirm}
+                    onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))}
+                    onKeyDown={e => e.key === "Enter" && changePassword()}
+                  />
+                </div>
+                <Button
+                  data-testid="admin-change-pass-submit"
+                  onClick={changePassword}
+                  disabled={pwSaving}
+                  className="text-xs gap-1.5 text-white w-full mt-1"
+                  style={{ background: "#1D4ED8" }}
+                >
+                  {pwSaving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                  {pwSaving ? "Updating…" : "Update Password"}
+                </Button>
+              </div>
+            </SectionCard>
           </TabsContent>
         </Tabs>
       </div>

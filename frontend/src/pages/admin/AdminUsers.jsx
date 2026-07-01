@@ -5,7 +5,7 @@ import AdminLayout from "@/components/AdminLayout";
 import {
   Users, AlertTriangle, Ban, CheckCircle, Search, Loader2, Filter, X, Send,
   MoreHorizontal, Eye, Zap, Shield, Flag, Wallet, Star, ShieldCheck,
-  CreditCard, CalendarClock,
+  CreditCard, CalendarClock, KeyRound, Copy,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ function ActionMenuItem({ icon: Icon, label, onClick, danger, muted }) {
   );
 }
 
-function ActionMenu({ user, onImpersonate, onVerify, onSuspend, onPenalty, onWallet, onFlag, onAssignPlan, onExtendExpiry, loading }) {
+function ActionMenu({ user, onImpersonate, onVerify, onSuspend, onPenalty, onWallet, onFlag, onAssignPlan, onExtendExpiry, onResetPassword, loading }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -85,6 +85,13 @@ function ActionMenu({ user, onImpersonate, onVerify, onSuspend, onPenalty, onWal
             label={user.is_suspended ? "Unsuspend" : "Suspend"}
             onClick={() => act(onSuspend)}
             danger={!user.is_suspended}
+          />
+
+          {/* Reset Password */}
+          <ActionMenuItem
+            icon={KeyRound}
+            label="Reset Password"
+            onClick={() => act(onResetPassword)}
           />
 
           <div className="h-px bg-slate-100 my-1" />
@@ -192,6 +199,12 @@ export default function AdminUsers() {
   const [extendExpiryUserId, setExtendExpiryUserId] = useState(null);
   const [extendDays, setExtendDays] = useState("30");
   const [extendLoading, setExtendLoading] = useState(false);
+
+  // Reset Password modal
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState(null); // { user, tempPassword }
+  const [resetPasswordConfirmUser, setResetPasswordConfirmUser] = useState(null);
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -360,6 +373,28 @@ export default function AdminUsers() {
     } finally { setExtendLoading(false); }
   };
 
+  // Reset Password handler
+  const handleResetPasswordConfirm = async () => {
+    if (!resetPasswordConfirmUser) return;
+    setResetPasswordLoading(true);
+    try {
+      const r = await api.post(`/admin/users/${resetPasswordConfirmUser.id}/reset-password`);
+      setResetPasswordResult({ user: resetPasswordConfirmUser, tempPassword: r.data.temporary_password });
+      toast.success("Temporary password generated");
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to reset password");
+    } finally {
+      setResetPasswordLoading(false);
+    }
+  };
+
+  const closeResetPasswordModal = () => {
+    setShowResetPassword(false);
+    setResetPasswordConfirmUser(null);
+    setResetPasswordResult(null);
+  };
+
   return (
     <AdminLayout>
       <div className="max-w-5xl mx-auto space-y-5 pb-24">
@@ -506,6 +541,7 @@ export default function AdminUsers() {
                     onWallet={() => { setWalletUserId(u.id); setShowWallet(true); }}
                     onAssignPlan={() => { setAssignPlanUserId(u.id); setSelectedPlanId(""); setShowAssignPlan(true); }}
                     onExtendExpiry={() => { setExtendExpiryUserId(u.id); setExtendDays("30"); setShowExtendExpiry(true); }}
+                    onResetPassword={() => { setResetPasswordConfirmUser(u); setResetPasswordResult(null); setShowResetPassword(true); }}
                     onFlag={(field, val) => handleFlagUser(u.id, field, val)}
                   />
                 </div>
@@ -726,6 +762,79 @@ export default function AdminUsers() {
               </button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Reset Password Modal ── */}
+      <Dialog open={showResetPassword} onOpenChange={v => { if (!v) closeResetPasswordModal(); }}>
+        <DialogContent className="bg-white border-slate-200 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-display flex items-center gap-2">
+              <KeyRound size={15} className="text-orange-500" /> Reset Password
+              {resetPasswordConfirmUser && <span className="text-xs font-normal text-slate-500 ml-1">— {resetPasswordConfirmUser.full_name}</span>}
+            </DialogTitle>
+          </DialogHeader>
+
+          {!resetPasswordResult ? (
+            <div className="space-y-4 mt-2">
+              <p className="text-sm text-slate-600">
+                This will generate a new random <strong>temporary password</strong> for{" "}
+                <span className="font-medium text-slate-900">{resetPasswordConfirmUser?.email}</span>.
+                Their current password will stop working immediately, and they will be required to set a new
+                password the next time they log in.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={closeResetPasswordModal} className="flex-1 py-2.5 rounded-xl text-sm text-slate-500 border border-slate-200 hover:bg-slate-50">Cancel</button>
+                <button
+                  data-testid="confirm-reset-password-btn"
+                  onClick={handleResetPasswordConfirm}
+                  disabled={resetPasswordLoading}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60"
+                  style={{ background: "#EA580C" }}
+                >
+                  {resetPasswordLoading ? "Generating…" : "Generate Temporary Password"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 mt-2">
+              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-start gap-2">
+                <CheckCircle size={14} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-emerald-700">
+                  Password reset! Share this temporary password with the user securely (it will not be shown again). They must change it after logging in.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1.5 block">Temporary Password</label>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    data-testid="temp-password-value"
+                    className="flex-1 bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-3 py-2 text-sm font-mono outline-none select-all"
+                    value={resetPasswordResult.tempPassword}
+                  />
+                  <button
+                    data-testid="copy-temp-password-btn"
+                    onClick={() => {
+                      navigator.clipboard.writeText(resetPasswordResult.tempPassword);
+                      toast.success("Temporary password copied!");
+                    }}
+                    className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    <Copy size={12} /> Copy
+                  </button>
+                </div>
+              </div>
+              <button
+                data-testid="reset-password-done-btn"
+                onClick={closeResetPasswordModal}
+                className="w-full py-2.5 rounded-xl text-sm font-medium text-white"
+                style={{ background: "#1D4ED8" }}
+              >
+                Done
+              </button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
