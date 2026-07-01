@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
     # ── Startup ──
     await db.users.create_index("email", unique=True)
     await db.users.create_index("referral_code")
+    await db.users.create_index("username", unique=True, sparse=True)  # sparse allows null values
     await db.users.create_index([("primary_role", 1), ("is_ghost_mode", 1), ("is_suspended", 1)])
     await db.users.create_index([("location", 1), ("is_ghost_mode", 1)])
     await db.gigs.create_index([("lead_photographer_id", 1), ("created_at", -1)])

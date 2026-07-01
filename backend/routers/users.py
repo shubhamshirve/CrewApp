@@ -211,10 +211,60 @@ async def get_available_users(
     return [_clean_user(u) for u in users]
 
 
+_USERNAME_RE = re.compile(r"^[a-z][a-z0-9_]{2,19}$")
+
+
+class UsernameSetRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=20)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not _USERNAME_RE.match(v):
+            raise ValueError(
+                "Username must be 3–20 chars, start with a letter, and contain only lowercase letters, numbers, or underscores."
+            )
+        return v
+
+
+@router.get("/check-username/{username}")
+async def check_username(username: str):
+    """Public — check if a username is available."""
+    username = username.strip().lower()
+    if not _USERNAME_RE.match(username):
+        return {"available": False, "reason": "Invalid format"}
+    db = get_db()
+    existing = await db.users.find_one({"username": username}, {"_id": 1})
+    return {"available": existing is None, "username": username}
+
+
+@router.post("/set-username")
+async def set_username(data: UsernameSetRequest, current_user: dict = Depends(get_current_user)):
+    """Authenticated — set username once (cannot be changed later)."""
+    if current_user.get("username"):
+        raise HTTPException(status_code=409, detail="Username already set and cannot be changed.")
+    db = get_db()
+    existing = await db.users.find_one({"username": data.username}, {"_id": 1})
+    if existing:
+        raise HTTPException(status_code=409, detail="Username is already taken.")
+    await db.users.update_one(
+        {"_id": current_user["id"]},
+        {"$set": {"username": data.username, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    user = await db.users.find_one({"_id": current_user["id"]})
+    return _clean_user(user)
+
+
 @router.get("/{user_id}")
 async def get_user(user_id: str, current_user: Optional[dict] = Depends(get_current_user)):
     db = get_db()
-    user = await db.users.find_one({"_id": user_id})
+    # Support username lookup: if no hyphens and matches username pattern, try by username first
+    user = None
+    if "-" not in user_id and _USERNAME_RE.match(user_id.lower()):
+        user = await db.users.find_one({"username": user_id.lower()})
+    if not user:
+        user = await db.users.find_one({"_id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return _clean_user({**user})

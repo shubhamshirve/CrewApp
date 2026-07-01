@@ -8,7 +8,7 @@ import {
   Shield, MapPin, Star, Camera, User, UserPlus, UserCheck,
   StickyNote, Save, Trash2, Pencil, Plus, X, Upload,
   Instagram, Globe, Wallet, Link2, ChevronDown, ChevronLeft, ChevronRight,
-  Phone, MessageCircle, Loader2, CheckCircle2, Sparkles, Wand2,
+  Phone, MessageCircle, Loader2, CheckCircle2, Sparkles, Wand2, Link2 as Link2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchPincodeData } from "@/utils/pincode";
@@ -89,12 +89,19 @@ function CitySelect({ value, onChange, inputClass }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function Profile() {
-  const { id } = useParams();
+  const { id, username: usernameParam } = useParams();
+  const profileIdentifier = usernameParam || id;   // supports /profile/:id and /u/:username
   const { user, api, refreshUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [ratings, setRatings] = useState({ avg_rating: null, total_ratings: 0, ratings: [] });
   const [connectionStatus, setConnectionStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Username setup state
+  const [usernameInput, setUsernameInput] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState(null); // null | "checking" | "available" | "taken" | "invalid"
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const usernameTimer = useRef(null);
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -168,25 +175,27 @@ export default function Profile() {
   const [docForm, setDocForm] = useState({ id_type: "Aadhar", govt_id_base64: "", selfie_base64: "" });
   const [docSaving, setDocSaving] = useState(false);
 
-  const isOwn = user?.id === id;
+  const isOwn = user?.id === id || (!id && !usernameParam);
 
   useEffect(() => {
     const load = async () => {
       try {
         const [userRes, ratingsRes] = await Promise.all([
-          api.get(`/users/${id}`),
-          api.get(`/ratings/user/${id}`),
+          api.get(`/users/${profileIdentifier}`),
+          api.get(`/ratings/user/${profileIdentifier}`),
         ]);
         setProfile(userRes.data);
-        if (!isOwn) {
+        const resolvedId = userRes.data.id;
+        const ownProfile = user?.id === resolvedId;
+        if (!ownProfile) {
           const conns = await api.get("/connections");
-          const found = conns.data.find(c => c.user?.id === id);
+          const found = conns.data.find(c => c.user?.id === resolvedId);
           setConnectionStatus(found ? "connected" : null);
           // Only load notes if connected
           if (found) {
             setNoteLoading(true);
             try {
-              const noteRes = await api.get(`/notes/${id}`);
+              const noteRes = await api.get(`/notes/${resolvedId}`);
               setNote(noteRes.data.content || "");
               setNoteExists(noteRes.data.exists || false);
             } catch { /* not connected or error */ }
@@ -321,6 +330,40 @@ export default function Profile() {
         ? aiNorm.category : p.category,
     }));
     setAiNorm(null);
+  };
+
+  // ── Username setup ────────────────────────────────────────────────────────────
+  const checkUsername = async (val) => {
+    if (!val || val.length < 3) { setUsernameStatus(null); return; }
+    const isValid = /^[a-z][a-z0-9_]{2,19}$/.test(val.toLowerCase());
+    if (!isValid) { setUsernameStatus("invalid"); return; }
+    setUsernameStatus("checking");
+    try {
+      const res = await api.get(`/users/check-username/${val.toLowerCase()}`);
+      setUsernameStatus(res.data.available ? "available" : "taken");
+    } catch { setUsernameStatus(null); }
+  };
+
+  const handleUsernameInputChange = (val) => {
+    setUsernameInput(val.toLowerCase().replace(/[^a-z0-9_]/g, ""));
+    setUsernameStatus(null);
+    if (usernameTimer.current) clearTimeout(usernameTimer.current);
+    if (val.trim().length >= 3) {
+      usernameTimer.current = setTimeout(() => checkUsername(val.trim().toLowerCase()), 600);
+    }
+  };
+
+  const handleSaveUsername = async () => {
+    if (usernameStatus !== "available") return;
+    setUsernameSaving(true);
+    try {
+      const res = await api.post("/users/set-username", { username: usernameInput.toLowerCase() });
+      setProfile(res.data);
+      await refreshUser();
+      toast.success(`@${usernameInput} set! Your profile is now at /u/${usernameInput}`);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to save username");
+    } finally { setUsernameSaving(false); }
   };
 
   const handleGearSave = async () => {
@@ -490,6 +533,21 @@ export default function Profile() {
                 {profile.is_standby && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Standby</span>}
                 {profile.is_ghost_mode && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">Ghost Mode</span>}
               </div>
+              {/* @username + profile link */}
+              {profile.username && (
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-violet-500 font-mono font-semibold">@{profile.username}</span>
+                  {isOwn && (
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/u/${profile.username}`); toast.success("Profile link copied!"); }}
+                      className="text-[10px] text-slate-400 hover:text-slate-600 flex items-center gap-0.5"
+                      title="Copy profile link"
+                    >
+                      <Link2Icon size={9} /> copy link
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="flex items-center gap-3 mt-1 flex-wrap text-sm">
                 {profile.primary_role && <span className="font-display text-orange-500">{profile.primary_role}</span>}
                 {profile.secondary_role && <span className="text-slate-400">• {profile.secondary_role}</span>}
@@ -576,47 +634,49 @@ export default function Profile() {
                 )}
               </>
             ) : (
-              connectionStatus === "connected" ? (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button size="sm" variant="outline" className="border-slate-200 text-slate-500" disabled data-testid="connected-badge">
-                    <UserCheck size={14} className="mr-1.5 text-emerald-500" /> Connected
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* WhatsApp button — visible to all viewers regardless of connection status */}
+                {(profile.whatsapp_number || profile.phone) && (
+                  <a
+                    href={`https://wa.me/${(profile.whatsapp_number || profile.phone).replace(/\D/g, "")}?text=Hi%20${encodeURIComponent(profile.full_name)}%2C%20I%20found%20your%20profile%20on%20Photoo!`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="whatsapp-btn"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-display font-medium text-white transition-opacity hover:opacity-90"
+                    style={{ background: "#25D366" }}
+                    title={`WhatsApp ${profile.full_name}`}
+                  >
+                    <MessageCircle size={13} /> WhatsApp
+                  </a>
+                )}
+                {connectionStatus === "connected" ? (
+                  <>
+                    <Button size="sm" variant="outline" className="border-slate-200 text-slate-500" disabled data-testid="connected-badge">
+                      <UserCheck size={14} className="mr-1.5 text-emerald-500" /> Connected
+                    </Button>
+                    {/* Call button — only for connected users */}
+                    {(profile.phone || profile.whatsapp_number) && (
+                      <a
+                        href={`tel:${profile.phone || profile.whatsapp_number}`}
+                        data-testid="call-btn"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-display font-medium text-white transition-opacity hover:opacity-90"
+                        style={{ background: "#3B82F6" }}
+                        title={`Call ${profile.full_name}`}
+                      >
+                        <Phone size={13} /> Call
+                      </a>
+                    )}
+                  </>
+                ) : connectionStatus === "pending" ? (
+                  <Button size="sm" variant="outline" className="border-slate-200 text-slate-400" disabled data-testid="pending-connection-badge">
+                    Request Sent
                   </Button>
-                  {/* Call button */}
-                  {(profile.phone || profile.whatsapp_number) && (
-                    <a
-                      href={`tel:${profile.phone || profile.whatsapp_number}`}
-                      data-testid="call-btn"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-display font-medium text-white transition-opacity hover:opacity-90"
-                      style={{ background: "#3B82F6" }}
-                      title={`Call ${profile.full_name}`}
-                    >
-                      <Phone size={13} /> Call
-                    </a>
-                  )}
-                  {/* WhatsApp button */}
-                  {(profile.whatsapp_number || profile.phone) && (
-                    <a
-                      href={`https://wa.me/${(profile.whatsapp_number || profile.phone).replace(/\D/g, "")}?text=Hi%20${encodeURIComponent(profile.full_name)}%2C%20I%20found%20your%20profile%20on%20Photoo!`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      data-testid="whatsapp-btn"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-display font-medium text-white transition-opacity hover:opacity-90"
-                      style={{ background: "#25D366" }}
-                      title={`WhatsApp ${profile.full_name}`}
-                    >
-                      <MessageCircle size={13} /> WhatsApp
-                    </a>
-                  )}
-                </div>
-              ) : connectionStatus === "pending" ? (
-                <Button size="sm" variant="outline" className="border-slate-200 text-slate-400" disabled data-testid="pending-connection-badge">
-                  Request Sent
-                </Button>
-              ) : (
-                <Button size="sm" data-testid="connect-btn" onClick={handleConnect} style={{ background: "#F97316", color: "#fff" }} className="font-display font-semibold">
-                  <UserPlus size={14} className="mr-1.5" /> Connect
-                </Button>
-              )
+                ) : (
+                  <Button size="sm" data-testid="connect-btn" onClick={handleConnect} style={{ background: "#F97316", color: "#fff" }} className="font-display font-semibold">
+                    <UserPlus size={14} className="mr-1.5" /> Connect
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -672,6 +732,52 @@ export default function Profile() {
             )}
           </div>
         </div>
+
+        {/* ── Username setup (own profile, no username yet) ──────────────────── */}
+        {isOwn && !profile.username && (
+          <div className="p-5 rounded-xl border-2 border-dashed border-violet-200 bg-violet-50">
+            <div className="flex items-center gap-2 mb-2">
+              <Link2Icon size={14} className="text-violet-500" />
+              <h3 className="text-sm font-semibold text-slate-900 font-display">Claim your @username</h3>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-600 font-medium">One-time · cannot be changed</span>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">Get a clean profile URL like <span className="font-mono text-violet-600">/u/johndoe</span> instead of a long ID.</p>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">@</span>
+                <input
+                  data-testid="username-input"
+                  className="w-full pl-6 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:border-violet-400 focus:outline-none font-mono"
+                  placeholder="yourname"
+                  value={usernameInput}
+                  maxLength={20}
+                  onChange={e => handleUsernameInputChange(e.target.value)}
+                />
+                {usernameStatus === "checking" && (
+                  <Loader2 size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
+                )}
+                {usernameStatus === "available" && (
+                  <CheckCircle2 size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-500" />
+                )}
+                {usernameStatus === "taken" && (
+                  <X size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-400" />
+                )}
+              </div>
+              <Button
+                size="sm"
+                disabled={usernameStatus !== "available" || usernameSaving}
+                onClick={handleSaveUsername}
+                className="font-display font-semibold text-white text-xs"
+                style={{ background: usernameStatus === "available" ? "#8B5CF6" : undefined }}
+              >
+                {usernameSaving ? <Loader2 size={12} className="animate-spin" /> : "Claim"}
+              </Button>
+            </div>
+            {usernameStatus === "taken" && <p className="text-xs text-red-500 mt-1.5">That username is taken. Try another.</p>}
+            {usernameStatus === "invalid" && <p className="text-xs text-amber-500 mt-1.5">3–20 chars, start with a letter, lowercase letters/numbers/underscores only.</p>}
+            {usernameStatus === "available" && <p className="text-xs text-emerald-600 mt-1.5">✓ @{usernameInput} is available!</p>}
+          </div>
+        )}
 
         {/* Gear Vault */}
         <div className="p-5 rounded-xl border border-slate-200 bg-white">

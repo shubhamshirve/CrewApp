@@ -84,20 +84,46 @@ async def _record_coupon_redemption(db, code: str, user_id: str, plan_id: Option
     await db.coupons.update_one({"_id": code}, {"$inc": {"redemption_count": 1}})
 
 
-def get_razorpay_client():
-    return razorpay.Client(auth=(
-        os.environ.get("RAZORPAY_KEY_ID"),
-        os.environ.get("RAZORPAY_KEY_SECRET")
-    ))
+def get_razorpay_client(key_id: str, key_secret: str) -> "razorpay.Client":
+    """Create a Razorpay client from the provided credentials."""
+    return razorpay.Client(auth=(key_id, key_secret))
 
 
-def _require_razorpay():
-    """Raise a clear 503 if Razorpay credentials are not configured."""
-    if not os.environ.get("RAZORPAY_KEY_ID") or not os.environ.get("RAZORPAY_KEY_SECRET"):
+async def _get_razorpay_creds() -> tuple[str, str]:
+    """
+    Fetch Razorpay credentials — DB (platform_secrets) takes priority over env vars.
+    Returns (key_id, key_secret). Either may be empty string if not configured.
+    """
+    db = get_db()
+    try:
+        doc = await db.platform_secrets.find_one({"_id": "api_keys"}, {"razorpay": 1})
+        if doc and doc.get("razorpay"):
+            rp = doc["razorpay"]
+            key_id = rp.get("key_id", "").strip()
+            key_secret = rp.get("key_secret", "").strip()
+            if key_id and key_secret:
+                return key_id, key_secret
+    except Exception:
+        pass
+    # Fallback to env vars
+    return (
+        os.environ.get("RAZORPAY_KEY_ID", "").strip(),
+        os.environ.get("RAZORPAY_KEY_SECRET", "").strip(),
+    )
+
+
+async def _require_razorpay() -> tuple[str, str]:
+    """
+    Fetch and validate Razorpay credentials.
+    Raises HTTP 503 if not configured; returns (key_id, key_secret) otherwise.
+    """
+    key_id, key_secret = await _get_razorpay_creds()
+    if not key_id or not key_secret:
         raise HTTPException(
             status_code=503,
-            detail="Payment gateway is not configured. Please add wallet balance to pay or contact support."
+            detail="Payment gateway is not configured. Please add Razorpay Key ID and Key Secret in Admin → Settings → API Keys."
         )
+    return key_id, key_secret
 
 
 class SubscribeRequest(BaseModel):
@@ -255,8 +281,8 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
             "discount_amount": discount_amount,
         }
 
-    _require_razorpay()
-    rp = get_razorpay_client()
+    key_id, key_secret = await _require_razorpay()
+    rp = get_razorpay_client(key_id, key_secret)
     try:
         order = rp.order.create({
             "amount": remaining_paise,
@@ -386,8 +412,8 @@ async def activate_with_wallet(data: SubscribeRequest, current_user: dict = Depe
 
 @router.post("/subscribe/verify")
 async def verify_payment(data: VerifyPaymentRequest, current_user: dict = Depends(get_current_user)):
-    _require_razorpay()
-    rp = get_razorpay_client()
+    key_id, key_secret = await _require_razorpay()
+    rp = get_razorpay_client(key_id, key_secret)
     db = get_db()
     now = datetime.now(timezone.utc)
 
@@ -553,8 +579,8 @@ async def upgrade_plan(data: SubscribeRequest, current_user: dict = Depends(get_
         })
         return {"full_wallet_cover": True, "pro_rata_credited": pro_rata, "wallet_deducted": wallet_deducted, "expires_at": expires_at}
 
-    _require_razorpay()
-    rp = get_razorpay_client()
+    key_id, key_secret = await _require_razorpay()
+    rp = get_razorpay_client(key_id, key_secret)
     try:
         order = rp.order.create({
             "amount": remaining_paise, "currency": "INR",
