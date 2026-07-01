@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   ScrollText, RefreshCw, ChevronLeft, ChevronRight,
   Activity, AlertCircle, CreditCard, Cpu, MessageSquare, LogIn,
+  Eye, X, Copy, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,69 +41,158 @@ function Pill({ label, color = "blue" }) {
   );
 }
 
+/* ── Detail Modal ─────────────────────────────────────────────────────────── */
+function LogDetailModal({ record, onClose }) {
+  const [copied, setCopied] = useState(false);
+  if (!record) return null;
+
+  const SKIP_KEYS = ["id"];
+  const SENSITIVE = ["key_secret", "webhook_secret", "password", "token"];
+
+  const displayVal = (key, val) => {
+    if (SENSITIVE.some(s => key.toLowerCase().includes(s))) return "••••••••";
+    if (val === null || val === undefined) return <span className="text-slate-300 italic">null</span>;
+    if (typeof val === "boolean") return <span className={val ? "text-emerald-600" : "text-red-500"}>{String(val)}</span>;
+    if (typeof val === "object") return (
+      <pre className="text-[10px] bg-slate-50 rounded p-2 overflow-x-auto text-slate-600 max-h-32 whitespace-pre-wrap break-all">
+        {JSON.stringify(val, null, 2)}
+      </pre>
+    );
+    return <span className="break-all">{String(val)}</span>;
+  };
+
+  const copyJson = () => {
+    navigator.clipboard.writeText(JSON.stringify(record, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const entries = Object.entries(record).filter(([k]) => !SKIP_KEYS.includes(k));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      data-testid="log-detail-modal"
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col border border-slate-200">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 font-display">Log Entry Details</h2>
+            <p className="text-[11px] text-slate-400 font-mono mt-0.5">{record.id || "—"}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline" size="sm"
+              className="h-7 gap-1 text-xs border-slate-200 text-slate-500"
+              onClick={copyJson}
+              data-testid="copy-log-json-btn"
+            >
+              {copied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+              {copied ? "Copied" : "Copy JSON"}
+            </Button>
+            <button
+              onClick={onClose}
+              className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+              data-testid="close-log-detail-btn"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-0 divide-y divide-slate-50">
+          {entries.map(([key, val]) => (
+            <div key={key} className="py-2.5 grid grid-cols-[160px_1fr] gap-3 items-start">
+              <span className="text-[11px] font-medium text-slate-500 font-mono pt-0.5 break-all">{key}</span>
+              <span className="text-xs text-slate-800 font-display leading-relaxed">{displayVal(key, val)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LogTable({ columns, rows, loading, total, skip, onSkipChange }) {
+  const [selected, setSelected] = useState(null);
   const from = total === 0 ? 0 : skip + 1;
   const to   = Math.min(skip + PAGE_SIZE, total);
   return (
-    <div>
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : rows.length === 0 ? (
-        <p className="text-slate-400 text-xs text-center py-12 font-display">No logs yet.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr>
-                {columns.map(col => (
-                  <th key={col.key} className="text-left text-slate-400 font-display text-[11px] pb-2 pr-4 border-b border-slate-200 whitespace-nowrap">
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={row.id || i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  {columns.map(col => (
-                    <td
-                      key={col.key}
-                      className="py-2 pr-4 text-slate-700 align-top"
-                      title={col.rawTitle
-                        ? (typeof row[col.rawTitle] === "object"
-                          ? JSON.stringify(row[col.rawTitle])
-                          : String(row[col.rawTitle] ?? ""))
-                        : undefined}
-                    >
-                      {col.render
-                        ? col.render(row)
-                        : <span className="font-mono">{trunc(row[col.key])}</span>}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {total > 0 && (
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-          <span className="text-[11px] text-slate-400 font-display">{from}–{to} of {total}</span>
-          <div className="flex gap-1.5">
-            <Button variant="outline" size="sm" className="h-7 w-7 p-0 border-slate-200 text-slate-500"
-              onClick={() => onSkipChange(skip - PAGE_SIZE)} disabled={skip === 0} aria-label="Previous page">
-              <ChevronLeft size={12} />
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 w-7 p-0 border-slate-200 text-slate-500"
-              onClick={() => onSkipChange(skip + PAGE_SIZE)} disabled={to >= total} aria-label="Next page">
-              <ChevronRight size={12} />
-            </Button>
+    <>
+      {selected && <LogDetailModal record={selected} onClose={() => setSelected(null)} />}
+      <div>
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        </div>
-      )}
-    </div>
+        ) : rows.length === 0 ? (
+          <p className="text-slate-400 text-xs text-center py-12 font-display">No logs yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr>
+                  {columns.map(col => (
+                    <th key={col.key} className="text-left text-slate-400 font-display text-[11px] pb-2 pr-4 border-b border-slate-200 whitespace-nowrap">
+                      {col.label}
+                    </th>
+                  ))}
+                  <th className="text-left text-slate-400 font-display text-[11px] pb-2 border-b border-slate-200 w-12" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr key={row.id || i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    {columns.map(col => (
+                      <td
+                        key={col.key}
+                        className="py-2 pr-4 text-slate-700 align-top"
+                        title={col.rawTitle
+                          ? (typeof row[col.rawTitle] === "object"
+                            ? JSON.stringify(row[col.rawTitle])
+                            : String(row[col.rawTitle] ?? ""))
+                          : undefined}
+                      >
+                        {col.render
+                          ? col.render(row)
+                          : <span className="font-mono">{trunc(row[col.key])}</span>}
+                      </td>
+                    ))}
+                    <td className="py-2 align-top">
+                      <button
+                        onClick={() => setSelected(row)}
+                        data-testid={`view-log-btn-${row.id || i}`}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-display text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"
+                      >
+                        <Eye size={10} /> View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {total > 0 && (
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+            <span className="text-[11px] text-slate-400 font-display">{from}–{to} of {total}</span>
+            <div className="flex gap-1.5">
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0 border-slate-200 text-slate-500"
+                onClick={() => onSkipChange(skip - PAGE_SIZE)} disabled={skip === 0} aria-label="Previous page">
+                <ChevronLeft size={12} />
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0 border-slate-200 text-slate-500"
+                onClick={() => onSkipChange(skip + PAGE_SIZE)} disabled={to >= total} aria-label="Next page">
+                <ChevronRight size={12} />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

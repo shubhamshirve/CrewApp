@@ -27,6 +27,31 @@ def _get_api_key() -> str:
     return key
 
 
+async def _call_gemini(api_key: str, session_id: str, system_msg: str, prompt: str) -> str:
+    """
+    Call Gemini with primary key. If it fails (leaked / quota), retry with EMERGENT_LLM_KEY.
+    Returns the raw text response or raises on total failure.
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+
+    async def _attempt(key: str, sid: str) -> str:
+        chat = LlmChat(
+            api_key=key,
+            session_id=sid,
+            system_message=system_msg,
+        ).with_model("gemini", "gemini-2.5-flash")
+        return await chat.send_message(UserMessage(text=prompt))
+
+    try:
+        return await _attempt(api_key, session_id)
+    except Exception as primary_err:
+        emergent_key = os.environ.get(_EMERGENT_KEY_ENV, "").strip()
+        if emergent_key and emergent_key != api_key:
+            logger.warning("Gear AI: primary key failed (%s), retrying with emergent key", primary_err)
+            return await _attempt(emergent_key, session_id + "_fb")
+        raise primary_err
+
+
 def _extract_json(text: str) -> dict:
     """Extract the first JSON object from a Gemini response string."""
     # Try direct parse first
@@ -50,34 +75,17 @@ def _extract_json(text: str) -> dict:
     return {}
 
 
-async def normalize_gear_name(name: str) -> dict:
+async def normalize_gear_name(name: str, api_key: str = None) -> dict:
     """
     Normalize a photography gear name using Gemini.
-
-    Returns:
-        {
-            "normalized_name": str,
-            "brand": str | None,
-            "category": str,          # Camera / Lens / Lighting / Drone / Audio / Accessories / Other
-            "is_photography_gear": bool,
-            "confidence": float,       # 0.0 – 1.0
-            "prompt_chars": int,       # for cost logging
-            "response_chars": int,     # for cost logging
-        }
-    Falls back to raw input if AI is unavailable.
+    api_key: pass the key from DB (Admin Settings). Falls back to env if None.
     """
-    api_key = _get_api_key()
-    if not api_key:
+    key = api_key or _get_api_key()
+    if not key:
         logger.warning("[GearAI] No API key configured — skipping normalization")
-        return {
-            "normalized_name": name,
-            "brand": None,
-            "category": "Other",
-            "is_photography_gear": False,
-            "confidence": 0.0,
-            "prompt_chars": 0,
-            "response_chars": 0,
-        }
+        return {"normalized_name": name, "brand": None, "category": "Other",
+                "is_photography_gear": False, "confidence": 0.0,
+                "prompt_chars": 0, "response_chars": 0}
 
     prompt = (
         "You are a photography gear database expert. Normalize the given gear name to its "
@@ -99,26 +107,20 @@ async def normalize_gear_name(name: str) -> dict:
     )
 
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-
         session_id = f"gear_normalize_{uuid.uuid4().hex[:10]}"
-        chat = LlmChat(
-            api_key=api_key,
+        response = await _call_gemini(
+            api_key=key,
             session_id=session_id,
-            system_message=(
+            system_msg=(
                 "You are a precise photography gear database assistant. "
                 "Always respond with valid JSON only, no extra text."
             ),
-        ).with_model("gemini", "gemini-2.5-flash")
-
-        response = await chat.send_message(UserMessage(text=prompt))
+            prompt=prompt,
+        )
         data = _extract_json(response)
-
-        # Sanitise
         category = data.get("category", "Other")
         if category not in VALID_CATEGORIES:
             category = "Other"
-
         return {
             "normalized_name": data.get("normalized_name", name) or name,
             "brand": data.get("brand") or None,
@@ -128,50 +130,25 @@ async def normalize_gear_name(name: str) -> dict:
             "prompt_chars": len(prompt),
             "response_chars": len(response),
         }
-
     except Exception as exc:
         logger.error("[GearAI] normalize_gear_name error: %s", exc)
-        return {
-            "normalized_name": name,
-            "brand": None,
-            "category": "Other",
-            "is_photography_gear": False,
-            "confidence": 0.0,
-            "prompt_chars": 0,
-            "response_chars": 0,
-        }
+        return {"normalized_name": name, "brand": None, "category": "Other",
+                "is_photography_gear": False, "confidence": 0.0,
+                "prompt_chars": 0, "response_chars": 0}
 
 
-async def validate_gear_submission(name: str, category: str, brand: str | None = None) -> dict:
+async def validate_gear_submission(name: str, category: str, brand: str | None = None, api_key: str = None) -> dict:
     """
     Validate a custom gear submission using Gemini.
-    Also normalises the name, brand, and category.
-
-    Returns:
-        {
-            "is_valid": bool,
-            "confidence": float,          # 0.0 – 1.0
-            "normalized_name": str,
-            "normalized_brand": str | None,
-            "normalized_category": str,
-            "reason": str,
-            "ai_available": bool
-        }
+    api_key: pass the key from DB (Admin Settings). Falls back to env if None.
     """
-    api_key = _get_api_key()
-    if not api_key:
+    key = api_key or _get_api_key()
+    if not key:
         logger.warning("[GearAI] No API key configured — skipping validation")
-        return {
-            "is_valid": False,
-            "confidence": 0.0,
-            "normalized_name": name,
-            "normalized_brand": brand,
-            "normalized_category": category,
-            "reason": "AI validation not configured",
-            "ai_available": False,
-            "prompt_chars": 0,
-            "response_chars": 0,
-        }
+        return {"is_valid": False, "confidence": 0.0, "normalized_name": name,
+                "normalized_brand": brand, "normalized_category": category,
+                "reason": "AI validation not configured", "ai_available": False,
+                "prompt_chars": 0, "response_chars": 0}
 
     brand_str = brand if brand else "unknown"
     prompt = (
@@ -195,25 +172,20 @@ async def validate_gear_submission(name: str, category: str, brand: str | None =
     )
 
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-
         session_id = f"gear_validate_{uuid.uuid4().hex[:10]}"
-        chat = LlmChat(
-            api_key=api_key,
+        response = await _call_gemini(
+            api_key=key,
             session_id=session_id,
-            system_message=(
+            system_msg=(
                 "You are a precise photography gear validation assistant. "
                 "Always respond with valid JSON only, no extra text."
             ),
-        ).with_model("gemini", "gemini-2.5-flash")
-
-        response = await chat.send_message(UserMessage(text=prompt))
+            prompt=prompt,
+        )
         data = _extract_json(response)
-
         norm_cat = data.get("normalized_category", category)
         if norm_cat not in VALID_CATEGORIES:
             norm_cat = category if category in VALID_CATEGORIES else "Other"
-
         return {
             "is_valid": bool(data.get("is_valid", False)),
             "confidence": float(data.get("confidence", 0.0)),
@@ -228,14 +200,7 @@ async def validate_gear_submission(name: str, category: str, brand: str | None =
 
     except Exception as exc:
         logger.error("[GearAI] validate_gear_submission error: %s", exc)
-        return {
-            "is_valid": False,
-            "confidence": 0.0,
-            "normalized_name": name,
-            "normalized_brand": brand,
-            "normalized_category": category,
-            "reason": f"AI error: {exc}",
-            "ai_available": False,
-            "prompt_chars": 0,
-            "response_chars": 0,
-        }
+        return {"is_valid": False, "confidence": 0.0, "normalized_name": name,
+                "normalized_brand": brand, "normalized_category": category,
+                "reason": f"AI error: {exc}", "ai_available": False,
+                "prompt_chars": 0, "response_chars": 0}

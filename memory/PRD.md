@@ -282,4 +282,7 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ Admin Settings shows read-only Webhook URL with copy button below Razorpay fields, plus instructions
 - ✅ Fixed coupon bug: `appliedCoupon` condition was `selectedPlanForCoupon === plan.id` (always null vs real ID → never matched); fixed to just use `couponResult.code` directly
 - ✅ Fixed coupon UI price display: was relying on `final_price` from validate endpoint (null when no plan_id) — now computes discounted price locally from `discount_type`/`discount_value`
-- ✅ Separated Revenue vs Sales in admin reports: payment_logs now stores `amount_paise` (actual charged = plan_price - discount) and `plan_price_paise` (face value); overview API returns both `revenue_30d` and `sales_30d`; Revenue & Sales tab shows grouped bar chart with discount impact card; Payment Log table shows both Revenue and Sales columns
+- ✅ Fixed gear AI normalization: `gear_ai_service.py` now reads Gemini key from DB (Admin Settings → API Keys → Gemini) first, then falls back to env → EMERGENT_LLM_KEY. Previously it only read from env (old leaked key), so AI was silently failing. Gear normalization now returns correct names (e.g. "sony a7 iv" → "Sony A7 IV", confidence: 0.98)
+- ✅ Added `_call_gemini()` helper with automatic retry on primary key failure (same pattern as crew-suggestions)
+- ✅ Added View button + LogDetailModal to all log tabs in AdminLogs — click "View" on any row to see all fields in a clean modal with Copy JSON button; sensitive fields (key_secret, webhook_secret, password, token) are masked
+- ✅ Cleared leaked GOOGLE_GEMINI_API_KEY from backend/.env; DB key from Admin Settings is now authoritative

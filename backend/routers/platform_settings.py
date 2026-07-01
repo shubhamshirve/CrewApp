@@ -336,6 +336,20 @@ async def remove_gear_catalogue_item(item_id: str, admin: dict = Depends(get_adm
     return {"items": items}
 
 
+async def _get_gemini_key(db) -> str:
+    """
+    Get Gemini API key — priority: DB (admin settings) → env GOOGLE_GEMINI_API_KEY → env EMERGENT_LLM_KEY
+    """
+    doc = await db.platform_secrets.find_one({"_id": "api_keys"})
+    db_key = (doc.get("gemini", {}).get("api_key", "") if doc else "").strip()
+    if db_key:
+        return db_key
+    env_key = os.environ.get("GOOGLE_GEMINI_API_KEY", "").strip()
+    if env_key:
+        return env_key
+    return os.environ.get("EMERGENT_LLM_KEY", "").strip()
+
+
 @router.get("/gear-catalogue/normalize")
 async def normalize_gear_name_endpoint(name: str, current_user: dict = Depends(get_current_user)):
     """
@@ -361,7 +375,8 @@ async def normalize_gear_name_endpoint(name: str, current_user: dict = Depends(g
             "ai_disabled": True,
         }
 
-    ai_result = await normalize_gear_name(name.strip())
+    api_key = await _get_gemini_key(db)
+    ai_result = await normalize_gear_name(name.strip(), api_key=api_key)
 
     # Try to find a matching item in the catalogue
     catalogue_match = None
@@ -445,7 +460,8 @@ async def submit_custom_gear(
 
     # ── AI Validation ────────────────────────────────────────────────────────
     if ai_enabled:
-        ai = await validate_gear_submission(raw_name, data.category, data.brand)
+        api_key = await _get_gemini_key(db)
+        ai = await validate_gear_submission(raw_name, data.category, data.brand, api_key=api_key)
         # ── Log AI usage ──────────────────────────────────────────────────────
         try:
             import uuid as _uuid_log
