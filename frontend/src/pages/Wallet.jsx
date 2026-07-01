@@ -103,6 +103,10 @@ export default function Wallet() {
       const loaded = await loadRazorpayScript();
       if (!loaded) { toast.error("Failed to load payment gateway"); return; }
       const { order, key_id, wallet_deducted, coupon_code, discount_amount } = res.data;
+      const restoreScroll = () => {
+        document.body.style.overflow = "";
+        document.body.style.paddingRight = "";
+      };
       const options = {
         key: key_id,
         amount: order.amount,
@@ -110,7 +114,9 @@ export default function Wallet() {
         name: "Photoo",
         description: `${plan.name} ₹${plan.price}/month`,
         order_id: order.id,
+        modal: { ondismiss: restoreScroll },
         handler: async (response) => {
+          restoreScroll();
           try {
             await api.post("/wallet/subscribe/verify", {
               razorpay_order_id: response.razorpay_order_id,
@@ -132,6 +138,10 @@ export default function Wallet() {
       };
       new window.Razorpay(options).open();
     } catch (err) {
+      // Restore body scroll — Razorpay SDK sets overflow:hidden on open;
+      // if it fails or throws before cleanup, scroll stays locked.
+      document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
       toast.error(err.response?.data?.detail || "Subscription failed");
     } finally {
       setSubscribing(null);
@@ -161,11 +171,17 @@ export default function Wallet() {
       const loaded = await loadRazorpayScript();
       if (!loaded) { toast.error("Failed to load payment gateway"); return; }
       const { order, key_id, wallet_deducted, pro_rata_credited } = res.data;
+      const restoreScrollUpgrade = () => {
+        document.body.style.overflow = "";
+        document.body.style.paddingRight = "";
+      };
       const options = {
         key: key_id, amount: order.amount, currency: "INR",
         name: "Photoo", description: `Upgrade to ${plan.name}`,
         order_id: order.id,
+        modal: { ondismiss: restoreScrollUpgrade },
         handler: async (response) => {
+          restoreScrollUpgrade();
           try {
             await api.post("/wallet/subscribe/verify", {
               razorpay_order_id: response.razorpay_order_id,
@@ -182,6 +198,8 @@ export default function Wallet() {
       };
       new window.Razorpay(options).open();
     } catch (err) {
+      document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
       toast.error(err.response?.data?.detail || "Upgrade failed");
     } finally { setSubscribing(null); }
   };

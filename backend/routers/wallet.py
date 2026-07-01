@@ -323,7 +323,7 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
         "plan_id": plan_info["plan_id"],
         "plan": plan_info["plan_key"],
         "order": order,
-        "key_id": os.environ.get("RAZORPAY_KEY_ID"),
+        "key_id": key_id,          # ← use the DB-fetched key, NOT os.environ
         "coupon_code": coupon_code_used,
         "discount_amount": discount_amount,
     }
@@ -597,7 +597,7 @@ async def upgrade_plan(data: SubscribeRequest, current_user: dict = Depends(get_
         "remaining_to_pay": remaining_rs,
         "plan_id": new_plan_info["plan_id"],
         "order": order,
-        "key_id": os.environ.get("RAZORPAY_KEY_ID"),
+        "key_id": key_id,          # ← use the DB-fetched key, NOT os.environ
     }
 
 

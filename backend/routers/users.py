@@ -213,6 +213,84 @@ async def get_available_users(
 
 _USERNAME_RE = re.compile(r"^[a-z][a-z0-9_]{2,19}$")
 
+# ── Profile Checklist ──────────────────────────────────────────────────────────
+def _build_checklist(user: dict) -> dict:
+    """Compute profile completeness checklist for a user."""
+    items = [
+        {
+            "id": "photo",
+            "label": "Add a profile photo",
+            "hint": "Upload your best headshot so clients recognise you",
+            "done": bool(user.get("avatar_url")),
+        },
+        {
+            "id": "bio",
+            "label": "Write your bio",
+            "hint": "A short intro about your work and style (min 30 chars)",
+            "done": len(user.get("bio") or "") >= 30,
+        },
+        {
+            "id": "location",
+            "label": "Set your location",
+            "hint": "Let clients know where you are based",
+            "done": bool(user.get("location") or user.get("city")),
+        },
+        {
+            "id": "rate",
+            "label": "Set your day rate",
+            "hint": "Add your primary rate so clients know your pricing",
+            "done": (user.get("primary_rate") or 0) > 0,
+        },
+        {
+            "id": "gear",
+            "label": "Add your gear",
+            "hint": "List at least one piece of equipment you own",
+            "done": len(user.get("gear_vault") or []) > 0,
+        },
+        {
+            "id": "style",
+            "label": "Add style tags",
+            "hint": "Pick your shooting styles to appear in search filters",
+            "done": len(user.get("style_tags") or []) > 0,
+        },
+        {
+            "id": "portfolio",
+            "label": "Add a portfolio link",
+            "hint": "Share your Instagram, website, or Behance",
+            "done": bool(
+                user.get("portfolio_url")
+                or user.get("instagram_url")
+                or user.get("website_url")
+            ),
+        },
+        {
+            "id": "username",
+            "label": "Claim your @username",
+            "hint": "Get a clean shareable profile URL like /u/yourname",
+            "done": bool(user.get("username")),
+        },
+    ]
+    done_count = sum(1 for i in items if i["done"])
+    return {
+        "items": items,
+        "done_count": done_count,
+        "total": len(items),
+        "percent": round(done_count / len(items) * 100),
+        "complete": done_count == len(items),
+    }
+
+
+@router.get("/me/checklist")
+async def get_my_checklist(current_user: dict = Depends(get_current_user)):
+    """Authenticated — return profile completeness checklist."""
+    db = get_db()
+    user = await db.users.find_one({"_id": current_user["id"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _build_checklist(user)
+
+
+
 
 class UsernameSetRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=20)

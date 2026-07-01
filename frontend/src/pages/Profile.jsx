@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchPincodeData } from "@/utils/pincode";
+import ProfileChecklist from "@/components/ProfileChecklist";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,12 @@ export default function Profile() {
   const [usernameStatus, setUsernameStatus] = useState(null); // null | "checking" | "available" | "taken" | "invalid"
   const [usernameSaving, setUsernameSaving] = useState(false);
   const usernameTimer = useRef(null);
+
+  // Profile checklist
+  const [checklist, setChecklist] = useState(null);
+  const [checklistDismissed, setChecklistDismissed] = useState(
+    () => localStorage.getItem("profile_checklist_dismissed_v1") === "true"
+  );
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -207,6 +214,13 @@ export default function Profile() {
           const metaRes = await api.get("/platform/gear-catalogue");
           setMasterGear(metaRes.data?.items || []);
         } catch { /* fallback */ }
+        // Load checklist for own profile
+        if (user?.id === userRes.data.id) {
+          try {
+            const clRes = await api.get("/users/me/checklist");
+            setChecklist(clRes.data);
+          } catch { /* non-critical */ }
+        }
       } catch { toast.error("Failed to load profile"); } finally { setLoading(false); }
     };
     load();
@@ -360,6 +374,8 @@ export default function Profile() {
       const res = await api.post("/users/set-username", { username: usernameInput.toLowerCase() });
       setProfile(res.data);
       await refreshUser();
+      // Refresh checklist since username is now set
+      try { const cl = await api.get("/users/me/checklist"); setChecklist(cl.data); } catch {}
       toast.success(`@${usernameInput} set! Your profile is now at /u/${usernameInput}`);
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to save username");
@@ -732,6 +748,17 @@ export default function Profile() {
             )}
           </div>
         </div>
+
+        {/* ── Profile Checklist (own profile, not dismissed, not complete) ──── */}
+        {isOwn && checklist && !checklist.complete && !checklistDismissed && (
+          <ProfileChecklist
+            checklist={checklist}
+            onDismiss={() => {
+              setChecklistDismissed(true);
+              localStorage.setItem("profile_checklist_dismissed_v1", "true");
+            }}
+          />
+        )}
 
         {/* ── Username setup (own profile, no username yet) ──────────────────── */}
         {isOwn && !profile.username && (
