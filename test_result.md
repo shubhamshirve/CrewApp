@@ -418,13 +418,14 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 11
+  test_sequence: 12
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Razorpay missing credentials crash on subscribe with coupon"
-  stuck_tasks: []
+    - "AI Gear Suggestion Feature Testing"
+  stuck_tasks:
+    - "Frontend Login Not Working in Playwright Tests"
   test_all: false
   test_priority: "high_first"
 
@@ -453,4 +454,6 @@ agent_communication:
     message: "Google Calendar analysis: Integration is fully MOCKED (no real OAuth). All 4 endpoints (status/connect/disconnect/sync-logs) exist but only set DB flags. sync_gig_to_calendar() in calendar_service.py is never called anywhere. Real implementation needs Google Cloud OAuth credentials. Gear automation (Option D) implemented: 1) GOOGLE_GEMINI_API_KEY stored in backend/.env (not in frontend, gitignored). 2) Created gear_ai_service.py using emergentintegrations + Gemini 2.5 Flash. 3) New GET /platform/gear-catalogue/normalize endpoint — real-time AI normalization with catalogue match detection. 4) Updated POST /platform/gear-submissions — auto-approves if AI confidence >=0.85 OR 3+ users submitted same gear, with smart duplicate detection. 5) Frontend Profile.jsx updated with debounced AI suggestions while typing, Accept button, updated toast messages. All tested and working."
   - agent: "testing"
     message: "✅ RAZORPAY CRASH FIX VERIFIED (2/2 tests passed): Tested the fix for 'Internal Server Error when applying coupon and clicking subscribe'. Used vikram@example.com (₹0 wallet balance) to test both scenarios: (1) Subscribe with coupon TEST20 (20% off, ₹69→₹55.20) - returns HTTP 503 with clear message 'Payment gateway is not configured...', NOT 500 crash. (2) Subscribe without coupon (₹69 full price) - returns HTTP 503 with same message, NOT 500 crash. The _require_razorpay() helper function correctly validates credentials before any Razorpay API call. All 3 endpoints (create_subscription_order, verify_payment, upgrade_plan) are properly protected. Bug is completely fixed."
+  - agent: "testing"
+    message: "AI GEAR SUGGESTION TESTING RESULTS: ❌ CRITICAL BLOCKER - Frontend login not working in Playwright tests. Multiple attempts to login with rohan@example.com / Test@1234 failed - page remains on /auth after clicking Sign In button. Login API works correctly via curl (returns token + user data), but frontend form submission is not triggering navigation or storing auth data in localStorage. HOWEVER, backend AI gear normalization API is FULLY FUNCTIONAL: ✅ TEST 1 - 'sony a7iv' → Returns normalized_name='Sony A7 IV', brand='Sony', category='Camera', is_photography_gear=true, confidence=0.97, catalogue_match found. ✅ TEST 2 - 'banana' → Returns normalized_name='banana', brand=null, category='Other', is_photography_gear=false, confidence=0, catalogue_match=null (correctly identified as non-photography). ✅ TEST 3 - 'canon r5' → Returns normalized_name='Canon EOS R5', brand='Canon', category='Camera', is_photography_gear=true, confidence=0.98, catalogue_match found. Backend implementation is perfect. Frontend UI testing blocked by login issue."
 
