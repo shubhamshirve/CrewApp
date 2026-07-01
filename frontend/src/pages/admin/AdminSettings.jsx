@@ -14,6 +14,33 @@ const inputClass = "bg-white border border-slate-200 text-slate-900 placeholder:
 
 const GEAR_CATS = ["Camera", "Lens", "Lighting", "Drone", "Audio", "Accessories", "Other"];
 
+const AI_FEATURE_TOGGLES = [
+  {
+    key: "ai_crew_suggestions_enabled",
+    label: "Crew Suggestions",
+    desc: "AI-powered crew recommendations shown to leads when creating a gig.",
+    testId: "ai-crew-suggestions-toggle",
+  },
+  {
+    key: "ai_gig_checklist_enabled",
+    label: "Gig Checklists",
+    desc: "AI-generated pre-event checklists for upcoming gigs.",
+    testId: "ai-gig-checklist-toggle",
+  },
+  {
+    key: "ai_gear_normalize_enabled",
+    label: "Gear Name Normalization",
+    desc: "Real-time AI suggestions while a user types a gear name in their profile/onboarding.",
+    testId: "ai-gear-normalize-toggle",
+  },
+  {
+    key: "ai_gear_validation_enabled",
+    label: "Gear Auto-Validation",
+    desc: "AI validates custom gear submissions and auto-approves high-confidence matches into the catalogue.",
+    testId: "ai-gear-validation-toggle",
+  },
+];
+
 export default function AdminSettings() {
   const { api, user } = useAuth();
 
@@ -25,6 +52,10 @@ export default function AdminSettings() {
     base_plan_name: "Base Plan",
     premium_plan_name: "Premium Plan",
     ai_features_enabled: true,
+    ai_crew_suggestions_enabled: true,
+    ai_gig_checklist_enabled: true,
+    ai_gear_normalize_enabled: true,
+    ai_gear_validation_enabled: true,
   });
   const [pricingLoading, setPricingLoading] = useState(false);
   const [pricingSaving, setPricingSaving] = useState(false);
@@ -98,7 +129,10 @@ export default function AdminSettings() {
         premium_plan_price: parseInt(pricing.premium_plan_price) || 1,
         base_plan_name: pricing.base_plan_name,
         premium_plan_name: pricing.premium_plan_name,
-        ai_features_enabled: pricing.ai_features_enabled,
+        ai_crew_suggestions_enabled: pricing.ai_crew_suggestions_enabled,
+        ai_gig_checklist_enabled: pricing.ai_gig_checklist_enabled,
+        ai_gear_normalize_enabled: pricing.ai_gear_normalize_enabled,
+        ai_gear_validation_enabled: pricing.ai_gear_validation_enabled,
       });
       setPricing(res.data);
       toast.success("Pricing rules saved!");
@@ -426,33 +460,41 @@ export default function AdminSettings() {
               </div>
             ) : (
               <>
-                <SectionCard title="Platform Features" icon={Zap}>
-                  {/* AI Features Toggle */}
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Zap size={14} className="text-violet-600" />
+                <SectionCard title="AI-Powered Features" icon={Zap}>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Toggle each AI feature independently. Disabling a feature stops its Gemini API calls and reduces cost for that specific feature only.
+                  </p>
+                  <div className="space-y-3">
+                    {AI_FEATURE_TOGGLES.map(f => (
+                      <div key={f.key} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50">
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Zap size={14} className="text-violet-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900 font-display">{f.label}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">{f.desc}</p>
+                          </div>
+                        </div>
+                        <button
+                          data-testid={f.testId}
+                          type="button"
+                          onClick={() => setPricing(p => ({ ...p, [f.key]: !p[f.key] }))}
+                          className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${pricing[f.key] ? "bg-violet-500" : "bg-slate-300"}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${pricing[f.key] ? "translate-x-5" : "translate-x-0"}`} />
+                        </button>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900 font-display">AI-Powered Features</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Controls: Crew suggestions, gig checklists, <strong>gear name normalization</strong>, and <strong>gear auto-approval</strong>.
-                          Disable to stop all AI calls and reduce Gemini API costs.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      data-testid="ai-features-toggle"
-                      type="button"
-                      onClick={() => setPricing(p => ({ ...p, ai_features_enabled: !p.ai_features_enabled }))}
-                      className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${pricing.ai_features_enabled ? "bg-violet-500" : "bg-slate-300"}`}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${pricing.ai_features_enabled ? "translate-x-5" : "translate-x-0"}`} />
-                    </button>
+                    ))}
                   </div>
-                  <p className="text-xs text-slate-400 flex items-center gap-1">
-                    Status: <span className={`font-semibold ${pricing.ai_features_enabled ? "text-violet-600" : "text-slate-500"}`}>{pricing.ai_features_enabled ? "Enabled" : "Disabled"}</span>
-                    {!pricing.ai_features_enabled && <span className="text-amber-500 ml-1">— All AI features disabled. Gear submissions go to manual review.</span>}
+                  <p className="text-xs text-slate-400 mt-3">
+                    {AI_FEATURE_TOGGLES.every(f => pricing[f.key]) ? (
+                      <span className="text-violet-600 font-semibold">All AI features enabled.</span>
+                    ) : (
+                      <span className="text-amber-500 font-semibold">
+                        {AI_FEATURE_TOGGLES.filter(f => !pricing[f.key]).length} of {AI_FEATURE_TOGGLES.length} feature(s) disabled.
+                      </span>
+                    )}
                   </p>
                 </SectionCard>
 

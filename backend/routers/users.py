@@ -152,15 +152,22 @@ async def search_users(
 ):
     db = get_db()
     query: dict = {"is_suspended": False, "is_ghost_mode": False}
+    and_conditions: List[dict] = []
+
     if q:
         # Escape to prevent ReDoS — user input is literal text, not a regex pattern
-        safe_q = re.escape(q.strip()[:100])
-        query["full_name"] = {"$regex": safe_q, "$options": "i"}
+        raw_q = q.strip()[:100]
+        # Allow searching "@username" the same as "username"
+        safe_q = re.escape(raw_q.lstrip("@"))
+        and_conditions.append({"$or": [
+            {"full_name": {"$regex": safe_q, "$options": "i"}},
+            {"username": {"$regex": safe_q, "$options": "i"}},
+        ]})
     if role:
         valid_roles = await _get_valid_roles(db)
         if role not in valid_roles:
             raise HTTPException(status_code=400, detail="Invalid role filter")
-        query["$or"] = [{"primary_role": role}, {"secondary_role": role}]
+        and_conditions.append({"$or": [{"primary_role": role}, {"secondary_role": role}]})
     if location:
         safe_loc = re.escape(location.strip()[:100])
         query["location"] = {"$regex": safe_loc, "$options": "i"}
@@ -170,6 +177,8 @@ async def search_users(
         query["style_tags"] = {"$in": [style]}
     if verified_only:
         query["is_verified"] = True
+    if and_conditions:
+        query["$and"] = and_conditions
 
     cursor = db.users.find(query, {"password_hash": 0}).limit(50)
     users = await cursor.to_list(50)

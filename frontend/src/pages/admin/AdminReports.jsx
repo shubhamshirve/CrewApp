@@ -372,10 +372,10 @@ export default function AdminReports() {
                             <div className="text-slate-400 text-[10px]">{p.user_email}</div>
                           </td>
                           <td className="py-2 font-mono font-semibold text-emerald-600">
-                            ₹{p.amount_paise ? (p.amount_paise / 100).toLocaleString("en-IN") : "—"}
+                            ₹{p.amount_paise != null ? (p.amount_paise / 100).toLocaleString("en-IN") : "—"}
                           </td>
                           <td className="py-2 font-mono text-slate-500">
-                            {p.plan_price_paise
+                            {p.plan_price_paise != null
                               ? `₹${(p.plan_price_paise / 100).toLocaleString("en-IN")}`
                               : <span className="text-slate-300">—</span>}
                           </td>

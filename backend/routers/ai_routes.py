@@ -31,7 +31,7 @@ async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict =
     db = get_db()
     # Check if AI features are enabled in platform settings
     cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
-    if not cfg.get("ai_features_enabled", True):
+    if not cfg.get("ai_crew_suggestions_enabled", cfg.get("ai_features_enabled", True)):
         return {"suggestion": "AI features are currently disabled by the platform admin.", "ai_disabled": True}
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -111,7 +111,7 @@ async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict =
 async def get_gig_checklist(data: CrewSuggestionRequest, current_user: dict = Depends(get_current_user)):
     db = get_db()
     cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
-    if not cfg.get("ai_features_enabled", True):
+    if not cfg.get("ai_gig_checklist_enabled", cfg.get("ai_features_enabled", True)):
         return {"checklist": "AI features are currently disabled by the platform admin.", "ai_disabled": True}
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage

@@ -70,7 +70,7 @@ export default function Search() {
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <Input data-testid="search-input" className={`pl-9 ${inputClass}`} placeholder="Search by name..." value={query} onChange={e => setQuery(e.target.value)} />
+            <Input data-testid="search-input" className={`pl-9 ${inputClass}`} placeholder="Search by name or username..." value={query} onChange={e => setQuery(e.target.value)} />
           </div>
           <Button data-testid="toggle-filters-btn" variant="outline" className="border-slate-200 text-slate-500 hover:text-slate-900 gap-2" onClick={() => setShowFilters(!showFilters)}>
             <SlidersHorizontal size={16} /> Filters

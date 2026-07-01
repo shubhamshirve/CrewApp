@@ -9,10 +9,13 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import os
 import re
+import logging
 
 from db import get_db
 from auth_utils import get_admin_user, get_current_user
 from cache import get_cached, invalidate_cache
+
+logger = logging.getLogger(__name__)
 
 # Cache TTL: 5 minutes for event types/roles (rarely change)
 _PLATFORM_TTL = 300
@@ -28,7 +31,11 @@ DEFAULT_SETTINGS = {
     "premium_plan_price": 99,
     "base_plan_name": "Base Plan",
     "premium_plan_name": "Premium Plan",
-    "ai_features_enabled": True,        # Toggle AI crew suggestions & smart matching
+    "ai_features_enabled": True,               # Legacy master flag — kept only as a fallback default for the granular toggles below
+    "ai_crew_suggestions_enabled": True,        # AI crew suggestions on gig creation
+    "ai_gig_checklist_enabled": True,           # AI-generated pre-event checklists
+    "ai_gear_normalize_enabled": True,          # Real-time AI gear name normalization while typing
+    "ai_gear_validation_enabled": True,         # AI validation/auto-approval of custom gear submissions
     "updated_at": datetime.now(timezone.utc).isoformat(),
 }
 
@@ -120,13 +127,18 @@ async def get_platform_settings():
     """Public — return current pricing config."""
     db = get_db()
     doc = await _get_settings(db)
+    legacy_master = doc.get("ai_features_enabled", True)
     return {
         "referral_reward": doc.get("referral_reward", DEFAULT_SETTINGS["referral_reward"]),
         "base_plan_price": doc.get("base_plan_price", DEFAULT_SETTINGS["base_plan_price"]),
         "premium_plan_price": doc.get("premium_plan_price", DEFAULT_SETTINGS["premium_plan_price"]),
         "base_plan_name": doc.get("base_plan_name", DEFAULT_SETTINGS["base_plan_name"]),
         "premium_plan_name": doc.get("premium_plan_name", DEFAULT_SETTINGS["premium_plan_name"]),
-        "ai_features_enabled": doc.get("ai_features_enabled", True),
+        "ai_features_enabled": legacy_master,
+        "ai_crew_suggestions_enabled": doc.get("ai_crew_suggestions_enabled", legacy_master),
+        "ai_gig_checklist_enabled": doc.get("ai_gig_checklist_enabled", legacy_master),
+        "ai_gear_normalize_enabled": doc.get("ai_gear_normalize_enabled", legacy_master),
+        "ai_gear_validation_enabled": doc.get("ai_gear_validation_enabled", legacy_master),
         "updated_at": doc.get("updated_at"),
     }
 
@@ -138,6 +150,10 @@ class PricingUpdateRequest(BaseModel):
     base_plan_name: Optional[str] = None
     premium_plan_name: Optional[str] = None
     ai_features_enabled: Optional[bool] = None
+    ai_crew_suggestions_enabled: Optional[bool] = None
+    ai_gig_checklist_enabled: Optional[bool] = None
+    ai_gear_normalize_enabled: Optional[bool] = None
+    ai_gear_validation_enabled: Optional[bool] = None
 
 
 @router.put("/settings")
@@ -172,6 +188,14 @@ async def update_platform_settings(
 
     if data.ai_features_enabled is not None:
         update_fields["ai_features_enabled"] = data.ai_features_enabled
+    if data.ai_crew_suggestions_enabled is not None:
+        update_fields["ai_crew_suggestions_enabled"] = data.ai_crew_suggestions_enabled
+    if data.ai_gig_checklist_enabled is not None:
+        update_fields["ai_gig_checklist_enabled"] = data.ai_gig_checklist_enabled
+    if data.ai_gear_normalize_enabled is not None:
+        update_fields["ai_gear_normalize_enabled"] = data.ai_gear_normalize_enabled
+    if data.ai_gear_validation_enabled is not None:
+        update_fields["ai_gear_validation_enabled"] = data.ai_gear_validation_enabled
 
     await db.platform_settings.update_one(
         {"_id": "platform_settings"},
@@ -365,7 +389,7 @@ async def normalize_gear_name_endpoint(name: str, current_user: dict = Depends(g
 
     # ── Check if AI is enabled ────────────────────────────────────────────────
     cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
-    if not cfg.get("ai_features_enabled", True):
+    if not cfg.get("ai_gear_normalize_enabled", cfg.get("ai_features_enabled", True)):
         return {
             "normalized_name": name,
             "brand": None,
@@ -456,7 +480,7 @@ async def submit_custom_gear(
 
     # ── Check if AI features are enabled ─────────────────────────────────────
     cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
-    ai_enabled = cfg.get("ai_features_enabled", True)
+    ai_enabled = cfg.get("ai_gear_validation_enabled", cfg.get("ai_features_enabled", True))
 
     # ── AI Validation ────────────────────────────────────────────────────────
     if ai_enabled:
