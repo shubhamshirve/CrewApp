@@ -275,3 +275,8 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ AI crew suggestions: primary Gemini key with fallback to EMERGENT_LLM_KEY if primary fails (e.g. leaked key)
 - ✅ Fixed profile checklist photo check: now checks `profile_image` OR `avatar_url` field (previously only checked avatar_url which is never set)
 - ✅ Added EMERGENT_LLM_KEY to backend/.env as fallback for AI features
+- ✅ Fixed Razorpay payment description now shows actual discounted amount (was showing original plan price even after coupon applied)
+- ✅ Added `config.display` to Razorpay checkout to enable UPI QR generation
+- ✅ Created `POST /api/wallet/webhook` endpoint — verifies HMAC-SHA256 signature, logs events, handles payment.captured idempotently
+- ✅ Added `webhook_secret` field to Razorpay group in platform_secrets (admin can set it in Settings → API Keys)
+- ✅ Admin Settings shows read-only Webhook URL with copy button below Razorpay fields, plus instructions

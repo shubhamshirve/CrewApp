@@ -103,6 +103,11 @@ export default function Wallet() {
       const loaded = await loadRazorpayScript();
       if (!loaded) { toast.error("Failed to load payment gateway"); return; }
       const { order, key_id, wallet_deducted, coupon_code, discount_amount } = res.data;
+      const actualAmountRs = (order.amount / 100).toLocaleString("en-IN");
+      const descParts = [`${plan.name}`];
+      if (discount_amount > 0) descParts.push(`₹${discount_amount.toLocaleString("en-IN")} discount applied`);
+      if (wallet_deducted > 0) descParts.push(`₹${wallet_deducted.toLocaleString("en-IN")} from wallet`);
+      descParts.push(`Pay ₹${actualAmountRs}`);
       const restoreScroll = () => {
         document.body.style.overflow = "";
         document.body.style.paddingRight = "";
@@ -112,9 +117,14 @@ export default function Wallet() {
         amount: order.amount,
         currency: "INR",
         name: "Photoo",
-        description: `${plan.name} ₹${plan.price}/month`,
+        description: descParts.join(" · "),
         order_id: order.id,
         modal: { ondismiss: restoreScroll },
+        config: {
+          display: {
+            preferences: { show_default_blocks: true },
+          }
+        },
         handler: async (response) => {
           restoreScroll();
           try {
@@ -171,15 +181,21 @@ export default function Wallet() {
       const loaded = await loadRazorpayScript();
       if (!loaded) { toast.error("Failed to load payment gateway"); return; }
       const { order, key_id, wallet_deducted, pro_rata_credited } = res.data;
+      const upgradeAmountRs = (order.amount / 100).toLocaleString("en-IN");
       const restoreScrollUpgrade = () => {
         document.body.style.overflow = "";
         document.body.style.paddingRight = "";
       };
       const options = {
         key: key_id, amount: order.amount, currency: "INR",
-        name: "Photoo", description: `Upgrade to ${plan.name}`,
+        name: "Photoo", description: `Upgrade to ${plan.name} · Pay ₹${upgradeAmountRs}`,
         order_id: order.id,
         modal: { ondismiss: restoreScrollUpgrade },
+        config: {
+          display: {
+            preferences: { show_default_blocks: true },
+          }
+        },
         handler: async (response) => {
           restoreScrollUpgrade();
           try {

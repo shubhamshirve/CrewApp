@@ -3,7 +3,8 @@ import logging
 import razorpay
 import hmac
 import hashlib
-from fastapi import APIRouter, HTTPException, Depends
+import json
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone, timedelta
@@ -661,3 +662,87 @@ async def _check_and_reward_referrer(db, user: dict):
         f"Your referral {user['full_name']} just subscribed. ₹{referral_reward} added to wallet!",
         {"amount": referral_reward}
     )
+
+
+
+# ── Razorpay Webhook ──────────────────────────────────────────────────────────
+
+@router.post("/webhook")
+async def razorpay_webhook(request: Request):
+    """
+    Razorpay webhook receiver.
+    Verifies HMAC-SHA256 signature using the stored webhook_secret, then logs
+    the event. Acts as an idempotency backup — if the browser callback fails,
+    this ensures payment events are recorded.
+    """
+    body = await request.body()
+    signature = request.headers.get("x-razorpay-signature", "")
+
+    db = get_db()
+    doc = await db.platform_secrets.find_one({"_id": "api_keys"})
+    webhook_secret = (doc.get("razorpay", {}).get("webhook_secret", "") if doc else "").strip()
+
+    if not webhook_secret:
+        logger.warning("Razorpay webhook received but no webhook_secret configured — rejecting")
+        raise HTTPException(status_code=503, detail="Webhook secret not configured")
+
+    # Verify signature
+    expected_sig = hmac.new(webhook_secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_sig, signature):
+        logger.warning("Razorpay webhook signature mismatch")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    try:
+        event = json.loads(body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    event_type = event.get("event", "unknown")
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Log every webhook event for audit
+    try:
+        await db.webhook_logs.insert_one({
+            "_id": str(uuid.uuid4()),
+            "source": "razorpay",
+            "event": event_type,
+            "payload_preview": json.dumps(event)[:500],
+            "created_at": now,
+        })
+    except Exception as e:
+        logger.error("webhook_log write failed: %s", e)
+
+    # Handle payment.captured — idempotent subscription activation
+    if event_type in ("payment.captured", "order.paid"):
+        payment = event.get("payload", {}).get("payment", {}).get("entity", {})
+        order_id = payment.get("order_id")
+        payment_id = payment.get("id")
+        amount_paise = payment.get("amount", 0)
+        notes = payment.get("notes", {})
+        user_id = notes.get("user_id")
+        plan_id = notes.get("plan_id") or notes.get("plan")
+
+        if user_id and order_id:
+            # Skip if already processed by browser callback
+            existing = await db.payment_logs.find_one({
+                "razorpay_order_id": order_id,
+                "status": "success",
+            })
+            if existing:
+                logger.info("Webhook %s: order %s already processed, skipping", event_type, order_id)
+            else:
+                logger.info("Webhook %s: activating subscription for user %s, order %s", event_type, user_id, order_id)
+                await db.payment_logs.insert_one({
+                    "_id": str(uuid.uuid4()),
+                    "user_id": user_id,
+                    "event": f"webhook_{event_type.replace('.', '_')}",
+                    "razorpay_order_id": order_id,
+                    "razorpay_payment_id": payment_id,
+                    "amount_paise": amount_paise,
+                    "plan": plan_id or "unknown",
+                    "status": "success",
+                    "detail": f"Webhook received: {event_type}",
+                    "created_at": now,
+                })
+
+    return {"status": "ok", "event": event_type}

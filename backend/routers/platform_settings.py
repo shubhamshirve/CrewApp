@@ -643,6 +643,7 @@ API_KEY_GROUPS = {
         "fields": {
             "key_id": {"label": "Key ID", "secret": False},
             "key_secret": {"label": "Key Secret", "secret": True},
+            "webhook_secret": {"label": "Webhook Secret", "secret": True},
         }
     },
     "resend": {

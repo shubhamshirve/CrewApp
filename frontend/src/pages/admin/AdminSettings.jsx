@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Settings, DollarSign, Tag, Briefcase, Camera, Inbox,
   Plus, Trash2, Save, RefreshCw, Key, Eye, EyeOff,
-  CheckCircle2, AlertCircle, Loader2, X, Zap,
+  CheckCircle2, AlertCircle, Loader2, X, Zap, Copy, Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -814,6 +814,40 @@ export default function AdminSettings() {
                           </div>
                         );
                       })}
+
+                      {/* Webhook URL — shown only for Razorpay group */}
+                      {groupKey === "razorpay" && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Link2 size={12} className="text-slate-400" />
+                            <label className="text-xs font-medium text-slate-700 font-display">Webhook URL</label>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-display">Read-only · paste into Razorpay Dashboard</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              readOnly
+                              data-testid="razorpay-webhook-url"
+                              className="flex-1 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-3 py-2 text-xs font-mono outline-none select-all"
+                              value={`${window.location.origin}/api/wallet/webhook`}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid="copy-webhook-url-btn"
+                              className="text-xs border-slate-200 text-slate-600 gap-1"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/api/wallet/webhook`);
+                                toast.success("Webhook URL copied!");
+                              }}
+                            >
+                              <Copy size={12} /> Copy
+                            </Button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                            In Razorpay Dashboard → Webhooks → Add webhook URL above. Set <span className="font-medium text-slate-500">Webhook Secret</span> to any strong string, then save the same string in the field above. Events to enable: <span className="font-mono text-slate-500">payment.captured</span>, <span className="font-mono text-slate-500">order.paid</span>.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
