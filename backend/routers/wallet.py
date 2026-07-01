@@ -267,8 +267,8 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
 
     wallet_balance = current_user.get("wallet_balance", 0.0)
     wallet_deducted = min(wallet_balance, bill_rs)
-    remaining_rs = bill_rs - wallet_deducted
-    remaining_paise = int(remaining_rs * 100)
+    remaining_rs = round(bill_rs - wallet_deducted)          # round to nearest ₹1
+    remaining_paise = remaining_rs * 100
 
     if remaining_paise == 0:
         return {
@@ -290,10 +290,10 @@ async def create_subscription_order(data: SubscribeRequest, current_user: dict =
             "currency": "INR",
             "receipt": f"sub_{current_user['id'][:8]}_{uuid.uuid4().hex[:8]}",
             "notes": {
-                "user_id": current_user["id"],
-                "plan": plan_info["plan_key"],
-                "plan_id": plan_info["plan_id"] or "",
-                "coupon_code": coupon_code_used or "",
+                "customer_name": current_user.get("full_name", ""),
+                "customer_email": current_user.get("email", ""),
+                "plan_name": plan_info["plan_name"],
+                "coupon_applied": coupon_code_used or "None",
             }
         })
     except Exception as rp_err:
@@ -561,8 +561,8 @@ async def upgrade_plan(data: SubscribeRequest, current_user: dict = Depends(get_
     # Now subscribe to new plan using wallet-first billing
     bill_rs = new_plan_info["plan_price"]
     wallet_deducted = min(wallet_balance, bill_rs)
-    remaining_rs = bill_rs - wallet_deducted
-    remaining_paise = int(remaining_rs * 100)
+    remaining_rs = round(bill_rs - wallet_deducted)         # round to nearest ₹1
+    remaining_paise = remaining_rs * 100
 
     if remaining_paise == 0:
         # Full wallet cover after pro-rata
@@ -595,7 +595,12 @@ async def upgrade_plan(data: SubscribeRequest, current_user: dict = Depends(get_
         order = rp.order.create({
             "amount": remaining_paise, "currency": "INR",
             "receipt": f"upg_{current_user['id'][:8]}_{uuid.uuid4().hex[:8]}",
-            "notes": {"user_id": current_user["id"], "plan_id": new_plan_info["plan_id"] or "", "type": "upgrade"},
+            "notes": {
+                "customer_name": current_user.get("full_name", ""),
+                "customer_email": current_user.get("email", ""),
+                "plan_name": new_plan_info["plan_name"],
+                "type": "Upgrade",
+            },
         })
     except Exception as rp_err:
         logger.error("Razorpay upgrade order creation failed: %s", rp_err)
@@ -728,19 +733,22 @@ async def razorpay_webhook(request: Request):
         payment_id = payment.get("id")
         amount_paise = payment.get("amount", 0)
         notes = payment.get("notes", {})
-        user_id = notes.get("user_id")
-        plan_id = notes.get("plan_id") or notes.get("plan")
+
+        # Notes now use human-readable keys; resolve user by email
+        customer_email = notes.get("customer_email")
+        user_id = None
+        if customer_email:
+            user_doc = await db.users.find_one({"email": customer_email}, {"_id": 1})
+            if user_doc:
+                user_id = user_doc["_id"]
+        plan_name = notes.get("plan_name", "unknown")
 
         if user_id and order_id:
-            # Skip if already processed by browser callback
-            existing = await db.payment_logs.find_one({
-                "razorpay_order_id": order_id,
-                "status": "success",
-            })
+            existing = await db.payment_logs.find_one({"razorpay_order_id": order_id, "status": "success"})
             if existing:
                 logger.info("Webhook %s: order %s already processed, skipping", event_type, order_id)
             else:
-                logger.info("Webhook %s: activating subscription for user %s, order %s", event_type, user_id, order_id)
+                logger.info("Webhook %s: logging event for user %s, order %s", event_type, user_id, order_id)
                 await db.payment_logs.insert_one({
                     "_id": str(uuid.uuid4()),
                     "user_id": user_id,
@@ -748,7 +756,7 @@ async def razorpay_webhook(request: Request):
                     "razorpay_order_id": order_id,
                     "razorpay_payment_id": payment_id,
                     "amount_paise": amount_paise,
-                    "plan": plan_id or "unknown",
+                    "plan": plan_name,
                     "status": "success",
                     "detail": f"Webhook received: {event_type}",
                     "created_at": now,
