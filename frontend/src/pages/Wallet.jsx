@@ -83,7 +83,7 @@ export default function Wallet() {
 
   const handleSubscribe = async (plan) => {
     setSubscribing(plan.id);
-    const appliedCoupon = (couponResult && selectedPlanForCoupon === plan.id) ? couponResult.code : null;
+    const appliedCoupon = couponResult ? couponResult.code : null;
     try {
       const res = await api.post("/wallet/subscribe/create-order", {
         plan_id: plan.id,
@@ -296,6 +296,11 @@ export default function Wallet() {
                 const isUpgrade = !isActive && activePlanId && plan.price > (plans.find(p => p.id === activePlanId)?.price || 0);
                 const isDowngrade = !isActive && activePlanId && plan.price < (plans.find(p => p.id === activePlanId)?.price || 0);
                 const couponApplies = couponResult && (!couponResult.applicable_plan_id || couponResult.applicable_plan_id === plan.id);
+                const discountedPrice = couponApplies
+                  ? (couponResult.discount_type === "percentage"
+                      ? plan.price * (1 - couponResult.discount_value / 100)
+                      : Math.max(0, plan.price - couponResult.discount_value))
+                  : null;
                 return (
                   <div
                     key={plan.id}
@@ -311,9 +316,9 @@ export default function Wallet() {
                       <div>
                         <p className="text-xs text-slate-500 font-display">{plan.name}</p>
                         <div className="flex items-baseline gap-1 mt-1">
-                          {couponApplies && couponResult.final_price !== null ? (
+                          {couponApplies && discountedPrice !== null ? (
                             <>
-                              <span className="text-3xl font-bold text-orange-600 font-display">₹{couponResult.final_price.toFixed(0)}</span>
+                              <span className="text-3xl font-bold text-orange-600 font-display">₹{discountedPrice.toFixed(0)}</span>
                               <span className="text-slate-400 line-through text-sm ml-1">₹{plan.price}</span>
                             </>
                           ) : (
