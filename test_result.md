@@ -397,7 +397,35 @@ frontend:
         agent: "testing"
         comment: "✅ BUG FIXED - ALL TESTS PASSED (5/5): The _check_90min_buffer() function now correctly accepts 6 parameters including optional exclude_gig_id parameter (line 147: exclude_gig_id: str | None = None). Tested with rohan@example.com on portrait gig 'Kapoor Family Portrait Session' (gig-portrait-000-0000-0000-0000-000000000002). TEST A: Successfully added session on different day (2025-12-28 09:00-12:00) - returned 200 OK, no 500 error. TEST B: Successfully added session on same day as existing session (2026-06-24 11:30-14:00) - returned 200 OK, no conflict detected (Rohan as lead has no accepted freelancer invites), no 500 error. TEST C: Verified newly added sessions appear in GET /api/gigs/{gig_id} response (total 5 sessions). The TypeError is completely resolved - endpoint no longer crashes with 500 Internal Server Error."
 
-  - task: "Razorpay missing credentials crash on subscribe with coupon"
+  - task: "AI Usage Report in Admin Reports"
+    implemented: true
+    working: true
+    file: "backend/routers/admin.py, frontend/src/pages/admin/AdminReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added GET /admin/reports/ai-usage endpoint. Added 'AI Usage' tab to AdminReports.jsx with: stats cards (total requests, cost in USD/INR), gear outcomes (auto-approved/pending/already in catalogue), daily requests bar chart, endpoint breakdown table. Cost estimated from Gemini 2.5 Flash pricing ($0.075/1M input, $0.30/1M output tokens). Verified working with 4 test gear-normalize requests logged."
+      - working: true
+        agent: "testing"
+        comment: "✅ BACKEND API VERIFIED: GET /api/admin/reports/ai-usage?days=30 returns correct data: total_all=5, total_30d=5, total_cost_usd_30d=$0.000062 (≈₹0.0053), endpoint_breakdown shows 'gear-normalize' with 5 requests, gear_outcomes_30d shows auto_approved=5/pending=2/already_in_catalogue=3, daily_data shows 5 requests on 2026-07-01. All data structure matches AdminReports.jsx expectations. Frontend UI testing blocked by navigation issue (same as previous testing agent) - login works via API but Playwright cannot navigate to admin pages after login."
+
+  - task: "AI disable toggle wired to gear AI features"
+    implemented: true
+    working: true
+    file: "backend/routers/platform_settings.py, frontend/src/pages/admin/AdminSettings.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Wired existing ai_features_enabled platform setting to gear normalize endpoint (returns raw name when disabled) and gear submission endpoint (skips AI validation, goes straight to pending when disabled). Updated AdminSettings.jsx toggle description to mention gear features. Disable in Admin > Settings > AI-Powered Features."
+      - working: true
+        agent: "testing"
+        comment: "✅ BACKEND API VERIFIED: GET /api/platform/settings returns ai_features_enabled=true. PUT /api/platform/settings with ai_features_enabled=false successfully toggles OFF (returns updated_at timestamp). When disabled, GET /api/platform/gear-catalogue/normalize?name=canon%20r5 returns ai_disabled=true, confidence=0.0, no AI processing. When re-enabled (PUT with ai_features_enabled=true), setting updates correctly. Toggle functionality working perfectly at API level. Frontend UI testing blocked by navigation issue."
     implemented: true
     working: true
     file: "backend/routers/wallet.py"
@@ -423,9 +451,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "AI Gear Suggestion Feature Testing"
+    - "Frontend Authentication Flow Investigation"
   stuck_tasks:
-    - "Frontend Login Not Working in Playwright Tests"
+    - "Frontend UI Testing - Navigation/Routing Issue"
   test_all: false
   test_priority: "high_first"
 
@@ -456,4 +484,6 @@ agent_communication:
     message: "✅ RAZORPAY CRASH FIX VERIFIED (2/2 tests passed): Tested the fix for 'Internal Server Error when applying coupon and clicking subscribe'. Used vikram@example.com (₹0 wallet balance) to test both scenarios: (1) Subscribe with coupon TEST20 (20% off, ₹69→₹55.20) - returns HTTP 503 with clear message 'Payment gateway is not configured...', NOT 500 crash. (2) Subscribe without coupon (₹69 full price) - returns HTTP 503 with same message, NOT 500 crash. The _require_razorpay() helper function correctly validates credentials before any Razorpay API call. All 3 endpoints (create_subscription_order, verify_payment, upgrade_plan) are properly protected. Bug is completely fixed."
   - agent: "testing"
     message: "AI GEAR SUGGESTION TESTING RESULTS: ❌ CRITICAL BLOCKER - Frontend login not working in Playwright tests. Multiple attempts to login with rohan@example.com / Test@1234 failed - page remains on /auth after clicking Sign In button. Login API works correctly via curl (returns token + user data), but frontend form submission is not triggering navigation or storing auth data in localStorage. HOWEVER, backend AI gear normalization API is FULLY FUNCTIONAL: ✅ TEST 1 - 'sony a7iv' → Returns normalized_name='Sony A7 IV', brand='Sony', category='Camera', is_photography_gear=true, confidence=0.97, catalogue_match found. ✅ TEST 2 - 'banana' → Returns normalized_name='banana', brand=null, category='Other', is_photography_gear=false, confidence=0, catalogue_match=null (correctly identified as non-photography). ✅ TEST 3 - 'canon r5' → Returns normalized_name='Canon EOS R5', brand='Canon', category='Camera', is_photography_gear=true, confidence=0.98, catalogue_match found. Backend implementation is perfect. Frontend UI testing blocked by login issue."
+  - agent: "testing"
+    message: "AI FEATURES BACKEND TESTING COMPLETE (3/3 APIs verified): ✅ TEST 1 - AI Gear Normalization API: GET /api/platform/gear-catalogue/normalize?name=godox%20ad200 returns catalogue_match for 'Godox AD200 Pro' (Lighting category). When AI disabled, returns ai_disabled=true with no processing. Graceful fallback when Gemini quota exceeded (20 req/day free tier limit hit). ✅ TEST 2 - AI Usage Report API: GET /api/admin/reports/ai-usage returns total_all=5, cost=$0.000062, endpoint_breakdown with gear-normalize entries, gear_outcomes (auto_approved/pending/already_in_catalogue), daily_data chart. All data structure correct. ✅ TEST 3 - AI Toggle API: PUT /api/platform/settings successfully toggles ai_features_enabled ON/OFF, gear normalization respects toggle state. ALL BACKEND APIs WORKING PERFECTLY. ⚠️ FRONTEND UI TESTING BLOCKED: Same navigation issue as previous testing agent - login API works but Playwright cannot access /profile or /admin pages after login. Recommend main agent investigate frontend auth flow/routing (AuthContext, localStorage, route guards)."
 

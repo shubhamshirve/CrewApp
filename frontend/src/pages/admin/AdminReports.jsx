@@ -4,6 +4,7 @@ import AdminLayout from "@/components/AdminLayout";
 import {
   Users, TrendingUp, CreditCard, ShieldCheck, Briefcase,
   Globe, Calendar, RefreshCw, Loader2, IndianRupee, UserCheck,
+  Sparkles, CheckCircle2, Clock, DollarSign, Zap, BarChart2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -53,6 +54,10 @@ export default function AdminReports() {
   const [range, setRange] = useState(30);
   const [tab, setTab] = useState("overview");
 
+  // AI usage state
+  const [aiUsage, setAiUsage] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -72,7 +77,17 @@ export default function AdminReports() {
     finally { setLoading(false); }
   }, [api, range]);
 
+  const loadAiUsage = useCallback(async () => {
+    setAiLoading(true);
+    try {
+      const res = await api.get(`/admin/reports/ai-usage?days=${range}`);
+      setAiUsage(res.data);
+    } catch { toast.error("Failed to load AI usage report"); }
+    finally { setAiLoading(false); }
+  }, [api, range]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (tab === "ai") loadAiUsage(); }, [tab, loadAiUsage]);
 
   const shortDate = (d) => {
     const [, m, day] = d.split("-");
@@ -105,12 +120,12 @@ export default function AdminReports() {
               ))}
             </div>
             <button
-              onClick={load}
-              disabled={loading}
+              onClick={() => { load(); if (tab === "ai") loadAiUsage(); }}
+              disabled={loading || aiLoading}
               className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all"
               title="Refresh"
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={14} className={loading || aiLoading ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
@@ -122,6 +137,7 @@ export default function AdminReports() {
             { id: "registrations", label: "Registrations" },
             { id: "revenue", label: "Revenue" },
             { id: "payments", label: "Payment Log" },
+            { id: "ai", label: "AI Usage" },
           ].map(t => (
             <button
               key={t.id}
@@ -129,7 +145,7 @@ export default function AdminReports() {
               onClick={() => setTab(t.id)}
               className={`px-4 py-1.5 rounded-lg text-xs font-display transition-all whitespace-nowrap ${tab === t.id ? "bg-white shadow text-slate-900" : "text-slate-500"}`}
             >
-              {t.label}
+              {t.id === "ai" ? <span className="flex items-center gap-1"><Sparkles size={10} />{t.label}</span> : t.label}
             </button>
           ))}
         </div>
@@ -339,6 +355,151 @@ export default function AdminReports() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {/* ── AI USAGE TAB ──────────────────────────────────────────────── */}
+            {tab === "ai" && (
+              <div className="space-y-5">
+                {aiLoading ? (
+                  <div className="flex justify-center py-20">
+                    <Loader2 size={28} className="animate-spin text-violet-400" />
+                  </div>
+                ) : aiUsage ? (
+                  <>
+                    {/* Cost notice */}
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-violet-200 bg-violet-50">
+                      <Sparkles size={16} className="text-violet-500 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-violet-700">
+                        <span className="font-semibold">Gemini 2.5 Flash</span> pricing: $0.075 / 1M input tokens · $0.30 / 1M output tokens.
+                        Cost is estimated from character counts (≈ 4 chars/token). Uses your{" "}
+                        <span className="font-semibold">Google Gemini API key</span>.
+                        You can disable AI features in{" "}
+                        <span className="font-semibold">Admin → Settings → AI Features</span>.
+                      </div>
+                    </div>
+
+                    {/* Stats grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <StatCard label="Total Requests (All)" value={aiUsage.total_all?.toLocaleString("en-IN")} icon={Zap} color="#8B5CF6" testId="ai-total-all" />
+                      <StatCard label="Requests (30d)" value={aiUsage.total_30d?.toLocaleString("en-IN")} icon={BarChart2} color="#3B82F6" sub={`${aiUsage.total_7d} this week · ${aiUsage.total_1d} today`} testId="ai-total-30d" />
+                      <StatCard
+                        label="Est. Cost (30d)"
+                        value={`$${(aiUsage.total_cost_usd_30d || 0).toFixed(4)}`}
+                        icon={DollarSign}
+                        color="#10B981"
+                        sub={`≈ ₹${((aiUsage.total_cost_usd_30d || 0) * 85).toFixed(2)}`}
+                        testId="ai-cost-30d"
+                      />
+                      <StatCard
+                        label="Est. Cost (All Time)"
+                        value={`$${(aiUsage.total_cost_usd_all || 0).toFixed(4)}`}
+                        icon={DollarSign}
+                        color="#F59E0B"
+                        sub={`≈ ₹${((aiUsage.total_cost_usd_all || 0) * 85).toFixed(2)}`}
+                        testId="ai-cost-all"
+                      />
+                    </div>
+
+                    {/* Gear automation outcomes */}
+                    {aiUsage.gear_outcomes_30d && (
+                      <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900 font-display mb-4">
+                          Gear AI Outcomes (30d)
+                        </h3>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { label: "Auto-Approved", val: aiUsage.gear_outcomes_30d.auto_approved, color: "#10B981", icon: CheckCircle2 },
+                            { label: "Pending Review", val: aiUsage.gear_outcomes_30d.pending, color: "#F59E0B", icon: Clock },
+                            { label: "Already in Catalogue", val: aiUsage.gear_outcomes_30d.already_in_catalogue, color: "#3B82F6", icon: CheckCircle2 },
+                          ].map(({ label, val, color, icon: IC }) => (
+                            <div key={label} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: `${color}10` }}>
+                              <IC size={16} style={{ color }} />
+                              <div>
+                                <p className="text-xl font-bold font-display" style={{ color }}>{val ?? 0}</p>
+                                <p className="text-[10px] text-slate-500 font-display">{label}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Daily requests chart */}
+                    {aiUsage.daily_data?.length > 0 && (
+                      <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900 font-display mb-4">
+                          Daily AI Requests (last {range}d)
+                        </h3>
+                        <ResponsiveContainer width="100%" height={180}>
+                          <BarChart data={aiUsage.daily_data.map(d => ({ ...d, date: d.date.slice(5) }))}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10, fontFamily: "inherit" }} />
+                            <YAxis tick={{ fontSize: 10, fontFamily: "inherit" }} allowDecimals={false} />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Bar dataKey="count" name="Requests" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* Endpoint breakdown table */}
+                    {aiUsage.endpoint_breakdown?.length > 0 && (
+                      <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-x-auto">
+                        <h3 className="text-sm font-semibold text-slate-900 font-display mb-4">
+                          Breakdown by Feature (30d)
+                        </h3>
+                        <table className="w-full text-xs font-display">
+                          <thead>
+                            <tr className="border-b border-slate-100">
+                              <th className="pb-2 text-left text-slate-500">Feature / Endpoint</th>
+                              <th className="pb-2 text-right text-slate-500">Requests</th>
+                              <th className="pb-2 text-right text-slate-500">Input Chars</th>
+                              <th className="pb-2 text-right text-slate-500">Output Chars</th>
+                              <th className="pb-2 text-right text-slate-500">Est. Cost (USD)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {aiUsage.endpoint_breakdown.map(ep => (
+                              <tr key={ep.endpoint} className="border-b border-slate-50 hover:bg-slate-50">
+                                <td className="py-2">
+                                  <span className="px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 font-mono text-[10px]">
+                                    {ep.endpoint}
+                                  </span>
+                                </td>
+                                <td className="py-2 text-right font-semibold text-slate-800">{ep.count}</td>
+                                <td className="py-2 text-right text-slate-500">{ep.prompt_chars?.toLocaleString("en-IN") || 0}</td>
+                                <td className="py-2 text-right text-slate-500">{ep.response_chars?.toLocaleString("en-IN") || 0}</td>
+                                <td className="py-2 text-right font-mono text-emerald-600">${ep.cost_usd?.toFixed(5) || "0.00000"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t border-slate-200">
+                              <td className="pt-2 font-semibold text-slate-700">Total</td>
+                              <td className="pt-2 text-right font-bold text-slate-800">{aiUsage.total_30d}</td>
+                              <td className="pt-2" />
+                              <td className="pt-2" />
+                              <td className="pt-2 text-right font-mono font-bold text-emerald-700">${(aiUsage.total_cost_usd_30d || 0).toFixed(5)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+
+                    {aiUsage.total_all === 0 && (
+                      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <Sparkles size={32} className="mb-3 opacity-30" />
+                        <p className="text-sm font-display">No AI requests yet</p>
+                        <p className="text-xs mt-1">AI usage will appear here as users interact with gear suggestions</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <p className="text-sm font-display">Click the AI Usage tab to load data</p>
+                  </div>
+                )}
               </div>
             )}
           </>

@@ -60,7 +60,9 @@ async def normalize_gear_name(name: str) -> dict:
             "brand": str | None,
             "category": str,          # Camera / Lens / Lighting / Drone / Audio / Accessories / Other
             "is_photography_gear": bool,
-            "confidence": float        # 0.0 – 1.0
+            "confidence": float,       # 0.0 – 1.0
+            "prompt_chars": int,       # for cost logging
+            "response_chars": int,     # for cost logging
         }
     Falls back to raw input if AI is unavailable.
     """
@@ -73,6 +75,8 @@ async def normalize_gear_name(name: str) -> dict:
             "category": "Other",
             "is_photography_gear": False,
             "confidence": 0.0,
+            "prompt_chars": 0,
+            "response_chars": 0,
         }
 
     prompt = (
@@ -121,6 +125,8 @@ async def normalize_gear_name(name: str) -> dict:
             "category": category,
             "is_photography_gear": bool(data.get("is_photography_gear", False)),
             "confidence": float(data.get("confidence", 0.0)),
+            "prompt_chars": len(prompt),
+            "response_chars": len(response),
         }
 
     except Exception as exc:
@@ -131,6 +137,8 @@ async def normalize_gear_name(name: str) -> dict:
             "category": "Other",
             "is_photography_gear": False,
             "confidence": 0.0,
+            "prompt_chars": 0,
+            "response_chars": 0,
         }
 
 
@@ -161,6 +169,8 @@ async def validate_gear_submission(name: str, category: str, brand: str | None =
             "normalized_category": category,
             "reason": "AI validation not configured",
             "ai_available": False,
+            "prompt_chars": 0,
+            "response_chars": 0,
         }
 
     brand_str = brand if brand else "unknown"
@@ -212,6 +222,8 @@ async def validate_gear_submission(name: str, category: str, brand: str | None =
             "normalized_category": norm_cat,
             "reason": data.get("reason", ""),
             "ai_available": True,
+            "prompt_chars": len(prompt),
+            "response_chars": len(response),
         }
 
     except Exception as exc:
@@ -224,4 +236,6 @@ async def validate_gear_submission(name: str, category: str, brand: str | None =
             "normalized_category": category,
             "reason": f"AI error: {exc}",
             "ai_available": False,
+            "prompt_chars": 0,
+            "response_chars": 0,
         }

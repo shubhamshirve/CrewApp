@@ -349,6 +349,18 @@ async def normalize_gear_name_endpoint(name: str, current_user: dict = Depends(g
     from services.gear_ai_service import normalize_gear_name
     db = get_db()
 
+    # ── Check if AI is enabled ────────────────────────────────────────────────
+    cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
+    if not cfg.get("ai_features_enabled", True):
+        return {
+            "normalized_name": name,
+            "brand": None,
+            "category": None,
+            "confidence": 0.0,
+            "catalogue_match": None,
+            "ai_disabled": True,
+        }
+
     ai_result = await normalize_gear_name(name.strip())
 
     # Try to find a matching item in the catalogue
@@ -366,6 +378,21 @@ async def normalize_gear_name_endpoint(name: str, current_user: dict = Depends(g
                 if norm in item["name"].lower() or item["name"].lower() in norm:
                     catalogue_match = item
                     break
+
+    # ── Log AI usage ──────────────────────────────────────────────────────────
+    try:
+        import uuid as _uuid2
+        await db.ai_usage_logs.insert_one({
+            "_id": str(_uuid2.uuid4()),
+            "user_id": current_user["id"],
+            "endpoint": "gear-normalize",
+            "model": "gemini-2.5-flash",
+            "prompt_chars": ai_result.get("prompt_chars", 0),
+            "response_chars": ai_result.get("response_chars", 0),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as log_err:
+        logger.warning("[GearAI] Failed to log usage: %s", log_err)
 
     return {
         "normalized_name": ai_result["normalized_name"],
@@ -412,8 +439,40 @@ async def submit_custom_gear(
     db = get_db()
     raw_name = data.name.strip()
 
+    # ── Check if AI features are enabled ─────────────────────────────────────
+    cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
+    ai_enabled = cfg.get("ai_features_enabled", True)
+
     # ── AI Validation ────────────────────────────────────────────────────────
-    ai = await validate_gear_submission(raw_name, data.category, data.brand)
+    if ai_enabled:
+        ai = await validate_gear_submission(raw_name, data.category, data.brand)
+        # ── Log AI usage ──────────────────────────────────────────────────────
+        try:
+            import uuid as _uuid_log
+            await db.ai_usage_logs.insert_one({
+                "_id": str(_uuid_log.uuid4()),
+                "user_id": current_user["id"],
+                "endpoint": "gear-validate",
+                "model": "gemini-2.5-flash",
+                "prompt_chars": ai.get("prompt_chars", 0),
+                "response_chars": ai.get("response_chars", 0),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as log_err:
+            logger.warning("[GearAI] Failed to log usage: %s", log_err)
+    else:
+        # AI disabled — skip validation, mark as pending for manual review
+        ai = {
+            "is_valid": False,
+            "confidence": 0.0,
+            "normalized_name": raw_name,
+            "normalized_brand": data.brand,
+            "normalized_category": data.category,
+            "reason": "AI features disabled",
+            "ai_available": False,
+            "prompt_chars": 0,
+            "response_chars": 0,
+        }
     normalized_name = ai.get("normalized_name") or raw_name
     normalized_brand = ai.get("normalized_brand") or data.brand
     normalized_category = ai.get("normalized_category") or data.category

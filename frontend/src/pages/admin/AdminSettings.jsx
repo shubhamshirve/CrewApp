@@ -390,7 +390,10 @@ export default function AdminSettings() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-slate-900 font-display">AI-Powered Features</p>
-                        <p className="text-xs text-slate-500 mt-0.5">Crew suggestions, smart gig checklists, and AI-assisted matching. Disable to reduce LLM API usage.</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Controls: Crew suggestions, gig checklists, <strong>gear name normalization</strong>, and <strong>gear auto-approval</strong>.
+                          Disable to stop all AI calls and reduce Gemini API costs.
+                        </p>
                       </div>
                     </div>
                     <button
@@ -404,7 +407,7 @@ export default function AdminSettings() {
                   </div>
                   <p className="text-xs text-slate-400 flex items-center gap-1">
                     Status: <span className={`font-semibold ${pricing.ai_features_enabled ? "text-violet-600" : "text-slate-500"}`}>{pricing.ai_features_enabled ? "Enabled" : "Disabled"}</span>
-                    {!pricing.ai_features_enabled && <span className="text-amber-500 ml-1">— Users will see a friendly "AI unavailable" message</span>}
+                    {!pricing.ai_features_enabled && <span className="text-amber-500 ml-1">— All AI features disabled. Gear submissions go to manual review.</span>}
                   </p>
                 </SectionCard>
 
@@ -413,7 +416,7 @@ export default function AdminSettings() {
                     <label className="text-xs text-slate-500 font-display mb-1 block">Referral Reward Amount (₹)</label>
                     <input type="number" min="0" className={inputClass} value={pricing.referral_reward} onChange={e => setPricing(p => ({ ...p, referral_reward: e.target.value }))} />
                     <p className="text-xs text-slate-400 mt-1.5 font-display">
-                      Credited to referrer's wallet when their referral makes first subscription
+                      Credited to referrer wallet when their referral makes first subscription
                     </p>
                   </div>
                 </SectionCard>

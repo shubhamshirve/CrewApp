@@ -884,3 +884,137 @@ async def get_recent_registrations(limit: int = 20, admin: dict = Depends(get_ad
         {"_id": 0, "password_hash": 0}
     ).sort("created_at", -1).limit(min(limit, 50)).to_list(50)
     return {"items": [_clean_user(u) for u in items]}
+
+
+# ── Gemini 2.5 Flash pricing constants (USD per token) ───────────────────────
+_GEMINI_INPUT_USD_PER_TOKEN  = 0.075 / 1_000_000   # $0.075 / 1M input tokens
+_GEMINI_OUTPUT_USD_PER_TOKEN = 0.30  / 1_000_000   # $0.30  / 1M output tokens
+_CHARS_PER_TOKEN = 4                                 # ~4 chars per token (average)
+
+
+def _est_cost_usd(prompt_chars: int, response_chars: int) -> float:
+    """Estimate Gemini 2.5 Flash cost in USD from char counts."""
+    return (
+        (prompt_chars / _CHARS_PER_TOKEN) * _GEMINI_INPUT_USD_PER_TOKEN
+        + (response_chars / _CHARS_PER_TOKEN) * _GEMINI_OUTPUT_USD_PER_TOKEN
+    )
+
+
+@router.get("/reports/ai-usage")
+async def get_ai_usage_report(days: int = 30, admin: dict = Depends(get_admin_user)):
+    """
+    AI usage analytics — total requests, breakdown by feature, estimated Gemini cost.
+    Uses the ai_usage_logs collection populated by both gear AI and crew-suggestion AI.
+    """
+    import asyncio as _asyncio
+    db = get_db()
+    now = datetime.now(timezone.utc)
+
+    start_30d = (now - timedelta(days=30)).isoformat()
+    start_7d  = (now - timedelta(days=7)).isoformat()
+    start_1d  = (now - timedelta(days=1)).isoformat()
+    start_nd  = (now - timedelta(days=days)).isoformat()
+
+    # ── Aggregate totals ─────────────────────────────────────────────────────
+    total_all, total_30d, total_7d, total_1d = await _asyncio.gather(
+        db.ai_usage_logs.count_documents({}),
+        db.ai_usage_logs.count_documents({"created_at": {"$gte": start_30d}}),
+        db.ai_usage_logs.count_documents({"created_at": {"$gte": start_7d}}),
+        db.ai_usage_logs.count_documents({"created_at": {"$gte": start_1d}}),
+    )
+
+    # ── Breakdown by endpoint (last 30d) ─────────────────────────────────────
+    endpoint_agg = await db.ai_usage_logs.aggregate([
+        {"$match": {"created_at": {"$gte": start_30d}}},
+        {"$group": {
+            "_id": "$endpoint",
+            "count": {"$sum": 1},
+            "prompt_chars": {"$sum": "$prompt_chars"},
+            "response_chars": {"$sum": "$response_chars"},
+        }},
+        {"$sort": {"count": -1}},
+    ]).to_list(20)
+
+    endpoint_breakdown = []
+    total_cost_usd_30d = 0.0
+    for ep in endpoint_agg:
+        cost = _est_cost_usd(ep.get("prompt_chars", 0), ep.get("response_chars", 0))
+        total_cost_usd_30d += cost
+        endpoint_breakdown.append({
+            "endpoint": ep["_id"] or "unknown",
+            "count": ep["count"],
+            "prompt_chars": ep.get("prompt_chars", 0),
+            "response_chars": ep.get("response_chars", 0),
+            "cost_usd": round(cost, 6),
+        })
+
+    # ── Gear-specific stats (auto-approve outcomes, last 30d) ─────────────────
+    gear_auto_approved = await db.custom_gear_submissions.count_documents({
+        "status": "auto_approved",
+        "created_at": {"$gte": start_30d},
+    })
+    gear_pending = await db.custom_gear_submissions.count_documents({
+        "status": "pending",
+        "created_at": {"$gte": start_30d},
+    })
+    gear_auto_exists = await db.custom_gear_submissions.count_documents({
+        "status": "auto_exists",
+        "created_at": {"$gte": start_30d},
+    })
+
+    # ── Overall cost for ALL time ─────────────────────────────────────────────
+    cost_agg_all = await db.ai_usage_logs.aggregate([
+        {"$group": {
+            "_id": None,
+            "prompt_chars": {"$sum": "$prompt_chars"},
+            "response_chars": {"$sum": "$response_chars"},
+        }},
+    ]).to_list(1)
+    total_cost_usd_all = 0.0
+    if cost_agg_all:
+        total_cost_usd_all = _est_cost_usd(
+            cost_agg_all[0].get("prompt_chars", 0),
+            cost_agg_all[0].get("response_chars", 0),
+        )
+
+    # ── Daily breakdown for chart (last N days) ───────────────────────────────
+    daily_agg = await db.ai_usage_logs.aggregate([
+        {"$match": {"created_at": {"$gte": start_nd}}},
+        {"$addFields": {"date_str": {"$substr": ["$created_at", 0, 10]}}},
+        {"$group": {
+            "_id": "$date_str",
+            "count": {"$sum": 1},
+            "prompt_chars": {"$sum": "$prompt_chars"},
+            "response_chars": {"$sum": "$response_chars"},
+        }},
+        {"$sort": {"_id": 1}},
+    ]).to_list(100)
+
+    from datetime import date as _dt_date
+    day_map = {r["_id"]: r for r in daily_agg}
+    daily_data = []
+    for i in range(days):
+        d = (now - timedelta(days=days - 1 - i)).date().isoformat()
+        r = day_map.get(d, {})
+        cost = _est_cost_usd(r.get("prompt_chars", 0), r.get("response_chars", 0))
+        daily_data.append({
+            "date": d,
+            "count": r.get("count", 0),
+            "cost_usd": round(cost, 6),
+        })
+
+    return {
+        "total_all": total_all,
+        "total_30d": total_30d,
+        "total_7d": total_7d,
+        "total_1d": total_1d,
+        "total_cost_usd_30d": round(total_cost_usd_30d, 6),
+        "total_cost_usd_all": round(total_cost_usd_all, 6),
+        "endpoint_breakdown": endpoint_breakdown,
+        "gear_outcomes_30d": {
+            "auto_approved": gear_auto_approved,
+            "pending": gear_pending,
+            "already_in_catalogue": gear_auto_exists,
+        },
+        "daily_data": daily_data,
+    }
