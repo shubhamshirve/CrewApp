@@ -635,26 +635,12 @@ export default function Profile() {
               </>
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
-                {/* WhatsApp button — visible to all viewers regardless of connection status */}
-                {(profile.whatsapp_number || profile.phone) && (
-                  <a
-                    href={`https://wa.me/${(profile.whatsapp_number || profile.phone).replace(/\D/g, "")}?text=Hi%20${encodeURIComponent(profile.full_name)}%2C%20I%20found%20your%20profile%20on%20Photoo!`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid="whatsapp-btn"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-display font-medium text-white transition-opacity hover:opacity-90"
-                    style={{ background: "#25D366" }}
-                    title={`WhatsApp ${profile.full_name}`}
-                  >
-                    <MessageCircle size={13} /> WhatsApp
-                  </a>
-                )}
                 {connectionStatus === "connected" ? (
                   <>
                     <Button size="sm" variant="outline" className="border-slate-200 text-slate-500" disabled data-testid="connected-badge">
                       <UserCheck size={14} className="mr-1.5 text-emerald-500" /> Connected
                     </Button>
-                    {/* Call button — only for connected users */}
+                    {/* Call button — connected users only */}
                     {(profile.phone || profile.whatsapp_number) && (
                       <a
                         href={`tel:${profile.phone || profile.whatsapp_number}`}
@@ -664,6 +650,20 @@ export default function Profile() {
                         title={`Call ${profile.full_name}`}
                       >
                         <Phone size={13} /> Call
+                      </a>
+                    )}
+                    {/* WhatsApp button — connected users only */}
+                    {(profile.whatsapp_number || profile.phone) && (
+                      <a
+                        href={`https://wa.me/${(profile.whatsapp_number || profile.phone).replace(/\D/g, "")}?text=Hi%20${encodeURIComponent(profile.full_name)}%2C%20I%20found%20your%20profile%20on%20Photoo!`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid="whatsapp-btn"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-display font-medium text-white transition-opacity hover:opacity-90"
+                        style={{ background: "#25D366" }}
+                        title={`WhatsApp ${profile.full_name}`}
+                      >
+                        <MessageCircle size={13} /> WhatsApp
                       </a>
                     )}
                   </>
