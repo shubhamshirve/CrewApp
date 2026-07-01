@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
-import os
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -35,10 +34,11 @@ async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict =
         return {"suggestion": "AI features are currently disabled by the platform admin.", "ai_disabled": True}
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
-        # Use user's Gemini key first; fall back to emergent key if unavailable
-        gemini_key = os.environ.get("GOOGLE_GEMINI_API_KEY")
-        emergent_key = os.environ.get("EMERGENT_LLM_KEY")
-        api_key = gemini_key or emergent_key
+        from services.api_key_service import get_gemini_api_key
+        # Read Gemini API key from DB (Admin Settings) first, fallback to env
+        api_key = await get_gemini_api_key(db)
+        if not api_key:
+            raise HTTPException(status_code=503, detail="Gemini API key not configured. Please set it in Admin Settings → API Keys → AI.")
 
         session_id = f"crew_suggestion_{current_user['id']}_{uuid.uuid4().hex[:8]}"
         chat = LlmChat(
@@ -66,26 +66,7 @@ async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict =
             prompt += f"Style preference: {data.style_preference}\n"
         prompt += "\nWhat should I look for when selecting crew for this event? Any specific tips?"
 
-        try:
-            response = await chat.send_message(UserMessage(text=prompt))
-        except Exception as primary_err:
-            # If user's Gemini key fails (e.g. leaked/revoked) and emergent key is available, retry
-            if gemini_key and emergent_key and gemini_key != emergent_key:
-                logger.warning("Gemini key failed (%s), falling back to emergent key", primary_err)
-                chat2 = LlmChat(
-                    api_key=emergent_key,
-                    session_id=session_id + "_fallback",
-                    system_message=(
-                        "You are an expert in the Indian wedding photography industry. "
-                        "Help lead photographers find the best freelance crew members. "
-                        "Provide concise, actionable suggestions about: what qualities to look for, "
-                        "fair pricing for Indian market, how to coordinate the team, and any specific "
-                        "tips for the event types mentioned. Keep responses under 300 words."
-                    )
-                ).with_model("gemini", "gemini-2.5-flash")
-                response = await chat2.send_message(UserMessage(text=prompt))
-            else:
-                raise primary_err
+        response = await chat.send_message(UserMessage(text=prompt))
 
         try:
             total_chars = len(prompt) + len(response)
@@ -103,6 +84,8 @@ async def get_crew_suggestions(data: CrewSuggestionRequest, current_user: dict =
         except Exception as e:
             logger.error("ai_usage_log write failed: %s", e)
         return {"suggestion": response, "session_id": session_id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
 
@@ -115,9 +98,11 @@ async def get_gig_checklist(data: CrewSuggestionRequest, current_user: dict = De
         return {"checklist": "AI features are currently disabled by the platform admin.", "ai_disabled": True}
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
-        gemini_key = os.environ.get("GOOGLE_GEMINI_API_KEY")
-        emergent_key = os.environ.get("EMERGENT_LLM_KEY")
-        api_key = gemini_key or emergent_key
+        from services.api_key_service import get_gemini_api_key
+        # Read Gemini API key from DB (Admin Settings) first, fallback to env
+        api_key = await get_gemini_api_key(db)
+        if not api_key:
+            raise HTTPException(status_code=503, detail="Gemini API key not configured. Please set it in Admin Settings → API Keys → AI.")
 
         checklist_session = f"checklist_{uuid.uuid4().hex[:12]}"
         chat = LlmChat(
@@ -133,19 +118,7 @@ async def get_gig_checklist(data: CrewSuggestionRequest, current_user: dict = De
             "Format as a bullet list with max 10 items. Be specific to Indian weddings."
         )
 
-        try:
-            response = await chat.send_message(UserMessage(text=prompt))
-        except Exception as primary_err:
-            if gemini_key and emergent_key and gemini_key != emergent_key:
-                logger.warning("Gemini key failed (%s), falling back to emergent key", primary_err)
-                chat2 = LlmChat(
-                    api_key=emergent_key,
-                    session_id=checklist_session + "_fallback",
-                    system_message="You are an expert wedding photography coordinator in India. Generate concise, practical checklists."
-                ).with_model("gemini", "gemini-2.5-flash")
-                response = await chat2.send_message(UserMessage(text=prompt))
-            else:
-                raise primary_err
+        response = await chat.send_message(UserMessage(text=prompt))
 
         try:
             total_chars = len(prompt) + len(response)
@@ -163,5 +136,7 @@ async def get_gig_checklist(data: CrewSuggestionRequest, current_user: dict = De
         except Exception as e:
             logger.error("ai_usage_log write failed: %s", e)
         return {"checklist": response}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")

@@ -1,6 +1,7 @@
 """
 Email Notification Service (Resend)
 Sends transactional emails. Gracefully falls back to DB logging when API key is not set.
+Keys are read from DB (Admin Settings → platform_secrets) first, then env var fallback.
 """
 import os
 import asyncio
@@ -11,15 +12,29 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 
-def _get_resend_key() -> str | None:
-    return os.environ.get("RESEND_API_KEY")
+async def _get_resend_credentials(db) -> tuple[str | None, str]:
+    """
+    Fetch Resend API key and sender email with priority:
+      1. DB — platform_secrets.resend.api_key / sender_email
+      2. Env vars — RESEND_API_KEY / SENDER_EMAIL
+    """
+    try:
+        doc = await db.platform_secrets.find_one({"_id": "api_keys"})
+        if doc and doc.get("resend"):
+            resend_cfg = doc["resend"]
+            db_key = resend_cfg.get("api_key", "").strip()
+            db_sender = resend_cfg.get("sender_email", "").strip()
+            if db_key:
+                return db_key, db_sender or os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+    except Exception as exc:
+        logger.error("[EmailService] DB read error: %s", exc)
+    # Fallback to env vars
+    env_key = os.environ.get("RESEND_API_KEY", "").strip() or None
+    env_sender = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+    return env_key, env_sender
 
 
-def _get_sender_email() -> str:
-    return os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
-
-
-async def _log_email(db, recipient: str, subject: str, event_type: str, status: str, error: str = None):
+async def _log_email(db, recipient: str, subject: str, event_type: str, status: str, error: str = None, has_key: bool = False):
     await db.email_logs.insert_one({
         "_id": str(uuid.uuid4()),
         "recipient": recipient,
@@ -27,7 +42,7 @@ async def _log_email(db, recipient: str, subject: str, event_type: str, status: 
         "event_type": event_type,
         "status": status,
         "error": error,
-        "simulated": not bool(_get_resend_key()),
+        "simulated": not has_key,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
 
@@ -40,30 +55,30 @@ async def send_email(
     event_type: str = "notification",
 ) -> dict:
     """Send email via Resend, or log it if no API key is configured."""
-    api_key = _get_resend_key()
+    api_key, sender_email = await _get_resend_credentials(db)
 
     if not api_key:
         logger.info(f"[Email MOCK] To: {recipient_email} | Subject: {subject} | Event: {event_type}")
-        await _log_email(db, recipient_email, subject, event_type, "simulated")
-        return {"status": "simulated", "message": "No RESEND_API_KEY configured"}
+        await _log_email(db, recipient_email, subject, event_type, "simulated", has_key=False)
+        return {"status": "simulated", "message": "No Resend API key configured. Set it in Admin Settings → API Keys."}
 
     try:
         import resend
         resend.api_key = api_key
         params = {
-            "from": _get_sender_email(),
+            "from": sender_email,
             "to": [recipient_email],
             "subject": subject,
             "html": html_content,
         }
         result = await asyncio.to_thread(resend.Emails.send, params)
         email_id = result.get("id") if isinstance(result, dict) else getattr(result, "id", None)
-        await _log_email(db, recipient_email, subject, event_type, "sent")
+        await _log_email(db, recipient_email, subject, event_type, "sent", has_key=True)
         logger.info(f"[Email] Sent to {recipient_email} | ID: {email_id}")
         return {"status": "sent", "email_id": email_id}
     except Exception as e:
         logger.error(f"[Email] Failed to send to {recipient_email}: {e}")
-        await _log_email(db, recipient_email, subject, event_type, "failed", str(e))
+        await _log_email(db, recipient_email, subject, event_type, "failed", str(e), has_key=True)
         return {"status": "failed", "error": str(e)}
 
 

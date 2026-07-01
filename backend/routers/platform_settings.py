@@ -362,16 +362,11 @@ async def remove_gear_catalogue_item(item_id: str, admin: dict = Depends(get_adm
 
 async def _get_gemini_key(db) -> str:
     """
-    Get Gemini API key — priority: DB (admin settings) → env GOOGLE_GEMINI_API_KEY → env EMERGENT_LLM_KEY
+    Get Gemini API key — priority: DB (admin settings) → env GOOGLE_GEMINI_API_KEY.
+    Uses the centralized api_key_service for consistent key resolution.
     """
-    doc = await db.platform_secrets.find_one({"_id": "api_keys"})
-    db_key = (doc.get("gemini", {}).get("api_key", "") if doc else "").strip()
-    if db_key:
-        return db_key
-    env_key = os.environ.get("GOOGLE_GEMINI_API_KEY", "").strip()
-    if env_key:
-        return env_key
-    return os.environ.get("EMERGENT_LLM_KEY", "").strip()
+    from services.api_key_service import get_gemini_api_key
+    return await get_gemini_api_key(db)
 
 
 @router.get("/gear-catalogue/normalize")
@@ -842,9 +837,9 @@ API_KEY_GROUPS = {
     },
     "ai": {
         "label": "AI / LLM (Gemini)",
-        "description": "AI-powered crew suggestions & gig checklists",
+        "description": "Google Gemini API key for AI crew suggestions, gear normalization & checklists. Get your key from aistudio.google.com.",
         "fields": {
-            "emergent_llm_key": {"label": "Emergent LLM Key", "secret": True},
+            "gemini_api_key": {"label": "Gemini API Key", "secret": True},
         }
     },
 }
@@ -875,11 +870,11 @@ async def get_api_keys(admin: dict = Depends(get_admin_user)):
         fields_out = {}
         group_stored = stored.get(group_key, {})
 
-        # For the AI group, seed from env if not in DB
-        if group_key == "ai" and not group_stored.get("emergent_llm_key"):
-            env_key = os.environ.get("EMERGENT_LLM_KEY", "")
+        # For the AI group, seed from env GOOGLE_GEMINI_API_KEY if not in DB
+        if group_key == "ai" and not group_stored.get("gemini_api_key"):
+            env_key = os.environ.get("GOOGLE_GEMINI_API_KEY", "")
             if env_key:
-                group_stored = {"emergent_llm_key": env_key}
+                group_stored = {"gemini_api_key": env_key}
 
         for field_key, field_meta in group_meta["fields"].items():
             raw = group_stored.get(field_key, "")

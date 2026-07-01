@@ -14,42 +14,28 @@ import uuid
 logger = logging.getLogger(__name__)
 
 _GEMINI_KEY_ENV = "GOOGLE_GEMINI_API_KEY"
-_EMERGENT_KEY_ENV = "EMERGENT_LLM_KEY"
 
 VALID_CATEGORIES = ["Camera", "Lens", "Lighting", "Drone", "Audio", "Accessories", "Other"]
 
 
 def _get_api_key() -> str:
-    """Return Google Gemini key, fallback to Emergent universal key."""
-    key = os.environ.get(_GEMINI_KEY_ENV, "").strip()
-    if not key:
-        key = os.environ.get(_EMERGENT_KEY_ENV, "").strip()
-    return key
+    """Return Google Gemini API key from env var (fallback only when api_key not provided via param)."""
+    return os.environ.get(_GEMINI_KEY_ENV, "").strip()
 
 
 async def _call_gemini(api_key: str, session_id: str, system_msg: str, prompt: str) -> str:
     """
-    Call Gemini with primary key. If it fails (leaked / quota), retry with EMERGENT_LLM_KEY.
-    Returns the raw text response or raises on total failure.
+    Call Gemini with the provided API key.
+    Returns the raw text response or raises on failure.
     """
     from emergentintegrations.llm.chat import LlmChat, UserMessage
 
-    async def _attempt(key: str, sid: str) -> str:
-        chat = LlmChat(
-            api_key=key,
-            session_id=sid,
-            system_message=system_msg,
-        ).with_model("gemini", "gemini-2.5-flash")
-        return await chat.send_message(UserMessage(text=prompt))
-
-    try:
-        return await _attempt(api_key, session_id)
-    except Exception as primary_err:
-        emergent_key = os.environ.get(_EMERGENT_KEY_ENV, "").strip()
-        if emergent_key and emergent_key != api_key:
-            logger.warning("Gear AI: primary key failed (%s), retrying with emergent key", primary_err)
-            return await _attempt(emergent_key, session_id + "_fb")
-        raise primary_err
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=session_id,
+        system_message=system_msg,
+    ).with_model("gemini", "gemini-2.5-flash")
+    return await chat.send_message(UserMessage(text=prompt))
 
 
 def _extract_json(text: str) -> dict:
