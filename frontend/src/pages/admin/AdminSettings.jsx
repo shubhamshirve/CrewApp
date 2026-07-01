@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Settings, DollarSign, Tag, Briefcase, Camera, Inbox,
   Plus, Trash2, Save, RefreshCw, Key, Eye, EyeOff,
-  CheckCircle2, AlertCircle, Loader2, X, Zap, Copy, Link2, Lock,
+  CheckCircle2, AlertCircle, Loader2, X, Zap, Copy, Link2, Lock, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -91,6 +91,7 @@ export default function AdminSettings() {
   const [submissions, setSubmissions] = useState([]);
   const [submissionEdits, setSubmissionEdits] = useState({});
   const [processingId, setProcessingId] = useState(null);
+  const [sweepRunning, setSweepRunning] = useState(false);
 
   // Test AI state
   const [testAiLoading, setTestAiLoading] = useState(false);
@@ -300,6 +301,43 @@ export default function AdminSettings() {
       toast.error("Failed to reject");
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const validateWithAI = async (sub) => {
+    setProcessingId(sub.id);
+    try {
+      const res = await api.post(`/platform/gear-submissions/${sub.id}/validate-ai`);
+      const { decision, ai_confidence, ai_reason } = res.data;
+      setSubmissions(s => s.filter(x => x.id !== sub.id));
+      if (decision === "approved") {
+        const gearRes = await api.get("/platform/gear-catalogue");
+        setGear(gearRes.data?.items || []);
+        toast.success(`AI approved "${sub.name}" (confidence ${(ai_confidence * 100).toFixed(0)}%) — added to catalogue!`);
+      } else {
+        toast.error(`AI rejected "${sub.name}" (confidence ${(ai_confidence * 100).toFixed(0)}%)${ai_reason ? ` — ${ai_reason}` : ""}`);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "AI validation failed");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const runGearSweepNow = async () => {
+    setSweepRunning(true);
+    try {
+      const res = await api.post("/platform/gear-submissions/run-sweep");
+      if (res.data?.skipped) {
+        toast.error(res.data.reason === "no_api_key" ? "No Gemini API key configured" : "AI Gear Auto-Validation is disabled");
+      } else {
+        toast.success(`Sweep complete — ${res.data.approved} approved, ${res.data.rejected} rejected (${res.data.total} processed)`);
+        loadGear();
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Sweep failed");
+    } finally {
+      setSweepRunning(false);
     }
   };
 
@@ -692,6 +730,9 @@ export default function AdminSettings() {
 
                 {/* Custom Gear Requests */}
                 <SectionCard title="Custom Gear Requests" icon={Inbox}>
+                  <p className="text-xs text-slate-400 mb-3">
+                    An automatic AI sweep also runs daily at <strong>3:00 AM</strong> and <strong>5:00 PM</strong> (IST) to resolve pending requests — approving high-confidence matches and rejecting clearly invalid ones.
+                  </p>
                   {submissions.length === 0 ? (
                     <div className="text-center py-8">
                       <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
@@ -700,9 +741,20 @@ export default function AdminSettings() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <p className="text-xs text-slate-500 mb-3">
-                        {submissions.length} pending submission{submissions.length !== 1 ? "s" : ""} — review and add to master catalogue or reject.
-                      </p>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-slate-500">
+                          {submissions.length} pending submission{submissions.length !== 1 ? "s" : ""} — review and add to master catalogue, reject, or let AI decide.
+                        </p>
+                        <button
+                          data-testid="run-gear-sweep-btn"
+                          onClick={runGearSweepNow}
+                          disabled={sweepRunning}
+                          className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-50 disabled:opacity-60 font-display flex-shrink-0"
+                        >
+                          {sweepRunning ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                          Run AI Sweep Now
+                        </button>
+                      </div>
                       {submissions.map(sub => {
                         const edit = submissionEdits[sub.id] || {};
                         const isProcessing = processingId === sub.id;
@@ -767,6 +819,17 @@ export default function AdminSettings() {
                               >
                                 {isProcessing ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
                                 Approve & Add
+                              </Button>
+                              <Button
+                                data-testid={`validate-ai-btn-${sub.id}`}
+                                size="sm"
+                                onClick={() => validateWithAI(sub)}
+                                disabled={isProcessing}
+                                className="text-xs text-white gap-1"
+                                style={{ background: "#7C3AED" }}
+                              >
+                                {isProcessing ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                                Validate by AI
                               </Button>
                               <Button
                                 size="sm"

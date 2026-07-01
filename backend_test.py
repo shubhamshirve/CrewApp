@@ -1,564 +1,507 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for CrewBook/Photoo
-Tests 3 backend changes as per review request:
-1. Revenue shows 0 (not null) for fully-discounted payments
-2. Discover/search by username
-3. Granular AI feature toggles
+Backend Test Script for AI Gear Validation Feature
+Tests: Validate by AI button + scheduled cron sweep for pending gear submissions
 """
-
 import requests
 import json
-from typing import Optional
+import time
+from typing import Dict, Optional
 
-# Base URL - using internal backend on supervisor port
+# Configuration
 BASE_URL = "http://localhost:8001/api"
-
-# Test credentials from /app/memory/test_credentials.md
 ADMIN_EMAIL = "admin@photoo.in"
 ADMIN_PASSWORD = "Admin@123"
 USER_EMAIL = "rohan@example.com"
 USER_PASSWORD = "Test@1234"
-USER_USERNAME = "rohanphotoo"
 
-# Global tokens
-admin_token: Optional[str] = None
-user_token: Optional[str] = None
+# Test state
+admin_token = None
+user_token = None
+test_submission_ids = []
 
 
-def login(email: str, password: str) -> str:
+def log_test(test_name: str, status: str, details: str = ""):
+    """Log test results with formatting"""
+    status_symbol = "✅" if status == "PASS" else "❌" if status == "FAIL" else "ℹ️"
+    print(f"\n{status_symbol} {test_name}")
+    if details:
+        print(f"   {details}")
+
+
+def login(email: str, password: str) -> Optional[str]:
     """Login and return JWT token"""
-    response = requests.post(
-        f"{BASE_URL}/auth/login",
-        json={"email": email, "password": password}
-    )
-    if response.status_code != 200:
-        raise Exception(f"Login failed for {email}: {response.status_code} {response.text}")
-    data = response.json()
-    return data["token"]
+    try:
+        response = requests.post(
+            f"{BASE_URL}/auth/login",
+            json={"email": email, "password": password}
+        )
+        if response.status_code == 200:
+            token = response.json().get("token")
+            log_test(f"Login as {email}", "PASS", f"Token: {token[:20]}...")
+            return token
+        else:
+            log_test(f"Login as {email}", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return None
+    except Exception as e:
+        log_test(f"Login as {email}", "FAIL", f"Exception: {str(e)}")
+        return None
 
 
-def get_admin_token() -> str:
-    """Get or reuse admin token"""
-    global admin_token
-    if not admin_token:
-        admin_token = login(ADMIN_EMAIL, ADMIN_PASSWORD)
-    return admin_token
+def get_platform_settings(token: str) -> Dict:
+    """Get platform settings"""
+    try:
+        response = requests.get(
+            f"{BASE_URL}/platform/settings",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            ai_enabled = data.get("ai_gear_validation_enabled", False)
+            log_test("GET /api/platform/settings", "PASS", 
+                    f"ai_gear_validation_enabled={ai_enabled}")
+            return data
+        else:
+            log_test("GET /api/platform/settings", "FAIL", 
+                    f"Status: {response.status_code}")
+            return {}
+    except Exception as e:
+        log_test("GET /api/platform/settings", "FAIL", f"Exception: {str(e)}")
+        return {}
 
 
-def get_user_token() -> str:
-    """Get or reuse user token"""
-    global user_token
-    if not user_token:
-        user_token = login(USER_EMAIL, USER_PASSWORD)
-    return user_token
-
-
-def print_test(test_name: str):
-    """Print test header"""
-    print(f"\n{'='*80}")
-    print(f"TEST: {test_name}")
-    print('='*80)
-
-
-def print_result(passed: bool, message: str):
-    """Print test result"""
-    status = "✅ PASS" if passed else "❌ FAIL"
-    print(f"{status}: {message}")
-
-
-def print_detail(label: str, value):
-    """Print test detail"""
-    print(f"  {label}: {value}")
-
-
-# ============================================================================
-# TEST 1 — Revenue shows 0 (not null) for fully-discounted payments
-# ============================================================================
-
-def test_1_revenue_zero_not_null():
-    """
-    Verify backend data contract: amount_paise field can be integer 0 (not null)
-    for fully-discounted/wallet-covered payments.
-    """
-    print_test("TEST 1 — Revenue shows 0 (not null) for fully-discounted payments")
-    
-    token = get_admin_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    # Call GET /api/admin/reports/recent-payments
-    response = requests.get(
-        f"{BASE_URL}/admin/reports/recent-payments",
-        headers=headers,
-        params={"limit": 20}
-    )
-    
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Failed to fetch recent payments: {response.text}")
+def update_platform_settings(token: str, ai_gear_validation_enabled: bool) -> bool:
+    """Update platform settings"""
+    try:
+        response = requests.put(
+            f"{BASE_URL}/platform/settings",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"ai_gear_validation_enabled": ai_gear_validation_enabled}
+        )
+        if response.status_code == 200:
+            log_test(f"PUT /api/platform/settings (ai_gear_validation_enabled={ai_gear_validation_enabled})", 
+                    "PASS", f"Updated successfully")
+            return True
+        else:
+            log_test(f"PUT /api/platform/settings", "FAIL", 
+                    f"Status: {response.status_code}, Response: {response.text}")
+            return False
+    except Exception as e:
+        log_test(f"PUT /api/platform/settings", "FAIL", f"Exception: {str(e)}")
         return False
-    
-    data = response.json()
-    items = data.get("items", [])
-    print_detail("Total payment records", len(items))
-    
-    # Check if any records have amount_paise field
-    has_amount_paise = False
-    zero_amount_found = False
-    null_amount_found = False
-    
-    for item in items:
-        if "amount_paise" in item:
-            has_amount_paise = True
-            amount = item.get("amount_paise")
-            
-            # Check if it's literally integer 0 (not null/None)
-            if amount == 0 and amount is not None:
-                zero_amount_found = True
-                print_detail("Found amount_paise=0 record", f"Event: {item.get('event')}, Plan: {item.get('plan_name', item.get('plan'))}")
-            
-            if amount is None:
-                null_amount_found = True
-                print_detail("Found amount_paise=null record", f"Event: {item.get('event')}")
-    
-    if not has_amount_paise:
-        print_result(True, "No payment records found to verify, but API structure is correct (amount_paise field exists in schema)")
-        return True
-    
-    # The key verification: amount_paise field can be integer 0 (not null)
-    if null_amount_found:
-        print_result(False, "Found amount_paise=null records - should be integer 0 for fully-discounted payments")
-        return False
-    
-    print_result(True, f"Backend data contract verified: amount_paise field is integer (0 or positive), never null. Zero-amount records found: {zero_amount_found}")
-    return True
 
 
-# ============================================================================
-# TEST 2 — Discover/search by username
-# ============================================================================
-
-def test_2_search_by_username():
-    """
-    Test GET /api/users/search with username queries
-    """
-    print_test("TEST 2 — Discover/search by username (GET /api/users/search)")
-    
-    token = get_user_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    all_passed = True
-    
-    # TEST 2.1: Search by username "rohanphotoo"
-    print("\n--- TEST 2.1: Search by username 'rohanphotoo' ---")
-    response = requests.get(
-        f"{BASE_URL}/users/search",
-        headers=headers,
-        params={"q": USER_USERNAME}
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Search failed: {response.text}")
-        all_passed = False
-    else:
-        results = response.json()
-        print_detail("Results count", len(results))
+def submit_custom_gear(token: str, name: str, category: str, brand: Optional[str] = None) -> Optional[Dict]:
+    """Submit custom gear and return submission data"""
+    try:
+        payload = {"name": name, "category": category}
+        if brand:
+            payload["brand"] = brand
         
-        # Check if rohan's profile is in results
-        rohan_found = any(u.get("username") == USER_USERNAME or u.get("email") == USER_EMAIL for u in results)
-        if rohan_found:
-            print_result(True, f"Username search working: '{USER_USERNAME}' found in results")
-        else:
-            print_result(False, f"Username search failed: '{USER_USERNAME}' not found in results")
-            all_passed = False
-    
-    # TEST 2.2: Search with "@rohanphotoo" (@ prefix should be stripped)
-    print("\n--- TEST 2.2: Search with '@rohanphotoo' (@ prefix) ---")
-    response = requests.get(
-        f"{BASE_URL}/users/search",
-        headers=headers,
-        params={"q": f"@{USER_USERNAME}"}
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Search with @ prefix failed: {response.text}")
-        all_passed = False
-    else:
-        results = response.json()
-        print_detail("Results count", len(results))
+        response = requests.post(
+            f"{BASE_URL}/platform/gear-submissions",
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload
+        )
         
-        rohan_found = any(u.get("username") == USER_USERNAME or u.get("email") == USER_EMAIL for u in results)
-        if rohan_found:
-            print_result(True, f"@ prefix handling working: '@{USER_USERNAME}' found rohan's profile")
+        if response.status_code == 200:
+            data = response.json()
+            status = data.get("status")
+            submission_id = data.get("id")
+            log_test(f"POST /api/platform/gear-submissions ('{name}')", "PASS", 
+                    f"ID: {submission_id}, Status: {status}")
+            return data
         else:
-            print_result(False, f"@ prefix handling failed: '@{USER_USERNAME}' did not find rohan's profile")
-            all_passed = False
-    
-    # TEST 2.3: Search by full_name (existing functionality - no regression)
-    print("\n--- TEST 2.3: Search by full_name (regression check) ---")
-    # Get rohan's full name first
-    response = requests.get(
-        f"{BASE_URL}/users/{USER_USERNAME}",
-        headers=headers
-    )
-    if response.status_code == 200:
-        rohan_profile = response.json()
-        full_name = rohan_profile.get("full_name", "")
-        if full_name:
-            # Search by part of full name
-            search_term = full_name.split()[0] if full_name else "Rohan"
-            response = requests.get(
-                f"{BASE_URL}/users/search",
-                headers=headers,
-                params={"q": search_term}
-            )
-            print_detail("Search term", search_term)
-            print_detail("Status Code", response.status_code)
-            
-            if response.status_code != 200:
-                print_result(False, f"Full name search failed: {response.text}")
-                all_passed = False
-            else:
-                results = response.json()
-                print_detail("Results count", len(results))
-                rohan_found = any(u.get("username") == USER_USERNAME or u.get("email") == USER_EMAIL for u in results)
-                if rohan_found:
-                    print_result(True, f"Full name search still working (no regression)")
-                else:
-                    print_result(False, f"Full name search regression: '{search_term}' did not find rohan")
-                    all_passed = False
-        else:
-            print_result(True, "Skipped full_name test (no full_name in profile)")
-    else:
-        print_result(True, "Skipped full_name test (could not fetch profile)")
-    
-    # TEST 2.4: Combine username search with role filter
-    print("\n--- TEST 2.4: Username search + role filter ---")
-    # Get rohan's primary_role first
-    response = requests.get(
-        f"{BASE_URL}/users/{USER_USERNAME}",
-        headers=headers
-    )
-    if response.status_code == 200:
-        rohan_profile = response.json()
-        primary_role = rohan_profile.get("primary_role")
-        if primary_role:
-            response = requests.get(
-                f"{BASE_URL}/users/search",
-                headers=headers,
-                params={"q": USER_USERNAME, "role": primary_role}
-            )
-            print_detail("Search params", f"q={USER_USERNAME}, role={primary_role}")
-            print_detail("Status Code", response.status_code)
-            
-            if response.status_code != 200:
-                print_result(False, f"Username + role filter failed: {response.text}")
-                all_passed = False
-            else:
-                results = response.json()
-                print_detail("Results count", len(results))
-                rohan_found = any(u.get("username") == USER_USERNAME for u in results)
-                if rohan_found:
-                    print_result(True, f"Username + role filter working correctly")
-                else:
-                    print_result(False, f"Username + role filter failed: rohan not found with role={primary_role}")
-                    all_passed = False
-        else:
-            print_result(True, "Skipped role filter test (no primary_role in profile)")
-    else:
-        print_result(True, "Skipped role filter test (could not fetch profile)")
-    
-    # TEST 2.5: Search non-existent username
-    print("\n--- TEST 2.5: Search non-existent username ---")
-    response = requests.get(
-        f"{BASE_URL}/users/search",
-        headers=headers,
-        params={"q": "nonexistentuser12345xyz"}
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Non-existent username search failed: {response.text}")
-        all_passed = False
-    else:
-        results = response.json()
-        print_detail("Results count", len(results))
-        if len(results) == 0:
-            print_result(True, "Non-existent username returns empty array (correct)")
-        else:
-            print_result(False, f"Non-existent username returned {len(results)} results (should be 0)")
-            all_passed = False
-    
-    return all_passed
+            log_test(f"POST /api/platform/gear-submissions ('{name}')", "FAIL", 
+                    f"Status: {response.status_code}, Response: {response.text}")
+            return None
+    except Exception as e:
+        log_test(f"POST /api/platform/gear-submissions ('{name}')", "FAIL", 
+                f"Exception: {str(e)}")
+        return None
 
 
-# ============================================================================
-# TEST 3 — Granular AI feature toggles
-# ============================================================================
+def get_pending_submissions(token: str) -> list:
+    """Get all pending gear submissions"""
+    try:
+        response = requests.get(
+            f"{BASE_URL}/platform/gear-submissions",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get("items", [])
+            log_test("GET /api/platform/gear-submissions", "PASS", 
+                    f"Found {len(items)} pending submissions")
+            return items
+        else:
+            log_test("GET /api/platform/gear-submissions", "FAIL", 
+                    f"Status: {response.status_code}")
+            return []
+    except Exception as e:
+        log_test("GET /api/platform/gear-submissions", "FAIL", f"Exception: {str(e)}")
+        return []
 
-def test_3_granular_ai_toggles():
-    """
-    Test granular AI feature toggles (4 independent toggles)
-    """
-    print_test("TEST 3 — Granular AI feature toggles")
-    
-    admin_token_str = get_admin_token()
-    user_token_str = get_user_token()
-    admin_headers = {"Authorization": f"Bearer {admin_token_str}"}
-    user_headers = {"Authorization": f"Bearer {user_token_str}"}
-    
-    all_passed = True
-    
-    # TEST 3.1: GET /api/platform/settings - verify 4 new AI toggle fields
-    print("\n--- TEST 3.1: GET /api/platform/settings (verify 4 AI toggles) ---")
-    response = requests.get(f"{BASE_URL}/platform/settings")
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Failed to get platform settings: {response.text}")
-        all_passed = False
-    else:
-        settings = response.json()
-        required_fields = [
-            "ai_crew_suggestions_enabled",
-            "ai_gig_checklist_enabled",
-            "ai_gear_normalize_enabled",
-            "ai_gear_validation_enabled"
-        ]
+
+def validate_submission_with_ai(token: str, submission_id: str, expect_status: int = 200) -> Optional[Dict]:
+    """Call validate-ai endpoint on a submission"""
+    try:
+        response = requests.post(
+            f"{BASE_URL}/platform/gear-submissions/{submission_id}/validate-ai",
+            headers={"Authorization": f"Bearer {token}"}
+        )
         
-        missing_fields = [f for f in required_fields if f not in settings]
-        if missing_fields:
-            print_result(False, f"Missing AI toggle fields: {missing_fields}")
-            all_passed = False
-        else:
-            print_detail("AI toggles found", ", ".join(required_fields))
-            for field in required_fields:
-                print_detail(f"  {field}", settings[field])
-            print_result(True, "All 4 AI toggle fields present in response")
-    
-    # TEST 3.2: Toggle individual feature (ai_gear_normalize_enabled=false)
-    print("\n--- TEST 3.2: PUT /api/platform/settings (toggle ai_gear_normalize_enabled=false) ---")
-    response = requests.put(
-        f"{BASE_URL}/platform/settings",
-        headers=admin_headers,
-        json={"ai_gear_normalize_enabled": False}
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Failed to toggle ai_gear_normalize_enabled: {response.text}")
-        all_passed = False
-    else:
-        settings = response.json()
-        if settings.get("ai_gear_normalize_enabled") == False:
-            print_result(True, "ai_gear_normalize_enabled toggled to false")
-            # Verify other toggles remain true
-            other_toggles = ["ai_crew_suggestions_enabled", "ai_gig_checklist_enabled", "ai_gear_validation_enabled"]
-            all_true = all(settings.get(t, False) for t in other_toggles)
-            if all_true:
-                print_result(True, "Other AI toggles remain true (independent toggles working)")
+        if response.status_code == expect_status:
+            if response.status_code == 200:
+                data = response.json()
+                decision = data.get("decision")
+                confidence = data.get("ai_confidence")
+                log_test(f"POST /api/platform/gear-submissions/{submission_id}/validate-ai", 
+                        "PASS", f"Decision: {decision}, Confidence: {confidence}")
+                return data
             else:
-                print_result(False, "Other AI toggles were affected (toggles not independent)")
-                all_passed = False
+                log_test(f"POST /api/platform/gear-submissions/{submission_id}/validate-ai", 
+                        "PASS", f"Expected {expect_status}, got {response.status_code}: {response.text}")
+                return {"status_code": response.status_code, "detail": response.json().get("detail", "")}
         else:
-            print_result(False, f"ai_gear_normalize_enabled not toggled correctly: {settings.get('ai_gear_normalize_enabled')}")
-            all_passed = False
-    
-    # TEST 3.3: Verify gear normalize returns ai_disabled=true
-    print("\n--- TEST 3.3: GET /api/platform/gear-catalogue/normalize (should return ai_disabled=true) ---")
-    response = requests.get(
-        f"{BASE_URL}/platform/gear-catalogue/normalize",
-        headers=user_headers,
-        params={"name": "Canon EOS R5"}
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Gear normalize endpoint failed: {response.text}")
-        all_passed = False
-    else:
-        result = response.json()
-        if result.get("ai_disabled") == True:
-            print_result(True, "Gear normalize returns ai_disabled=true when toggle is off")
-            print_detail("Response", json.dumps(result, indent=2))
-        else:
-            print_result(False, f"Gear normalize did not return ai_disabled=true: {result}")
-            all_passed = False
-    
-    # TEST 3.4: Re-enable normalize, disable crew suggestions
-    print("\n--- TEST 3.4: Toggle ai_gear_normalize_enabled=true, ai_crew_suggestions_enabled=false ---")
-    response = requests.put(
-        f"{BASE_URL}/platform/settings",
-        headers=admin_headers,
-        json={
-            "ai_gear_normalize_enabled": True,
-            "ai_crew_suggestions_enabled": False
-        }
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Failed to toggle settings: {response.text}")
-        all_passed = False
-    else:
-        settings = response.json()
-        if settings.get("ai_gear_normalize_enabled") == True and settings.get("ai_crew_suggestions_enabled") == False:
-            print_result(True, "Toggles updated correctly")
-        else:
-            print_result(False, f"Toggles not updated correctly: {settings}")
-            all_passed = False
-    
-    # TEST 3.5: Verify gear normalize NO LONGER returns ai_disabled
-    print("\n--- TEST 3.5: GET /api/platform/gear-catalogue/normalize (should NOT return ai_disabled) ---")
-    response = requests.get(
-        f"{BASE_URL}/platform/gear-catalogue/normalize",
-        headers=user_headers,
-        params={"name": "Canon EOS R5"}
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Gear normalize endpoint failed: {response.text}")
-        all_passed = False
-    else:
-        result = response.json()
-        ai_disabled = result.get("ai_disabled", False)
-        if not ai_disabled:
-            print_result(True, "Gear normalize no longer returns ai_disabled (feature re-enabled)")
-        else:
-            print_result(False, f"Gear normalize still returns ai_disabled=true: {result}")
-            all_passed = False
-    
-    # TEST 3.6: Test crew suggestions with ai_crew_suggestions_enabled=false
-    print("\n--- TEST 3.6: POST /api/ai/crew-suggestions (should return ai_disabled=true) ---")
-    crew_request = {
-        "gig_title": "Test Wedding",
-        "event_types": ["Wedding"],
-        "dates": ["2026-12-01"],
-        "location": "Mumbai",
-        "roles_needed": ["Second Shooter"]
-    }
-    response = requests.post(
-        f"{BASE_URL}/ai/crew-suggestions",
-        headers=user_headers,
-        json=crew_request
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Crew suggestions endpoint failed: {response.text}")
-        all_passed = False
-    else:
-        result = response.json()
-        if result.get("ai_disabled") == True:
-            print_result(True, "Crew suggestions returns ai_disabled=true when toggle is off")
-            print_detail("Message", result.get("suggestion", ""))
-        else:
-            print_result(False, f"Crew suggestions did not return ai_disabled=true: {result}")
-            all_passed = False
-    
-    # TEST 3.7: Test gig checklist (should NOT be disabled)
-    print("\n--- TEST 3.7: POST /api/ai/gig-checklist (should NOT return ai_disabled) ---")
-    response = requests.post(
-        f"{BASE_URL}/ai/gig-checklist",
-        headers=user_headers,
-        json=crew_request
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        # This might fail due to missing Gemini key, which is fine
-        print_detail("Note", "Endpoint returned error (likely missing Gemini key)")
-        print_result(True, "Gig checklist endpoint attempted (not short-circuited by disabled check)")
-    else:
-        result = response.json()
-        ai_disabled = result.get("ai_disabled", False)
-        if not ai_disabled:
-            print_result(True, "Gig checklist does NOT return ai_disabled (feature still enabled)")
-        else:
-            print_result(False, f"Gig checklist incorrectly returns ai_disabled=true: {result}")
-            all_passed = False
-    
-    # TEST 3.8: CLEANUP - Restore all toggles to true
-    print("\n--- TEST 3.8: CLEANUP - Restore all AI toggles to enabled (true) ---")
-    response = requests.put(
-        f"{BASE_URL}/platform/settings",
-        headers=admin_headers,
-        json={
-            "ai_crew_suggestions_enabled": True,
-            "ai_gig_checklist_enabled": True,
-            "ai_gear_normalize_enabled": True,
-            "ai_gear_validation_enabled": True
-        }
-    )
-    print_detail("Status Code", response.status_code)
-    
-    if response.status_code != 200:
-        print_result(False, f"Failed to restore AI toggles: {response.text}")
-        all_passed = False
-    else:
-        settings = response.json()
-        all_enabled = all(settings.get(f, False) for f in [
-            "ai_crew_suggestions_enabled",
-            "ai_gig_checklist_enabled",
-            "ai_gear_normalize_enabled",
-            "ai_gear_validation_enabled"
-        ])
-        if all_enabled:
-            print_result(True, "All AI toggles restored to enabled (true)")
-        else:
-            print_result(False, f"Failed to restore all toggles: {settings}")
-            all_passed = False
-    
-    return all_passed
+            log_test(f"POST /api/platform/gear-submissions/{submission_id}/validate-ai", 
+                    "FAIL", f"Expected {expect_status}, got {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        log_test(f"POST /api/platform/gear-submissions/{submission_id}/validate-ai", 
+                "FAIL", f"Exception: {str(e)}")
+        return None
 
 
-# ============================================================================
-# Main Test Runner
-# ============================================================================
+def run_sweep(token: str, expect_status: int = 200) -> Optional[Dict]:
+    """Call run-sweep endpoint"""
+    try:
+        response = requests.post(
+            f"{BASE_URL}/platform/gear-submissions/run-sweep",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        if response.status_code == expect_status:
+            data = response.json()
+            if data.get("skipped"):
+                log_test("POST /api/platform/gear-submissions/run-sweep", "PASS", 
+                        f"Skipped: {data.get('reason')}")
+            else:
+                log_test("POST /api/platform/gear-submissions/run-sweep", "PASS", 
+                        f"Total: {data.get('total')}, Approved: {data.get('approved')}, Rejected: {data.get('rejected')}")
+            return data
+        else:
+            log_test("POST /api/platform/gear-submissions/run-sweep", "FAIL", 
+                    f"Expected {expect_status}, got {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        log_test("POST /api/platform/gear-submissions/run-sweep", "FAIL", 
+                f"Exception: {str(e)}")
+        return None
+
 
 def main():
-    print("\n" + "="*80)
-    print("BACKEND API TESTING - CrewBook/Photoo")
-    print("Testing 3 backend changes:")
-    print("1. Revenue shows 0 (not null) for fully-discounted payments")
-    print("2. Discover/search by username")
-    print("3. Granular AI feature toggles")
-    print("="*80)
+    global admin_token, user_token, test_submission_ids
     
-    results = {}
+    print("=" * 80)
+    print("AI GEAR VALIDATION FEATURE TEST")
+    print("=" * 80)
     
-    try:
-        # Run all tests
-        results["TEST 1"] = test_1_revenue_zero_not_null()
-        results["TEST 2"] = test_2_search_by_username()
-        results["TEST 3"] = test_3_granular_ai_toggles()
-        
-    except Exception as e:
-        print(f"\n❌ CRITICAL ERROR: {e}")
-        import traceback
-        traceback.print_exc()
+    # ========== SETUP ==========
+    print("\n" + "=" * 80)
+    print("SETUP")
+    print("=" * 80)
+    
+    # Login as admin
+    admin_token = login(ADMIN_EMAIL, ADMIN_PASSWORD)
+    if not admin_token:
+        print("\n❌ CRITICAL: Admin login failed. Cannot continue.")
         return
     
-    # Summary
-    print("\n" + "="*80)
-    print("TEST SUMMARY")
-    print("="*80)
+    # Check ai_gear_validation_enabled setting
+    settings = get_platform_settings(admin_token)
+    ai_enabled = settings.get("ai_gear_validation_enabled", False)
     
-    for test_name, passed in results.items():
-        status = "✅ PASSED" if passed else "❌ FAILED"
-        print(f"{test_name}: {status}")
+    if not ai_enabled:
+        print("\nℹ️  AI Gear Validation is disabled. Enabling it...")
+        if not update_platform_settings(admin_token, True):
+            print("\n❌ CRITICAL: Failed to enable AI Gear Validation. Cannot continue.")
+            return
+        settings = get_platform_settings(admin_token)
+        ai_enabled = settings.get("ai_gear_validation_enabled", False)
+        if not ai_enabled:
+            print("\n❌ CRITICAL: AI Gear Validation still disabled after update. Cannot continue.")
+            return
     
-    all_passed = all(results.values())
-    print("\n" + "="*80)
-    if all_passed:
-        print("✅ ALL TESTS PASSED")
+    # Login as regular user
+    user_token = login(USER_EMAIL, USER_PASSWORD)
+    if not user_token:
+        print("\n❌ CRITICAL: User login failed. Cannot continue.")
+        return
+    
+    # Submit a clearly valid gear item (should auto-approve with real AI)
+    print("\nℹ️  Submitting valid gear item (Sony Alpha 7 IV)...")
+    valid_submission = submit_custom_gear(user_token, "Sony Alpha 7 IV Full-Frame Mirrorless Camera", "Camera", "Sony")
+    if valid_submission:
+        status = valid_submission.get("status")
+        if status == "auto_approved":
+            print(f"   ℹ️  Item auto-approved (expected with real AI). Confidence: {valid_submission.get('ai_confidence')}")
+        elif status == "auto_exists":
+            print(f"   ℹ️  Item already exists in catalogue (expected).")
+        else:
+            print(f"   ℹ️  Item status: {status}")
+    
+    # Submit a nonsense/ambiguous item to force "pending" status
+    print("\nℹ️  Submitting nonsense gear item (XYZ Widget Thingamajig 9000)...")
+    pending_submission = submit_custom_gear(user_token, "XYZ Widget Thingamajig 9000", "Accessories", None)
+    if not pending_submission:
+        print("\n❌ CRITICAL: Failed to submit nonsense gear. Cannot continue.")
+        return
+    
+    pending_id = pending_submission.get("id")
+    pending_status = pending_submission.get("status")
+    
+    if pending_status != "pending":
+        print(f"\n⚠️  WARNING: Expected 'pending' status but got '{pending_status}'. This may affect tests.")
+        # Try another nonsense item
+        print("\nℹ️  Trying another nonsense item (Random Gadget 12345)...")
+        pending_submission = submit_custom_gear(user_token, "Random Gadget 12345 Non-Photography Item", "Other", None)
+        if pending_submission:
+            pending_id = pending_submission.get("id")
+            pending_status = pending_submission.get("status")
+            if pending_status != "pending":
+                print(f"\n⚠️  WARNING: Still got '{pending_status}' status. Continuing anyway...")
+    
+    test_submission_ids.append(pending_id)
+    
+    # ========== TEST 1: Manual "Validate by AI" button ==========
+    print("\n" + "=" * 80)
+    print("TEST 1: Manual 'Validate by AI' button endpoint")
+    print("=" * 80)
+    
+    # 1.1 - List pending submissions
+    pending_items = get_pending_submissions(admin_token)
+    if not pending_items:
+        print("\n⚠️  WARNING: No pending submissions found. Creating one...")
+        test_sub = submit_custom_gear(user_token, "Test Nonsense Item ABC123", "Other", None)
+        if test_sub:
+            pending_id = test_sub.get("id")
+            test_submission_ids.append(pending_id)
+            pending_items = get_pending_submissions(admin_token)
+    
+    # Find our pending submission
+    our_pending = next((item for item in pending_items if item.get("id") == pending_id), None)
+    if not our_pending:
+        print(f"\n⚠️  WARNING: Could not find pending submission {pending_id} in list. Using first available...")
+        if pending_items:
+            our_pending = pending_items[0]
+            pending_id = our_pending.get("id")
+    
+    # 1.2 - Call validate-ai endpoint as admin
+    print(f"\nℹ️  TEST 1.2: Calling validate-ai on submission {pending_id}...")
+    result = validate_submission_with_ai(admin_token, pending_id, expect_status=200)
+    if result:
+        decision = result.get("decision")
+        if decision in ["approved", "rejected"]:
+            print(f"   ✅ Submission resolved with decision: {decision}")
+        else:
+            print(f"   ⚠️  Unexpected decision: {decision}")
+    
+    # 1.3 - Verify submission is no longer in pending list
+    print(f"\nℹ️  TEST 1.3: Verifying submission {pending_id} is no longer pending...")
+    pending_items_after = get_pending_submissions(admin_token)
+    still_pending = any(item.get("id") == pending_id for item in pending_items_after)
+    if not still_pending:
+        log_test("Submission removed from pending list", "PASS", 
+                f"Submission {pending_id} is no longer in pending list")
     else:
-        print("❌ SOME TESTS FAILED")
-    print("="*80 + "\n")
+        log_test("Submission removed from pending list", "FAIL", 
+                f"Submission {pending_id} is still in pending list")
+    
+    # 1.4 - Try calling validate-ai again (should fail with 400)
+    print(f"\nℹ️  TEST 1.4: Calling validate-ai on already-resolved submission {pending_id}...")
+    result = validate_submission_with_ai(admin_token, pending_id, expect_status=400)
+    if result and result.get("status_code") == 400:
+        print(f"   ✅ Correctly rejected with 400: {result.get('detail')}")
+    
+    # 1.5 - Try calling validate-ai on non-existent submission (should fail with 404)
+    print(f"\nℹ️  TEST 1.5: Calling validate-ai on non-existent submission...")
+    fake_id = "nonexistent-submission-id-12345"
+    result = validate_submission_with_ai(admin_token, fake_id, expect_status=404)
+    if result and result.get("status_code") == 404:
+        print(f"   ✅ Correctly rejected with 404: {result.get('detail')}")
+    
+    # 1.6 - Try calling validate-ai as non-admin user (should fail with 401/403)
+    print(f"\nℹ️  TEST 1.6: Calling validate-ai as non-admin user...")
+    # First create a new pending submission
+    test_sub2 = submit_custom_gear(user_token, "Another Test Item XYZ789", "Other", None)
+    if test_sub2:
+        test_id2 = test_sub2.get("id")
+        test_submission_ids.append(test_id2)
+        result = validate_submission_with_ai(user_token, test_id2, expect_status=403)
+        if result and result.get("status_code") == 403:
+            print(f"   ✅ Correctly rejected with 403: {result.get('detail')}")
+    
+    # ========== TEST 2: Manual "Run AI Sweep Now" ==========
+    print("\n" + "=" * 80)
+    print("TEST 2: Manual 'Run AI Sweep Now' endpoint")
+    print("=" * 80)
+    
+    # 2.1 - Create 2 more pending submissions
+    print("\nℹ️  TEST 2.1: Creating 2 more pending submissions...")
+    sub1 = submit_custom_gear(user_token, "Nonsense Item Alpha 111", "Other", None)
+    sub2 = submit_custom_gear(user_token, "Nonsense Item Beta 222", "Other", None)
+    if sub1:
+        test_submission_ids.append(sub1.get("id"))
+    if sub2:
+        test_submission_ids.append(sub2.get("id"))
+    
+    # 2.2 - Call run-sweep as admin
+    print("\nℹ️  TEST 2.2: Calling run-sweep as admin...")
+    pending_before = get_pending_submissions(admin_token)
+    print(f"   ℹ️  Pending submissions before sweep: {len(pending_before)}")
+    
+    sweep_result = run_sweep(admin_token, expect_status=200)
+    if sweep_result:
+        total = sweep_result.get("total", 0)
+        approved = sweep_result.get("approved", 0)
+        rejected = sweep_result.get("rejected", 0)
+        if total > 0 and (approved + rejected) == total:
+            print(f"   ✅ Sweep processed {total} submissions correctly")
+        else:
+            print(f"   ⚠️  Sweep result: total={total}, approved={approved}, rejected={rejected}")
+    
+    # 2.3 - Verify all pending submissions are resolved
+    print("\nℹ️  TEST 2.3: Verifying all pending submissions are resolved...")
+    pending_after = get_pending_submissions(admin_token)
+    if len(pending_after) == 0:
+        log_test("All pending submissions resolved", "PASS", 
+                "No pending submissions remaining after sweep")
+    else:
+        log_test("All pending submissions resolved", "FAIL", 
+                f"{len(pending_after)} pending submissions still remain")
+    
+    # 2.4 - Try calling run-sweep as non-admin user (should fail with 401/403)
+    print("\nℹ️  TEST 2.4: Calling run-sweep as non-admin user...")
+    try:
+        response = requests.post(
+            f"{BASE_URL}/platform/gear-submissions/run-sweep",
+            headers={"Authorization": f"Bearer {user_token}"}
+        )
+        if response.status_code in [401, 403]:
+            log_test("Non-admin run-sweep blocked", "PASS", 
+                    f"Correctly rejected with {response.status_code}")
+        else:
+            log_test("Non-admin run-sweep blocked", "FAIL", 
+                    f"Expected 401/403, got {response.status_code}")
+    except Exception as e:
+        log_test("Non-admin run-sweep blocked", "FAIL", f"Exception: {str(e)}")
+    
+    # ========== TEST 3: AI disabled behavior ==========
+    print("\n" + "=" * 80)
+    print("TEST 3: AI disabled behavior")
+    print("=" * 80)
+    
+    # 3.1 - Disable AI
+    print("\nℹ️  TEST 3.1: Disabling AI Gear Validation...")
+    if not update_platform_settings(admin_token, False):
+        print("\n⚠️  WARNING: Failed to disable AI. Skipping TEST 3.")
+    else:
+        # 3.2 - Create a new pending submission (should land as pending with AI disabled)
+        print("\nℹ️  TEST 3.2: Creating submission with AI disabled...")
+        disabled_sub = submit_custom_gear(user_token, "Test Item With AI Disabled 999", "Other", None)
+        if disabled_sub:
+            disabled_id = disabled_sub.get("id")
+            disabled_status = disabled_sub.get("status")
+            test_submission_ids.append(disabled_id)
+            if disabled_status == "pending":
+                print(f"   ✅ Submission landed as 'pending' (expected with AI disabled)")
+            else:
+                print(f"   ℹ️  Submission status: {disabled_status}")
+            
+            # 3.3 - Try calling validate-ai (should fail with 400)
+            print(f"\nℹ️  TEST 3.3: Calling validate-ai with AI disabled...")
+            result = validate_submission_with_ai(admin_token, disabled_id, expect_status=400)
+            if result and result.get("status_code") == 400:
+                detail = result.get("detail", "")
+                if "disabled" in detail.lower():
+                    print(f"   ✅ Correctly rejected with 400: {detail}")
+                else:
+                    print(f"   ⚠️  Got 400 but unexpected message: {detail}")
+        
+        # 3.4 - Try calling run-sweep (should return skipped=true)
+        print("\nℹ️  TEST 3.4: Calling run-sweep with AI disabled...")
+        sweep_result = run_sweep(admin_token, expect_status=200)
+        if sweep_result:
+            skipped = sweep_result.get("skipped", False)
+            reason = sweep_result.get("reason", "")
+            if skipped and "ai_disabled" in reason:
+                print(f"   ✅ Sweep correctly skipped: {reason}")
+            else:
+                print(f"   ⚠️  Unexpected result: skipped={skipped}, reason={reason}")
+        
+        # 3.5 - Re-enable AI and cleanup
+        print("\nℹ️  TEST 3.5: Re-enabling AI Gear Validation...")
+        if update_platform_settings(admin_token, True):
+            print("   ✅ AI Gear Validation re-enabled")
+            
+            # Run sweep to clean up any leftover pending submissions
+            print("\nℹ️  Running final cleanup sweep...")
+            sweep_result = run_sweep(admin_token, expect_status=200)
+            if sweep_result:
+                print(f"   ℹ️  Cleanup sweep: {sweep_result}")
+            
+            # Verify no pending submissions remain
+            final_pending = get_pending_submissions(admin_token)
+            if len(final_pending) == 0:
+                print("   ✅ All pending submissions cleaned up")
+            else:
+                print(f"   ⚠️  {len(final_pending)} pending submissions still remain")
+    
+    # ========== TEST 4: Scheduler registration ==========
+    print("\n" + "=" * 80)
+    print("TEST 4: Scheduler registration (informational)")
+    print("=" * 80)
+    
+    print("\nℹ️  Checking backend logs for scheduler confirmation...")
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["tail", "-n", "100", "/var/log/supervisor/backend.err.log"],
+            capture_output=True,
+            text=True
+        )
+        logs = result.stdout
+        
+        scheduler_started = "Scheduler started — gear AI validation sweep set for 03:00 and 17:00 IST daily" in logs
+        job_added_count = logs.count('Added job "run_gear_validation_sweep" to job store')
+        
+        if scheduler_started:
+            log_test("Scheduler started message found", "PASS", 
+                    "Found: 'Scheduler started — gear AI validation sweep set for 03:00 and 17:00 IST daily'")
+        else:
+            log_test("Scheduler started message found", "FAIL", 
+                    "Message not found in recent logs")
+        
+        if job_added_count >= 2:
+            log_test("Scheduler jobs registered", "PASS", 
+                    f"Found {job_added_count} 'Added job' messages (expected 2 per startup: 3AM & 5PM)")
+        else:
+            log_test("Scheduler jobs registered", "FAIL", 
+                    f"Found only {job_added_count} 'Added job' messages (expected 2)")
+        
+    except Exception as e:
+        log_test("Scheduler log check", "FAIL", f"Exception: {str(e)}")
+    
+    # ========== SUMMARY ==========
+    print("\n" + "=" * 80)
+    print("TEST SUMMARY")
+    print("=" * 80)
+    print("\n✅ All tests completed. Review results above for any failures.")
+    print(f"\nℹ️  Test submission IDs created: {len(test_submission_ids)}")
+    print(f"   {test_submission_ids}")
+    print("\nℹ️  All test submissions should have been resolved by the sweep.")
+    print("   Gear catalogue and submissions collection should be in a clean state.")
 
 
 if __name__ == "__main__":

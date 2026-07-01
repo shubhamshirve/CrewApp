@@ -7,6 +7,8 @@ from starlette.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 import os
 import logging
 import uuid
@@ -42,6 +44,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         return response
+
+
+# ── Scheduler (gear AI validation cron — 3 AM & 5 PM daily, IST) ──────────────
+
+scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
 
 
 # ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
@@ -92,9 +99,17 @@ async def lifespan(app: FastAPI):
     if cors_origins == "*":
         logger.warning("CORS_ORIGINS is set to wildcard (*) — restrict this in production")
 
+    # ── Scheduled jobs ──
+    from routers.platform_settings import run_gear_validation_sweep
+    scheduler.add_job(run_gear_validation_sweep, CronTrigger(hour=3, minute=0), id="gear_ai_sweep_3am", replace_existing=True)
+    scheduler.add_job(run_gear_validation_sweep, CronTrigger(hour=17, minute=0), id="gear_ai_sweep_5pm", replace_existing=True)
+    scheduler.start()
+    logger.info("Scheduler started — gear AI validation sweep set for 03:00 and 17:00 IST daily")
+
     logger.info("Photoo API started successfully")
     yield
     # ── Shutdown ──
+    scheduler.shutdown(wait=False)
     client.close()
 
 

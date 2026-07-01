@@ -40,7 +40,13 @@ aiohttp==3.14.1
 
 # ── Rate limiting ─────────────────────────────────────────────────────────
 slowapi==0.1.9
+limits==5.8.0
+
+# ── Scheduled jobs (gear AI validation cron) ──────────────────────────────
+APScheduler==3.10.4
+
+# ── AI (Gemini via Emergent universal key) ────────────────────────────────
+emergentintegrations==0.2.0
 
 # ── Tests ─────────────────────────────────────────────────────────────────
 pytest==9.0.2
-limits==5.8.0

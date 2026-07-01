@@ -673,6 +673,135 @@ async def reject_gear_submission(submission_id: str, admin: dict = Depends(get_a
     return {"status": "rejected"}
 
 
+# ── AI-driven resolution (manual "Validate by AI" button + scheduled cron sweep) ──
+
+async def _ai_resolve_submission(db, submission: dict, api_key: str, resolved_by: str) -> dict:
+    """
+    Re-run AI validation on a single pending gear submission and resolve it definitively.
+    Decision rule: is_valid == True and confidence >= 0.5  → approve (add to catalogue)
+                   otherwise                                → reject
+    Shared by the manual 'Validate by AI' admin action and the scheduled cron sweep.
+    """
+    import uuid as _uuid
+    from services.gear_ai_service import validate_gear_submission
+
+    name = submission["name"]
+    category = submission.get("category")
+    brand = submission.get("brand")
+
+    ai = await validate_gear_submission(name, category, brand, api_key=api_key)
+    confidence = ai.get("confidence", 0.0)
+    is_valid = ai.get("is_valid", False)
+    normalized_name = ai.get("normalized_name") or name
+    normalized_brand = ai.get("normalized_brand") or brand
+    normalized_category = ai.get("normalized_category") or category
+
+    decision = "approved" if (is_valid and confidence >= 0.5) else "rejected"
+    added_item = None
+
+    if decision == "approved":
+        items = await _get_gear_catalogue(db)
+        if not any(i["name"].lower() == normalized_name.lower() for i in items):
+            new_item = {
+                "id": str(_uuid.uuid4()),
+                "name": normalized_name,
+                "category": normalized_category,
+                "brand": normalized_brand,
+            }
+            items.append(new_item)
+            await db.platform_meta.update_one(
+                {"_id": "gear_catalogue"}, {"$set": {"items": items}}, upsert=True
+            )
+            added_item = new_item
+
+    await db.custom_gear_submissions.update_one(
+        {"id": submission["id"]},
+        {"$set": {
+            "status": decision,
+            "ai_confidence": confidence,
+            "ai_valid": is_valid,
+            "ai_reason": ai.get("reason", ""),
+            "ai_resolved_at": datetime.now(timezone.utc).isoformat(),
+            "ai_resolved_by": resolved_by,
+        }}
+    )
+
+    return {
+        "submission_id": submission["id"],
+        "name": submission["name"],
+        "decision": decision,
+        "ai_confidence": confidence,
+        "ai_valid": is_valid,
+        "ai_reason": ai.get("reason", ""),
+        "normalized_name": normalized_name,
+        "added_item": added_item,
+    }
+
+
+@router.post("/gear-submissions/{submission_id}/validate-ai")
+async def validate_gear_submission_with_ai(submission_id: str, admin: dict = Depends(get_admin_user)):
+    """Admin — manually trigger a fresh AI validation on a pending submission, resolving it to approved/rejected immediately."""
+    db = get_db()
+    submission = await db.custom_gear_submissions.find_one({"id": submission_id}, {"_id": 0})
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if submission.get("status") != "pending":
+        raise HTTPException(status_code=400, detail=f"Submission is already '{submission.get('status')}' — nothing to validate")
+
+    cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
+    if not cfg.get("ai_gear_validation_enabled", cfg.get("ai_features_enabled", True)):
+        raise HTTPException(status_code=400, detail="AI Gear Auto-Validation is disabled in Platform Settings — enable it first")
+
+    api_key = await _get_gemini_key(db)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="No Gemini API key configured — add one in Admin Settings → API Keys")
+
+    return await _ai_resolve_submission(db, submission, api_key, resolved_by=f"manual_admin:{admin['id']}")
+
+
+async def run_gear_validation_sweep():
+    """
+    Scheduled job (runs 3 AM & 5 PM daily, IST) — resolves every pending custom gear
+    submission using a fresh AI validation call, auto-approving or auto-rejecting each one.
+    Skips entirely if AI Gear Auto-Validation is disabled or no Gemini key is configured.
+    """
+    db = get_db()
+    cfg = await db.platform_settings.find_one({"_id": "platform_settings"}) or {}
+    if not cfg.get("ai_gear_validation_enabled", cfg.get("ai_features_enabled", True)):
+        logger.info("[GearCron] Skipped — AI Gear Auto-Validation is disabled in platform settings")
+        return {"skipped": True, "reason": "ai_disabled"}
+
+    api_key = await _get_gemini_key(db)
+    if not api_key:
+        logger.info("[GearCron] Skipped — no Gemini API key configured")
+        return {"skipped": True, "reason": "no_api_key"}
+
+    pending = await db.custom_gear_submissions.find({"status": "pending"}, {"_id": 0}).to_list(length=500)
+    approved_count = 0
+    rejected_count = 0
+    for sub in pending:
+        try:
+            result = await _ai_resolve_submission(db, sub, api_key, resolved_by="cron")
+            if result["decision"] == "approved":
+                approved_count += 1
+            else:
+                rejected_count += 1
+        except Exception as e:
+            logger.warning("[GearCron] Failed to resolve submission %s: %s", sub.get("id"), e)
+
+    logger.info(
+        "[GearCron] Sweep complete — %d pending processed (%d approved, %d rejected)",
+        len(pending), approved_count, rejected_count,
+    )
+    return {"skipped": False, "total": len(pending), "approved": approved_count, "rejected": rejected_count}
+
+
+@router.post("/gear-submissions/run-sweep")
+async def trigger_gear_validation_sweep(admin: dict = Depends(get_admin_user)):
+    """Admin — manually trigger the scheduled AI validation sweep right now (same logic as the 3AM/5PM cron job)."""
+    return await run_gear_validation_sweep()
+
+
 # ── API Keys / Integrations ───────────────────────────────────────────────────
 
 # Keys we manage (each has a group and a list of field keys)
