@@ -61,6 +61,10 @@ export default function AdminSettings() {
   const [submissionEdits, setSubmissionEdits] = useState({});
   const [processingId, setProcessingId] = useState(null);
 
+  // Test AI state
+  const [testAiLoading, setTestAiLoading] = useState(false);
+  const [testAiResult, setTestAiResult] = useState(null);
+
   useEffect(() => {
     loadPricing();
     loadEventTypes();
@@ -258,6 +262,21 @@ export default function AdminSettings() {
       toast.error("Failed to reject");
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  // ── Test AI ────────────────────────────────────────────────────────────────
+
+  const testGeminiAi = async () => {
+    setTestAiLoading(true);
+    setTestAiResult(null);
+    try {
+      const res = await api.get("/platform/gear-catalogue/normalize?name=sony+a7+iv");
+      setTestAiResult({ success: true, data: res.data });
+    } catch (err) {
+      setTestAiResult({ success: false, error: err?.response?.data?.detail || "AI request failed — check your Gemini API key" });
+    } finally {
+      setTestAiLoading(false);
     }
   };
 
@@ -845,6 +864,50 @@ export default function AdminSettings() {
                           </div>
                           <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
                             In Razorpay Dashboard → Webhooks → Add webhook URL above. Set <span className="font-medium text-slate-500">Webhook Secret</span> to any strong string, then save the same string in the field above. Events to enable: <span className="font-mono text-slate-500">payment.captured</span>, <span className="font-mono text-slate-500">order.paid</span>.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Test AI — shown only for AI group */}
+                      {groupKey === "ai" && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Zap size={12} className="text-violet-500" />
+                            <label className="text-xs font-medium text-slate-700 font-display">Test AI Connection</label>
+                          </div>
+                          <Button
+                            size="sm"
+                            data-testid="test-ai-btn"
+                            onClick={testGeminiAi}
+                            disabled={testAiLoading}
+                            className="text-xs gap-1.5 text-white"
+                            style={{ background: "#7C3AED" }}
+                          >
+                            {testAiLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                            {testAiLoading ? "Testing…" : "Run Test (Sony A7 IV)"}
+                          </Button>
+                          {testAiResult && (
+                            <div className={`mt-2.5 p-3 rounded-lg border text-xs ${testAiResult.success ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}
+                              data-testid="test-ai-result">
+                              {testAiResult.success ? (
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5 text-emerald-700 font-semibold mb-1.5">
+                                    <CheckCircle2 size={13} /> Gemini AI is working!
+                                  </div>
+                                  <p className="text-slate-600">Normalized: <span className="font-semibold text-slate-800">{testAiResult.data.normalized_name}</span></p>
+                                  {testAiResult.data.brand && <p className="text-slate-600">Brand: <span className="font-semibold text-slate-800">{testAiResult.data.brand}</span></p>}
+                                  <p className="text-slate-600">Category: <span className="font-semibold text-slate-800">{testAiResult.data.category}</span></p>
+                                  <p className="text-slate-600">Confidence: <span className="font-semibold text-slate-800">{Math.round((testAiResult.data.confidence || 0) * 100)}%</span></p>
+                                </div>
+                              ) : (
+                                <div className="flex items-start gap-1.5 text-red-700">
+                                  <AlertCircle size={13} className="mt-0.5 flex-shrink-0" /> {testAiResult.error}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                            Sends a test normalization for "sony a7 iv" to verify your Gemini API key is valid and the AI pipeline is healthy.
                           </p>
                         </div>
                       )}
