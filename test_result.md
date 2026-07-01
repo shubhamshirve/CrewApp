@@ -459,7 +459,7 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Fixed Razorpay 500 crash. Root cause: rp.order.create() was called with None credentials when user has 0 wallet balance and coupon doesn't fully cover. Added _require_razorpay() check + try/except on all 3 Razorpay call sites (create-order, verify, upgrade). Now returns HTTP 503 with clear message. Test: login as vikram@example.com / Test@1234 (0 wallet), apply coupon TEST20 (20% off), try to subscribe to Basic plan (₹69→₹55.20). Should get toast 'Payment gateway not configured...' instead of crashing."
+    message: "Completed: 1) Razorpay 500 fixed (HTTP 503 now). 2) AI Usage Report: GET /admin/reports/ai-usage endpoint added + AI tab in AdminReports.jsx with stats, cost (USD+INR), daily chart, endpoint breakdown. 3) ai_features_enabled toggle wired to gear AI (normalize returns raw when off, submission skips AI when off). 4) gear_ai_service.py returns prompt_chars/response_chars for logging. All backend APIs verified working. NOTE: Gemini free tier = 20 req/day limit. Advise user to upgrade API key to remove limit. Playwright frontend automation blocked by post-login navigation - known issue, user should test manually."
   - agent: "testing"
     message: "✅ ALL OPTIMIZATION TESTS PASSED (8/8): 1) TTL cache working with proper invalidation 2) Dynamic event types/roles from DB 3) N+1 fix verified (health < 1s) 4) MongoDB indexes working 5) Admin CRUD operations successful. Created admin user via /api/admin/seed-admin. All performance optimizations are working correctly."
   - agent: "testing"
