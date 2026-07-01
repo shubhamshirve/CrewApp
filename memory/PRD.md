@@ -261,8 +261,17 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - Backend: PORT 8001, MongoDB via MONGO_URL
 - Frontend: PORT 3000, uses REACT_APP_BACKEND_URL
 - Admin: admin@photoo.in / Admin@123
-- Razorpay: Test keys configured
-- Gemini: Emergent LLM Key (sk-emergent-4710cB2646aF63eC14)
+- Razorpay: Test keys stored in DB (platform_secrets collection, _id: api_keys); fetched dynamically (NOT from .env)
+- Gemini: User's key stored as GOOGLE_GEMINI_API_KEY in backend/.env; fallback to EMERGENT_LLM_KEY=sk-emergent-dB6B072A425A7233b1 (both in backend/.env). NOTE: User's Gemini key AIzaSyB4sv4m14QvG3R-ust4mhW21FYZxU168_w was reported as leaked by Google — user needs to regenerate at https://aistudio.google.com/apikey
 - WhatsApp: MOCKED — logs stored in `whatsapp_logs` collection
 - Email: MOCKED — logs stored in `email_logs` collection (add RESEND_API_KEY to .env to activate)
 - Google Calendar: MOCKED — connect/disconnect stored in DB (add Google OAuth to activate)
+
+## Recent Changes (Jul 2026)
+- ✅ Fixed Profile.jsx critical syntax error (missing `export default function Profile()` declaration) — frontend was failing to compile
+- ✅ ProfileChecklist component integrated into Profile.jsx — shows on own profile when incomplete, expandable, dismissible
+- ✅ Razorpay scroll lock fix — added `modal.ondismiss` handler to both handleSubscribe and handleUpgrade in Wallet.jsx; scroll is restored on modal dismiss/error/close
+- ✅ Razorpay credentials now fetched from DB (platform_secrets collection) not from .env
+- ✅ AI crew suggestions: primary Gemini key with fallback to EMERGENT_LLM_KEY if primary fails (e.g. leaked key)
+- ✅ Fixed profile checklist photo check: now checks `profile_image` OR `avatar_url` field (previously only checked avatar_url which is never set)
+- ✅ Added EMERGENT_LLM_KEY to backend/.env as fallback for AI features

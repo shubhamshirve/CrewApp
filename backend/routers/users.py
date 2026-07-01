@@ -221,7 +221,7 @@ def _build_checklist(user: dict) -> dict:
             "id": "photo",
             "label": "Add a profile photo",
             "hint": "Upload your best headshot so clients recognise you",
-            "done": bool(user.get("avatar_url")),
+            "done": bool(user.get("profile_image") or user.get("avatar_url")),
         },
         {
             "id": "bio",
