@@ -291,3 +291,24 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 - ✅ Added `_call_gemini()` helper with automatic retry on primary key failure (same pattern as crew-suggestions)
 - ✅ Added View button + LogDetailModal to all log tabs in AdminLogs — click "View" on any row to see all fields in a clean modal with Copy JSON button; sensitive fields (key_secret, webhook_secret, password, token) are masked
 - ✅ Cleared leaked GOOGLE_GEMINI_API_KEY from backend/.env; DB key from Admin Settings is now authoritative
+
+## Future / Backlog Tasks
+
+### P1 — AI Crew Match
+- When a lead photographer creates or edits a gig, show an AI-ranked list of suggestions from their connected crew members.
+- Ranking inputs: crew member's gear vault (match against gig requirements), primary/secondary role, avg rating (punctuality, gear handling, teamwork), years of experience.
+- Powered by Gemini — score each candidate and return top 5 ranked results with a short rationale ("Best match: Sony A7 IV + 8yr exp").
+- Show as a side panel or bottom drawer in the gig creation flow.
+- Potential premium driver: non-premium users see only top 1; premium sees full list.
+
+### P2 — Real Google Calendar OAuth Sync
+- Needs Google Cloud Project + Calendar API OAuth 2.0 credentials from user.
+- Currently MOCKED in `routers/calendar_sync.py` and `services/calendar_service.py`.
+
+### P2 — WhatsApp Business API
+- Needs Meta Business credentials (WABA ID, phone number ID, access token).
+- Currently MOCKED in `services/whatsapp_mock.py`.
+
+### P2 — Resend Email Integration
+- Needs RESEND_API_KEY from user.
+- Currently MOCKED in `services/email_service.py`.
