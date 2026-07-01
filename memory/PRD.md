@@ -70,7 +70,12 @@ A SaaS platform for sourcing, booking, and managing freelance crew members (seco
 
 ## What's Been Implemented
 
-## What's Been Implemented
+### Session 6 — Feb 2026 (Current)
+- **Profile.jsx Refactor**: Split 1449-line monolith into 10 sub-components in `/app/frontend/src/components/profile/` — ProfileHeader, GearVault, RatingsSection, StyleAndWorkflow, UsernameSetup, PrivateNotes, EditProfileDialog, ChangePasswordDialog, GearDialog, DocUploadDialog, profileConstants.js. Profile.jsx is now 329 lines.
+- **Test AI Button**: Added to AdminSettings.jsx API Keys → AI/Gemini group. Calls `GET /platform/gear-catalogue/normalize?name=sony+a7+iv`, shows inline success/error block with normalized_name, brand, category, confidence.
+- **Fixed test_credentials.md**: Corrected admin email to admin@photoo.in.
+
+### Session 5 — Jan 2026
 
 ### Backend (FastAPI)
 - ✅ `server.py` — Main app with all routers
