@@ -13,6 +13,37 @@ from services.log_service import log_admin_action
 router = APIRouter(prefix="/admin")
 
 
+# ── Shared helpers ─────────────────────────────────────────────────────────────
+
+async def _enrich_user_display(db, items: list) -> list:
+    """
+    For each item that has a `user_id`, resolve it to `user_display`
+    = '@username' if set, else 'email', else first-8-chars-of-id.
+    Does a single batch DB query for all unique IDs.
+    """
+    ids = list({i["user_id"] for i in items if i.get("user_id")})
+    if not ids:
+        return items
+    users = await db.users.find(
+        {"_id": {"$in": ids}},
+        {"_id": 1, "username": 1, "email": 1, "full_name": 1}
+    ).to_list(len(ids))
+    lookup = {}
+    for u in users:
+        uid = u["_id"]
+        if u.get("username"):
+            lookup[uid] = f"@{u['username']}"
+        elif u.get("email"):
+            lookup[uid] = u["email"]
+        else:
+            lookup[uid] = uid[:8]
+    for item in items:
+        uid = item.get("user_id")
+        if uid:
+            item["user_display"] = lookup.get(uid, uid[:8])
+    return items
+
+
 class VerifyRequest(BaseModel):
     action: str  # approved / rejected
     reason: Optional[str] = None
@@ -591,6 +622,7 @@ async def get_admin_action_logs(
     total = await db.admin_logs.count_documents(query)
     for item in items:
         item["id"] = str(item.pop("_id"))
+    items = await _enrich_user_display(db, items)
     return {"items": items, "total": total}
 
 
@@ -610,6 +642,7 @@ async def get_api_error_logs(
     total = await db.api_error_logs.count_documents(query)
     for item in items:
         item["id"] = str(item.pop("_id"))
+    items = await _enrich_user_display(db, items)
     return {"items": items, "total": total}
 
 
@@ -627,8 +660,19 @@ async def get_payment_logs(
         query["event"] = event
     items = await db.payment_logs.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     total = await db.payment_logs.count_documents(query)
+    # Enrich plan display: prefer plan_name, fallback to plan (plan_key), then plan_id
+    plan_ids = list({i["plan_id"] for i in items if i.get("plan_id") and not i.get("plan_name")})
+    plan_lookup = {}
+    if plan_ids:
+        plan_docs = await db.plans.find({"_id": {"$in": plan_ids}}, {"_id": 1, "name": 1}).to_list(len(plan_ids))
+        plan_lookup = {p["_id"]: p["name"] for p in plan_docs}
     for item in items:
         item["id"] = str(item.pop("_id"))
+        if not item.get("plan_name"):
+            item["plan_display"] = plan_lookup.get(item.get("plan_id", ""), item.get("plan") or "—")
+        else:
+            item["plan_display"] = item["plan_name"]
+    items = await _enrich_user_display(db, items)
     return {"items": items, "total": total}
 
 
@@ -648,6 +692,7 @@ async def get_ai_usage_logs(
     total = await db.ai_usage_logs.count_documents(query)
     for item in items:
         item["id"] = str(item.pop("_id"))
+    items = await _enrich_user_display(db, items)
     return {"items": items, "total": total}
 
 
@@ -667,6 +712,7 @@ async def get_whatsapp_logs(
     total = await db.whatsapp_logs.count_documents(query)
     for item in items:
         item["id"] = str(item.pop("_id"))
+    items = await _enrich_user_display(db, items)
     return {"items": items, "total": total}
 
 
@@ -686,6 +732,7 @@ async def get_login_logs(
     total = await db.login_logs.count_documents(query)
     for item in items:
         item["id"] = str(item.pop("_id"))
+    items = await _enrich_user_display(db, items)
     return {"items": items, "total": total}
 
 

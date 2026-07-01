@@ -198,4 +198,14 @@ async def health():
     return {"status": "ok", "service": "Photoo API"}
 
 
+@api_router.get("/public/stats")
+async def public_stats():
+    """
+    Public endpoint — no auth required.
+    Returns platform statistics for use on the marketing website.
+    """
+    total_users = await db.users.count_documents({})
+    return {"total_users": total_users}
+
+
 app.include_router(api_router)

@@ -181,7 +181,7 @@ function ApiErrorsTab({ api }) {
     { key: "created_at",   label: "Time",         render: r => <span className="font-mono text-slate-400 text-[10px]">{fmt(r.created_at)}</span> },
     { key: "status_code",  label: "Status",        render: r => <Pill label={r.status_code} color={r.status_code >= 500 ? "red" : "amber"} /> },
     { key: "method",       label: "Method + Path", render: r => <span className="font-mono"><span className="text-slate-400">{r.method} </span><span className="text-slate-700">{trunc(r.path, 38)}</span></span> },
-    { key: "user_id",      label: "User",          render: r => <span className="font-mono text-slate-400 text-[10px]">{trunc(r.user_id || "anon", 16)}</span> },
+    { key: "user_id",      label: "User",          render: r => <span className="font-mono text-slate-600 text-[10px]">{r.user_display || trunc(r.user_id || "anon", 16)}</span> },
     { key: "error_detail", label: "Error",         rawTitle: "error_detail", render: r => <span className="font-mono text-red-500">{trunc(r.error_detail, 50)}</span> },
   ];
   return (
@@ -205,10 +205,10 @@ function PaymentsTab({ api }) {
     useLogFetch(api, "/admin/logs/payments");
   const columns = [
     { key: "created_at",         label: "Time",     render: r => <span className="font-mono text-slate-400 text-[10px]">{fmt(r.created_at)}</span> },
-    { key: "user_id",            label: "User",     render: r => <span className="font-mono text-slate-400 text-[10px]">{trunc(r.user_id, 16)}</span> },
+    { key: "user_id",            label: "User",     render: r => <span className="font-mono text-slate-600 text-[10px]">{r.user_display || trunc(r.user_id, 16)}</span> },
     { key: "event",              label: "Event",    render: r => <Pill label={r.event} color={r.event === "payment_failed" ? "red" : r.event === "payment_verified" ? "green" : "blue"} /> },
-    { key: "amount_paise",       label: "Amount",   render: r => <span className="font-mono text-slate-900">{r.amount_paise != null ? `₹${(r.amount_paise/100).toFixed(2)}` : "—"}</span> },
-    { key: "plan",               label: "Plan",     render: r => r.plan ? <Pill label={r.plan} color="zinc" /> : <span className="text-slate-400">—</span> },
+    { key: "amount_paise",       label: "Amount",   render: r => <span className="font-mono text-slate-900">{r.amount_paise != null ? `₹${(r.amount_paise/100).toFixed(0)}` : "—"}</span> },
+    { key: "plan_display",       label: "Plan",     render: r => r.plan_display ? <Pill label={r.plan_display} color="zinc" /> : <span className="text-slate-400">—</span> },
     { key: "status",             label: "Status",   render: r => <Pill label={r.status || "—"} color={r.status === "success" ? "green" : r.status === "failed" ? "red" : "zinc"} /> },
     { key: "razorpay_order_id",  label: "Order ID", render: r => <span className="font-mono text-slate-400 text-[10px]">{trunc(r.razorpay_order_id, 20)}</span> },
   ];
@@ -235,7 +235,7 @@ function AiUsageTab({ api }) {
     useLogFetch(api, "/admin/logs/ai-usage");
   const columns = [
     { key: "created_at",        label: "Time",       render: r => <span className="font-mono text-slate-400 text-[10px]">{fmt(r.created_at)}</span> },
-    { key: "user_id",           label: "User",       render: r => <span className="font-mono text-slate-400 text-[10px]">{trunc(r.user_id, 16)}</span> },
+    { key: "user_id",           label: "User",       render: r => <span className="font-mono text-slate-600 text-[10px]">{r.user_display || trunc(r.user_id, 16)}</span> },
     { key: "endpoint",          label: "Endpoint",   render: r => <Pill label={r.endpoint} color="blue" /> },
     { key: "session_id",        label: "Session",    render: r => <span className="font-mono text-slate-400 text-[10px]">{trunc(r.session_id, 24)}</span> },
     { key: "prompt_chars",      label: "Chars p/r",  render: r => <span className="font-mono text-slate-700">{r.prompt_chars} / {r.response_chars}</span> },
@@ -263,7 +263,7 @@ function WhatsAppTab({ api }) {
     useLogFetch(api, "/admin/logs/whatsapp");
   const columns = [
     { key: "created_at", label: "Time",     render: r => <span className="font-mono text-slate-400 text-[10px]">{fmt(r.created_at || r.sent_at)}</span> },
-    { key: "user_id",    label: "User",     render: r => <span className="font-mono text-slate-400 text-[10px]">{trunc(r.user_id || "—", 16)}</span> },
+    { key: "user_id",    label: "User",     render: r => <span className="font-mono text-slate-600 text-[10px]">{r.user_display || trunc(r.user_id || "—", 16)}</span> },
     { key: "phone",      label: "Phone",    render: r => <span className="font-mono text-slate-700">{r.phone}</span> },
     { key: "type",       label: "Template", render: r => <Pill label={r.type || r.template || "—"} color="blue" /> },
     { key: "status",     label: "Status",   render: r => <Pill label={r.status || (r.simulated ? "simulated" : "—")} color={r.status === "failed" ? "red" : "green"} /> },
@@ -292,7 +292,7 @@ function LoginAuditTab({ api }) {
   const [search, setSearch] = useState(filters.user_id || "");
   const columns = [
     { key: "created_at",  label: "Time",       render: r => <span className="font-mono text-slate-400 text-[10px]">{fmt(r.created_at)}</span> },
-    { key: "user_id",     label: "User ID",    render: r => <span className="font-mono text-slate-700 text-[10px]">{trunc(r.user_id, 20)}</span> },
+    { key: "user_id",     label: "User",    render: r => <span className="font-mono text-slate-600 text-[10px]">{r.user_display || trunc(r.user_id, 20)}</span> },
     { key: "ip",          label: "IP Address", render: r => <span className="font-mono text-slate-700">{r.ip || "—"}</span> },
     { key: "user_agent",  label: "Device",     rawTitle: "user_agent", render: r => <span className="font-mono text-slate-400 text-[10px]">{trunc(r.user_agent, 45)}</span> },
   ];
