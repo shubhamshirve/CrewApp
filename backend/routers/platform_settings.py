@@ -842,6 +842,15 @@ API_KEY_GROUPS = {
             "gemini_api_key": {"label": "Gemini API Key", "secret": True},
         }
     },
+    "vapid": {
+        "label": "Web Push (VAPID)",
+        "description": "VAPID keys for browser push notifications. Generate a keypair at web-push-codelab.glitch.me or via the web-push CLI.",
+        "fields": {
+            "public_key": {"label": "VAPID Public Key", "secret": False},
+            "private_key": {"label": "VAPID Private Key", "secret": True},
+            "subject": {"label": "VAPID Subject (mailto: or URL)", "secret": False},
+        }
+    },
 }
 
 
@@ -875,6 +884,23 @@ async def get_api_keys(admin: dict = Depends(get_admin_user)):
             env_key = os.environ.get("GOOGLE_GEMINI_API_KEY", "")
             if env_key:
                 group_stored = {"gemini_api_key": env_key}
+
+        # For the VAPID group, seed from env vars if not in DB
+        if group_key == "vapid":
+            merged = dict(group_stored)
+            if not merged.get("public_key"):
+                v = os.environ.get("VAPID_PUBLIC_KEY", "")
+                if v:
+                    merged["public_key"] = v
+            if not merged.get("private_key"):
+                v = os.environ.get("VAPID_PRIVATE_KEY", "")
+                if v:
+                    merged["private_key"] = v
+            if not merged.get("subject"):
+                v = os.environ.get("VAPID_SUBJECT", "")
+                if v:
+                    merged["subject"] = v
+            group_stored = merged
 
         for field_key, field_meta in group_meta["fields"].items():
             raw = group_stored.get(field_key, "")

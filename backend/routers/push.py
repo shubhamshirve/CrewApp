@@ -22,8 +22,13 @@ class PushSubscribeRequest(BaseModel):
 
 @router.get("/vapid-public-key")
 async def get_vapid_public_key():
-    """Return VAPID public key for frontend subscription."""
-    key = os.environ.get("VAPID_PUBLIC_KEY", "")
+    """Return VAPID public key for frontend subscription.
+    Reads from platform_secrets DB first, then falls back to VAPID_PUBLIC_KEY env var.
+    """
+    db = get_db()
+    doc = await db.platform_secrets.find_one({"_id": "api_keys"}, {"_id": 0})
+    stored = doc or {}
+    key = stored.get("vapid", {}).get("public_key", "") or os.environ.get("VAPID_PUBLIC_KEY", "")
     return {"vapid_public_key": key}
 
 

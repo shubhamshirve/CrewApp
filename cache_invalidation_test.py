@@ -6,7 +6,7 @@ import asyncio
 import aiohttp
 import json
 
-BASE_URL = "https://freelance-ledger-5.preview.emergentagent.com/api"
+BASE_URL = "https://admin-vapid-config.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@photoo.in"
 ADMIN_PASSWORD = "Admin@123"
 

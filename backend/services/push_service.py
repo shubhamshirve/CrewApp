@@ -1,6 +1,7 @@
 """
 Web Push Notification Service (VAPID).
 Sends push notifications to subscribed browsers.
+Reads VAPID keys from platform_secrets DB first, then falls back to environment variables.
 """
 import os
 import json
@@ -9,14 +10,27 @@ from pywebpush import webpush, WebPushException
 
 logger = logging.getLogger(__name__)
 
-VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
-VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
-VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:support@photoo.in")
+
+async def _get_vapid_keys(db) -> tuple[str, str, str]:
+    """
+    Resolve VAPID keys: DB (platform_secrets.api_keys.vapid.*) takes priority,
+    then falls back to VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT env vars.
+    Returns (public_key, private_key, subject).
+    """
+    doc = await db.platform_secrets.find_one({"_id": "api_keys"}, {"_id": 0})
+    stored = (doc or {}).get("vapid", {})
+
+    public_key = stored.get("public_key") or os.environ.get("VAPID_PUBLIC_KEY", "")
+    private_key = stored.get("private_key") or os.environ.get("VAPID_PRIVATE_KEY", "")
+    subject = stored.get("subject") or os.environ.get("VAPID_SUBJECT", "mailto:support@photoo.in")
+    return public_key, private_key, subject
 
 
 async def send_push_to_user(db, user_id: str, title: str, body: str, url: str = "/notifications"):
     """Send a web push notification to all subscriptions of a user."""
-    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+    public_key, private_key, subject = await _get_vapid_keys(db)
+
+    if not private_key or not public_key:
         logger.warning("VAPID keys not configured — skipping push notification")
         return
 
@@ -39,8 +53,8 @@ async def send_push_to_user(db, user_id: str, title: str, body: str, url: str = 
             webpush(
                 subscription_info=sub_info,
                 data=payload,
-                vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": VAPID_SUBJECT},
+                vapid_private_key=private_key,
+                vapid_claims={"sub": subject},
             )
         except WebPushException as e:
             err = str(e)

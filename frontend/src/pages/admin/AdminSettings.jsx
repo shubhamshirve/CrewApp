@@ -437,6 +437,7 @@ export default function AdminSettings() {
     whatsapp: { bg: "bg-green-50", border: "border-green-200", dot: "bg-green-500", text: "text-green-700" },
     google_calendar: { bg: "bg-orange-50", border: "border-orange-200", dot: "bg-orange-500", text: "text-orange-700" },
     ai: { bg: "bg-violet-50", border: "border-violet-200", dot: "bg-violet-500", text: "text-violet-700" },
+    vapid: { bg: "bg-sky-50", border: "border-sky-200", dot: "bg-sky-500", text: "text-sky-700" },
   };
 
   const filteredGear = gearCatFilter === "All" ? gear : gear.filter(g => g.category === gearCatFilter);
@@ -1039,6 +1040,40 @@ export default function AdminSettings() {
                           )}
                           <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
                             Sends a test normalization for "sony a7 iv" to verify your Gemini API key is valid and the AI pipeline is healthy.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* VAPID public key helper — shown only for VAPID group */}
+                      {groupKey === "vapid" && group.fields?.public_key?.is_configured && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Key size={12} className="text-sky-500" />
+                            <label className="text-xs font-medium text-slate-700 font-display">Public Key (read-only copy)</label>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-display">paste into frontend env or push client</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              readOnly
+                              data-testid="vapid-public-key-display"
+                              className="flex-1 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-3 py-2 text-xs font-mono outline-none select-all truncate"
+                              value={group.fields.public_key.value || ""}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid="copy-vapid-public-key-btn"
+                              className="text-xs border-slate-200 text-slate-600 gap-1"
+                              onClick={() => {
+                                navigator.clipboard.writeText(group.fields.public_key.value || "");
+                                toast.success("VAPID public key copied!");
+                              }}
+                            >
+                              <Copy size={12} /> Copy
+                            </Button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                            The public key is used by browsers when subscribing to push notifications. The private key stays on the server and is never exposed to clients. Generate a new keypair at <span className="font-mono">web-push-codelab.glitch.me</span> or run <span className="font-mono">npx web-push generate-vapid-keys</span>.
                           </p>
                         </div>
                       )}

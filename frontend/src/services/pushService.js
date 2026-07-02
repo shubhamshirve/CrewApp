@@ -1,7 +1,10 @@
 /**
  * Photoo Push Notification Service
  * Manages browser push subscription and communicates with backend.
+ * VAPID public key is fetched at runtime from the backend (Admin → Settings → API Keys → Web Push).
  */
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -37,10 +40,24 @@ export const pushService = {
     }
   },
 
+  /**
+   * Fetch the VAPID public key from the backend.
+   * The backend reads it from the platform_secrets DB (Admin → Settings → API Keys → Web Push),
+   * falling back to the VAPID_PUBLIC_KEY environment variable.
+   */
+  async fetchVapidPublicKey() {
+    const res = await fetch(`${BACKEND_URL}/api/push/vapid-public-key`);
+    if (!res.ok) throw new Error("Failed to fetch VAPID public key from server");
+    const data = await res.json();
+    if (!data.vapid_public_key) {
+      throw new Error("VAPID public key is not configured. Set it in Admin → Settings → API Keys → Web Push.");
+    }
+    return data.vapid_public_key;
+  },
+
   /** Subscribe browser to push service */
   async subscribe() {
-    const vapidKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
-    if (!vapidKey) throw new Error("VAPID public key not configured");
+    const vapidKey = await this.fetchVapidPublicKey();
 
     const reg = await navigator.serviceWorker.ready;
     const subscription = await reg.pushManager.subscribe({
